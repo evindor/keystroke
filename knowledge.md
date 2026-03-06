@@ -1,261 +1,342 @@
-# Rust + GTK4 + Wayland (Layer Shell) — Lessons Learned
+# Keystroke Launcher — Knowledge Base
 
-From building `window-list-overlay` (2026-03-06). Reference project at `~/Work/tries/2026-03-06-scroller/`.
+Lessons learned building a Raycast-like launcher for Hyprland/Omarchy in Rust + GTK4.
 
----
-
-## Crate versions (compatible set)
-
-These must be used together — mixing versions causes trait/type mismatches:
-
-```toml
-gtk4 = "0.10"
-gtk4-layer-shell = { version = "0.7", features = ["v1_3"] }
-glib = "0.21"
-gio = "0.21"
-gdk4 = "0.10"
-```
-
-`gtk4-layer-shell 0.7` wraps `wlr-layer-shell` for Wayland compositors (Hyprland, Sway, etc.).
-
----
-
-## Layer shell basics
+## GTK4 Layer Shell (Wayland overlays)
 
 ```rust
 use gtk4_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
 
 window.init_layer_shell();
-window.set_layer(Layer::Overlay);          // Above everything
-window.set_namespace(Some("my-app"));      // Wayland namespace (Option<&str>!)
-window.set_keyboard_mode(KeyboardMode::None); // Don't steal focus
-window.set_exclusive_zone(-1);             // Float over content, don't push
+window.set_layer(Layer::Overlay);
+window.set_namespace(Some("my-app"));          // Option<&str>!
+window.set_keyboard_mode(KeyboardMode::Exclusive); // captures all input
+window.set_exclusive_zone(-1);                 // float over content
 ```
 
-### Anchoring controls sizing and position
+**Use trait methods** (`LayerShell` on `ApplicationWindow`), NOT free functions (`gtk4_layer_shell::init_for_window` etc.) — the free functions don't exist in 0.7.
 
-- Anchor **one edge** → window centers on the perpendicular axis, content-sized
-- Anchor **two opposite edges** (Top+Bottom) → window stretches to fill that axis
-- Anchor **Right only** + margin → right-centered panel that sizes to content
+### Centering an overlay
 
-```rust
-window.set_anchor(Edge::Right, true);
-window.set_margin(Edge::Right, 20);
-// Result: centered vertically on right edge, content height
+Anchor nothing (default) → window centers on screen, sizes to content.
+Set width via `container.set_width_request(680)` not CSS — GTK4 doesn't support CSS `min-width`/`max-width`.
+
+### Layer rules for blur (in Hyprland config)
+
+```conf
+layerrule = blur, my-namespace
+layerrule = ignorealpha 0.3, my-namespace
 ```
 
-### Monitor targeting
+### Layer surfaces in hyprctl
 
-```rust
-window.set_monitor(Some(&monitor));  // Note: Option<&Monitor>
+Layer shell windows don't appear in `hyprctl clients -j`. Query them with:
+```bash
+hyprctl layers -j | jq '.. | objects | select(.namespace? == "keystroke")'
 ```
-
-Find monitor by connector name:
-```rust
-let display = gtk4::prelude::WidgetExt::display(&window); // disambiguate from RootExt
-let monitors = display.monitors();
-for i in 0..monitors.n_items() {
-    let obj = monitors.item(i).unwrap();
-    let monitor: gdk4::Monitor = obj.downcast().unwrap();
-    if monitor.connector().as_deref() == Some("DP-1") { ... }
-}
-```
-
-**Gotcha:** `window.display()` is ambiguous — both `RootExt` and `WidgetExt` define it. Use `gtk4::prelude::WidgetExt::display(&window)`.
 
 ---
 
 ## GTK4 API quirks (0.10)
 
 ### CssProvider
-- Use `provider.load_from_data(&css_string)` — NOT `load_from_string` (doesn't exist in 0.10)
+- `provider.load_from_data(&css_string)` — NOT `load_from_string` (doesn't exist in 0.10)
 
-### Icon resolution
-- `gio::Icon::to_string()` returns `Option<GString>`, not `String`
-- Convert: `icon.to_string().map(|s| s.into())`
+### CSS limitations
+GTK4 CSS is NOT web CSS. These don't work:
+- `min-width`, `max-width`, `min-height`, `max-height` → set programmatically on widgets
+- `box-shadow` with blur radius → only simple offsets work
+- `transition` → limited support, may cause warnings
 
-### Desktop app info
+Set sizing via widget methods: `widget.set_width_request()`, `widget.set_height_request()`,
+`scrolled_window.set_max_content_height()`.
+
+### EventControllerKey and Entry widgets
+
+**Critical:** GTK4's `Entry` widget consumes Return/Enter in the bubble phase (its built-in `activate` signal). To intercept Enter before the Entry sees it:
+
 ```rust
-gio::DesktopAppInfo::new("firefox.desktop")  // returns Option<DesktopAppInfo>
+let key_controller = gtk4::EventControllerKey::new();
+key_controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
+window.add_controller(key_controller);
 ```
-Try multiple patterns: exact class, lowercase, last dotted segment (e.g., `com.mitchellh.ghostty` → `ghostty`).
 
----
+This also ensures Escape, arrow keys, and Ctrl+J/K/N/P are captured before any child widget handles them.
 
-## Signal handling (Unix signals in GTK event loop)
+### Icon rendering
 
-No `signal-hook` crate needed — glib handles it natively:
-
+Two cases:
 ```rust
-glib::source::unix_signal_add_local(libc::SIGUSR1, move || {
-    // runs on GTK main thread, safe to touch widgets
-    glib::ControlFlow::Continue  // keep listening
+// Theme icon name (e.g. "firefox", "signal-desktop")
+let image = gtk4::Image::from_icon_name("firefox");
+image.set_pixel_size(24);
+
+// Absolute path (e.g. Omarchy webapp icons)
+let image = gtk4::Image::from_file("/path/to/icon.png");
+image.set_pixel_size(24);
+```
+
+Detect which: if the string starts with `/` or contains a file extension → absolute path. Otherwise → theme icon name.
+
+### GApplication ExitCode
+
+`connect_command_line` callback must return `glib::ExitCode`, not an integer:
+```rust
+app.connect_command_line(|app, _| {
+    app.activate();
+    0.into()  // NOT just `0`
 });
 ```
 
-PID file pattern for external signal delivery:
+### Iterating Box children
+
+GTK4 `Box` has no `.children()` method. Walk with:
 ```rust
-fs::write("/tmp/my-app.pid", std::process::id().to_string());
-// External: kill -USR1 $(cat /tmp/my-app.pid)
-```
-
----
-
-## Sharing state in signal/timer closures
-
-Single-threaded GTK app — use `Rc<RefCell<T>>`, no `Arc/Mutex` needed:
-
-```rust
-let overlay = Rc::new(RefCell::new(MyWidget::new()));
-
-// Clone Rc for each closure
-let overlay_clone = Rc::clone(&overlay);
-glib::timeout_add_local(Duration::from_millis(200), move || {
-    overlay_clone.borrow().do_something();
-    glib::ControlFlow::Continue
-});
-```
-
----
-
-## Detecting physical key state (evdev)
-
-**Problem:** Hyprland `bindr = , Super_L` doesn't fire after Super was used as a modifier (SUPER+u). The release event is swallowed.
-
-**Solution:** Poll `/dev/input/` devices directly using `EVIOCGKEY` ioctl.
-
-### Finding the right keyboard device
-
-Many `/dev/input/event*` devices respond to `EVIOCGKEY` but only actual keyboards track modifier keys. **Must filter by capability:**
-
-```rust
-// EVIOCGBIT(EV_KEY) — get device key capabilities
-let mut caps = [0u8; KEY_BYTES];
-ioctl(fd, eviocgbit_key(), caps.as_mut_ptr());
-// Check if KEY_LEFTMETA (125) bit is set in capabilities
-if caps[125 / 8] & (1 << (125 % 8)) != 0 { /* this device has Super */ }
-```
-
-**Critical:** USB keyboards often expose multiple interfaces (HID main + keyboard + consumer). The first event device that responds to EVIOCGKEY may NOT be the one tracking real key state. Always check **all** devices and use the one(s) that actually report `KEY_LEFTMETA` in their capabilities.
-
-### Polling pattern
-
-```rust
-// On show: start 50ms timer
-glib::timeout_add_local(Duration::from_millis(50), move || {
-    if !keys::is_super_pressed(&keyboards) {
-        overlay.hide();
-        return glib::ControlFlow::Break;
-    }
-    glib::ControlFlow::Continue
-});
-```
-
-### ioctl numbers
-
-```rust
-const KEY_LEFTMETA: usize = 125;
-const KEY_CNT: usize = 0x300;
-const KEY_BYTES: usize = (KEY_CNT + 7) / 8; // 96
-
-// _IOR('E', nr, size) = (2 << 30) | (size << 16) | ('E' << 8) | nr
-fn ior(nr: c_ulong, size: c_ulong) -> c_ulong {
-    (2 << 30) | (size << 16) | ((b'E' as c_ulong) << 8) | nr
+let mut child = container.first_child();
+while let Some(c) = child {
+    // process c
+    child = c.next_sibling();
 }
-fn eviocgkey()     -> c_ulong { ior(0x18, KEY_BYTES as _) }  // current key state
-fn eviocgbit_key() -> c_ulong { ior(0x21, KEY_BYTES as _) }  // key capabilities
 ```
-
-**Requires:** User in `input` group (`id -Gn | grep input`).
 
 ---
 
-## Hyprland integration
+## GApplication Daemon Pattern
 
-### Querying state via hyprctl
+The standard Omarchy pattern for overlay apps (used by Walker, Keystroke):
+
+1. **Daemon mode**: `app --gapplication-service` runs persistently
+2. **Toggle**: running `app` again (no flag) sends D-Bus activate to the daemon
+3. **No PID files, no signals** — GTK GApplication handles IPC via D-Bus
 
 ```rust
-fn hyprctl(args: &[&str]) -> Option<String> {
-    let output = Command::new("hyprctl").args(args).output().ok()?;
-    if output.status.success() { Some(String::from_utf8_lossy(&output.stdout).to_string()) }
-    else { None }
-}
-// hyprctl monitors -j, hyprctl clients -j, hyprctl activewindow -j
+let app = gtk4::Application::new(
+    Some("com.my.app"),
+    gio::ApplicationFlags::HANDLES_COMMAND_LINE,
+);
+
+// REQUIRED: without this, second invocations just exit
+app.connect_command_line(|app, _| {
+    app.activate();
+    0.into()
+});
+
+app.connect_activate(move |app| {
+    if !initialized { /* build UI */ }
+    else { /* toggle visibility */ }
+});
 ```
 
-Serde structs use `#[serde(rename_all = "camelCase")]` for hyprctl JSON.
+### Hyprland binding
+```conf
+bindd = ALT, SPACE, My launcher, exec, my-app
+```
 
-### Bindings for key hold/release
+### Autostart via systemd
+
+XDG autostart at `~/.config/autostart/my-app.desktop`:
+```ini
+[Desktop Entry]
+Name=My App
+Exec=my-app --gapplication-service
+Type=Application
+```
+
+Resilience drop-in at `~/.config/systemd/user/app-my-app@autostart.service.d/restart.conf`:
+```ini
+[Service]
+Restart=always
+RestartSec=2
+```
+
+---
+
+## Hyprland Keybinding Data
+
+### hyprctl binds -j
+
+Returns all active bindings as JSON. Key fields:
+
+```json
+{
+  "modmask": 64,
+  "key": "W",
+  "has_description": true,
+  "description": "Close window",
+  "dispatcher": "killactive",
+  "arg": "",
+  "mouse": false,
+  "release": false
+}
+```
+
+### Modmask bitmask
+
+| Bit | Modifier |
+|-----|----------|
+| 1   | SHIFT    |
+| 4   | CTRL     |
+| 8   | ALT      |
+| 64  | SUPER    |
+
+Combined: 65 = SUPER+SHIFT, 68 = SUPER+CTRL, 72 = SUPER+ALT, 73 = SUPER+ALT+SHIFT, 76 = SUPER+CTRL+ALT.
+
+### bindd format (in config files)
 
 ```conf
-# Press detection works fine:
-bind = , Super_L, exec, show.sh
-
-# Release detection is BROKEN when Super was used as modifier:
-bindr = , Super_L, exec, hide.sh        # ← doesn't fire after SUPER+u
-bindr = SUPER, Super_L, exec, hide.sh   # ← also doesn't fire
+bindd = MODIFIERS, KEY, Description, dispatcher, [args]
 ```
 
-**Use evdev polling instead for release detection.** Only the show binding goes in Hyprland config.
+Variants: `bindeld` (repeat + release + description), `bindld` (release + description), `bindmd` (mouse + description).
 
-### Debounce pattern (shell script)
+### Executing dispatchers
 
-Prevents flash on quick SUPER+1 combos. Only debounce show, not hide:
-
-```bash
-# Cancel previous pending
-[ -f /tmp/show.pid ] && kill "$(cat /tmp/show.pid)" 2>/dev/null && rm -f /tmp/show.pid
-# 200ms delay
-( sleep 0.2; kill -USR1 "$(cat /tmp/overlay.pid)"; rm -f /tmp/show.pid ) &
-echo $! > /tmp/show.pid
+```rust
+Command::new("hyprctl").args(["dispatch", "killactive"]).spawn();
+Command::new("hyprctl").args(["dispatch", "exec", "firefox"]).spawn();
 ```
 
 ---
 
-## Theme integration (Omarchy)
+## Omarchy Integration
 
-Read colors from `~/.config/omarchy/current/theme/waybar.css`:
+### Theme colors
 
+Read from `~/.config/omarchy/current/theme/waybar.css`:
 ```css
 @define-color foreground #d3c6aa;
 @define-color background #2d353b;
 ```
 
-Parse with simple string splitting (no regex crate needed). Generate dynamic CSS with `alpha()` for transparency. Re-parse on every show so theme changes take effect without restart.
+Parse with simple string splitting — no regex needed. Re-parse on every show so theme changes take effect without restart.
+
+### Launching apps: uwsm-app
+
+Omarchy runs graphical apps through `uwsm-app` for proper systemd scope tracking:
+
+```rust
+// Standard app:
+Command::new("uwsm-app").args(["--", "firefox"]).spawn();
+
+// TUI app (Terminal=true in .desktop):
+Command::new("uwsm-app").args(["--", "xdg-terminal-exec", "-e", "btop"]).spawn();
+```
+
+**Don't double-wrap**: if the Exec string already contains `uwsm-app` or `uwsm app` (e.g. omarchy launch scripts), run it directly via `sh -c`.
+
+### Desktop entry discovery
+
+Scan in order (user-local overrides system):
+1. `~/.local/share/applications/*.desktop`
+2. `/usr/share/applications/*.desktop`
+
+Omarchy hides unwanted system apps by placing `Hidden=true` stubs in `~/.local/share/applications/`.
+
+Omarchy webapps use absolute icon paths: `Icon=/home/user/.local/share/applications/icons/Claude.png`
+
+### Desktop entry field codes
+
+Strip these from Exec before launching: `%u %U %f %F %i %c %k %d %D %n %N %v %m`. `%%` becomes literal `%`.
 
 ---
 
-## Scrolling layout quirks
+## Fuzzy Matching: nucleo-matcher
 
-Hyprland scroller plugin `layoutopt:direction` is interpreted in **pre-transform coordinates**:
-- Portrait monitor (rotated 90°): use `direction:right` to get visual down-scrolling
-- Landscape monitor: use `direction:down` to get visual right-scrolling
+Same Smith-Waterman algorithm as fzf. Scoring: +16 per match, +8–10 boundary bonus, +4 consecutive, -3 gap start, -1 gap extension.
 
-This is counterintuitive — the directions appear swapped from what you'd expect.
+```rust
+use nucleo_matcher::{Config, Matcher, Utf32Str};
+use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
+
+let mut matcher = Matcher::new(Config::DEFAULT);
+let pattern = Pattern::parse("query", CaseMatching::Ignore, Normalization::Smart);
+
+let mut buf = Vec::new();
+let haystack = Utf32Str::new("haystack text", &mut buf);
+let score: Option<u32> = pattern.score(haystack, &mut matcher);
+```
+
+**buf must be cleared between calls** — `Utf32Str::new` writes into it.
+
+Space-separated patterns match independently: `"close win"` matches `"Close window"`.
 
 ---
 
-## Project structure reference
+## Frecency: Exponential Decay
+
+Inspired by `fre` (not zoxide's step function). Smooth continuous decay.
 
 ```
-Cargo.toml
-src/
-  main.rs        - Application, PID file, signal handlers, CSS, timers
-  overlay.rs     - Layer shell window, UI building
-  hyprland.rs    - hyprctl JSON queries
-  icons.rs       - Desktop app icon resolution
-  keys.rs        - evdev keyboard polling
-  theme.rs       - Parse waybar.css colors, generate CSS
-  style.css      - Static base CSS (include_str!)
+stored: { score: f64, ref_time: u64 }
+decayed_score = score / 2^((now - ref_time) / half_life)
+on_bump: new_score = decayed_score + 1.0, ref_time = now
 ```
 
-## Build + deploy
+Default half-life: 7 days (604800 seconds). Used once/week → steady score. Unused for a month → ~6% of peak.
 
-```bash
-cargo build --release
-ln -sf $(pwd)/target/release/my-app ~/.config/hypr/scripts/my-app
-# In autostart.conf:
-exec-once = ~/.config/hypr/scripts/my-app
+### Per-query frecency (key insight)
+
+Store frecency per `(query, command_id)` pair, not just per command. This enables mnemonic learning:
+- User types "vs", picks "Toggle split" → stored under query "vs"
+- After 10 uses, typing "vs" guarantees "Toggle split" at #1
+- Even though "vs" is a terrible fuzzy match for "Toggle split"
+
+### Combined ranking formula
+
+```
+final_score = fuzzy_score × (1.0 + frecency_weight × ln(combined_frecency + 1))
 ```
 
-`[profile.release]` with `strip = true` and `lto = true` for small binaries.
+Where `combined_frecency = query_frecency × 2 + global_frecency`. Default `frecency_weight = 0.2`.
+
+Empty query = pure frecency order (most-used commands first).
+
+---
+
+## Provider Architecture
+
+```rust
+pub trait Provider {
+    fn id(&self) -> &str;
+    fn commands(&self) -> Vec<Command>;           // static, called once on show
+    fn execute(&self, command: &Command);
+    fn query_commands(&self, _query: &str) -> Vec<Command> { vec![] }  // dynamic per-keystroke
+}
+```
+
+`query_commands()` is for dynamic providers (calculator). Results are prepended at max score.
+
+### Current providers
+
+| Provider | Static commands | Dynamic | Execute action |
+|----------|----------------|---------|----------------|
+| Hyprland | ~188 bindings | No | `hyprctl dispatch` |
+| Apps | ~80 desktop entries | No | `uwsm-app --` or `sh -c` |
+| Calculator | None | Yes (on math input) | `wl-copy` to clipboard |
+
+### Config (all optional, sane defaults)
+
+```toml
+[appearance]
+max_visible_results = 10
+width = 680
+border_radius = 16
+
+[scoring]
+frecency_weight = 0.2
+half_life_days = 7
+
+[aliases]
+vs = "hyprland:togglesplit"
+br = "hyprland:exec:omarchy-launch-browser"
+```
+
+---
+
+## Design Principles (established)
+
+1. **No external deps when a simple solution exists** — wrote our own expression parser (recursive descent) and .desktop file parser rather than pulling crates
+2. **Modular providers** — new functionality = new provider file implementing the trait
+3. **Re-parse everything on show** — theme, config, bindings, desktop entries refreshed each activation, no stale state
+4. **Per-query frecency** — the differentiator that enables mnemonic learning
+5. **Raycast-like UX** — centered overlay, input on top, results below, keyboard-only navigation
