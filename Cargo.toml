@@ -1,0 +1,24 @@
+[package]
+name = "keystroke"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "keystroke"
+path = "src/main.rs"
+
+[dependencies]
+gtk4 = "0.10"
+gtk4-layer-shell = { version = "0.7", features = ["v1_3"] }
+glib = "0.21"
+gio = "0.21"
+gdk4 = "0.10"
+nucleo-matcher = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+libc = "0.2"
+
+[profile.release]
+strip = true
+lto = true
