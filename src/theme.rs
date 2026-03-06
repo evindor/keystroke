@@ -272,6 +272,17 @@ window {{
     font-weight: 500;
 }}
 
+/* App icon */
+.result-icon {{
+    margin-right: 4px;
+    opacity: 0.9;
+}}
+
+.result-row.selected .result-icon,
+.result-row:selected .result-icon {{
+    opacity: 1.0;
+}}
+
 /* Hotkey text (secondary, faded, monospace) */
 .result-hotkey {{
     color: {fg_faded};

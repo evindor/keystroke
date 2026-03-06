@@ -19,6 +19,7 @@ use engine::{Engine, ScoredCommand};
 use providers::{Command, Provider};
 use store::Store;
 use theme::Theme;
+use ui::DisplayRow;
 
 // ---------------------------------------------------------------------------
 // Application state (single-threaded, shared via Rc<RefCell<...>>)
@@ -48,18 +49,21 @@ fn build_providers(config: &Config) -> Vec<Box<dyn Provider>> {
         let hp = providers::hyprland::HyprlandProvider::new(HashMap::new());
         active.push(Box::new(hp));
     }
+    // Apps provider (desktop entries).
+    active.push(Box::new(providers::apps::AppsProvider::new()));
     // Calculator is always available.
     active.push(Box::new(providers::calculator::CalculatorProvider::new()));
     active
 }
 
-/// Convert a slice of `ScoredCommand` into `(label, hotkey)` tuples for the UI.
-fn scored_to_display(scored: &[ScoredCommand]) -> Vec<(String, String)> {
+/// Convert a slice of `ScoredCommand` into display rows for the UI.
+fn scored_to_display(scored: &[ScoredCommand]) -> Vec<DisplayRow> {
     scored
         .iter()
-        .map(|sc| {
-            let hotkey = sc.command.hotkey.clone().unwrap_or_default();
-            (sc.command.label.clone(), hotkey)
+        .map(|sc| DisplayRow {
+            label: sc.command.label.clone(),
+            hotkey: sc.command.hotkey.clone().unwrap_or_default(),
+            icon: sc.command.icon.clone(),
         })
         .collect()
 }

@@ -6,6 +6,17 @@ use gtk4::prelude::*;
 use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
 
 // ---------------------------------------------------------------------------
+// Display types
+// ---------------------------------------------------------------------------
+
+/// A single row to display in the results list.
+pub struct DisplayRow {
+    pub label: String,
+    pub hotkey: String,
+    pub icon: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
 // Launcher
 // ---------------------------------------------------------------------------
 
@@ -153,9 +164,8 @@ impl Launcher {
         }
     }
 
-    /// Update the displayed results. Each entry is (label, hotkey_text_or_empty).
-    /// Clears previous results and rebuilds the list.
-    pub fn set_results(&self, results: &[(String, String)]) {
+    /// Update the displayed results. Clears previous results and rebuilds the list.
+    pub fn set_results(&self, results: &[DisplayRow]) {
         // Remove all existing children
         while let Some(child) = self.results_box.first_child() {
             self.results_box.remove(&child);
@@ -164,22 +174,40 @@ impl Launcher {
         // Reset selection to 0
         self.selected_index.set(0);
 
-        for (i, (label, hotkey)) in results.iter().enumerate() {
+        for (i, row_data) in results.iter().enumerate() {
             let row = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
             row.add_css_class("result-row");
+            row.set_spacing(12);
 
-            // Label (left side)
-            let label_widget = gtk4::Label::new(Some(label));
+            // Icon (left)
+            if let Some(ref icon_name) = row_data.icon {
+                let image = if icon_name.starts_with('/') {
+                    // Absolute path
+                    gtk4::Image::from_file(icon_name)
+                } else {
+                    // Theme icon name
+                    gtk4::Image::from_icon_name(icon_name)
+                };
+                image.set_pixel_size(24);
+                image.add_css_class("result-icon");
+                row.append(&image);
+            }
+
+            // Label
+            let label_widget = gtk4::Label::new(Some(&row_data.label));
             label_widget.add_css_class("result-label");
             label_widget.set_halign(gtk4::Align::Start);
             label_widget.set_hexpand(true);
+            label_widget.set_ellipsize(gtk4::pango::EllipsizeMode::End);
             row.append(&label_widget);
 
             // Hotkey (right side)
-            let hotkey_widget = gtk4::Label::new(Some(hotkey));
-            hotkey_widget.add_css_class("result-hotkey");
-            hotkey_widget.set_halign(gtk4::Align::End);
-            row.append(&hotkey_widget);
+            if !row_data.hotkey.is_empty() {
+                let hotkey_widget = gtk4::Label::new(Some(&row_data.hotkey));
+                hotkey_widget.add_css_class("result-hotkey");
+                hotkey_widget.set_halign(gtk4::Align::End);
+                row.append(&hotkey_widget);
+            }
 
             // Mark first row as selected
             if i == 0 {

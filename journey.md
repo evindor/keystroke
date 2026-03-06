@@ -43,12 +43,40 @@ All modules built and tested (24 tests passing):
 - `connect_command_line` returns `glib::ExitCode`, use `0.into()`
 - Per-query frecency stored as (normalized_query, command_id) → score pairs
 
+### Milestone 4: Calculator Provider — DONE
+- Built-in recursive descent expression parser (no external deps)
+- Supports: +, -, *, /, %, ^, **, parentheses, unary minus, decimals
+- Execute = copy result to clipboard via wl-copy
+- Extended Provider trait with `query_commands()` for dynamic results
+- 12 calculator tests
+
+### Milestone 5: Desktop Apps Provider — DONE
+- Scans ~/.local/share/applications/ and /usr/share/applications/
+- Custom .desktop file parser (no external deps)
+- User-local entries override system ones (dedup by filename)
+- Filters: Hidden, NoDisplay, TryExec check
+- Strips field codes (%u, %U, %f, %F, etc.) from Exec
+- Terminal=true apps wrapped with xdg-terminal-exec
+- Launch via uwsm-app (Omarchy pattern) — detects if already uwsm-wrapped
+- Icons: theme names and absolute paths both supported
+- Added icon column to UI (gtk4::Image from icon name or file path)
+- 5 apps tests, 41 total
+
+### Key Decisions Made (continued)
+- EventControllerKey must use PropagationPhase::Capture to intercept Enter before GTK Entry
+- No external deps for expression eval or desktop file parsing — roll our own
+- Icon rendering: absolute paths → Image::from_file, theme names → Image::from_icon_name
+- Command struct has optional `icon` field
+- Apps launched via sh -c to handle complex Exec strings with arguments
+
 ### Current State
-- App launches and shows overlay with all ~188 Hyprland bindings
-- Fuzzy search works
+- 3 providers: Hyprland bindings, Desktop apps, Calculator
+- ~188 Hyprland bindings + ~80 desktop apps visible
+- Icons display for desktop apps
+- Fuzzy search across all providers
 - Frecency learning works
-- Keyboard navigation works
-- Need to set up Hyprland binding + autostart for real testing
+- Calculator results appear at top when typing math expressions
+- Hyprland binding (ALT+SPACE) active
 
 ### File Structure
 ```
@@ -64,6 +92,8 @@ src/
   store.rs       — Frecency persistence (JSON)
   theme.rs       — Omarchy theme colors, CSS generation
   providers/
-    mod.rs       — Command struct, Provider trait
+    mod.rs       — Command struct, Provider trait (with query_commands)
     hyprland.rs  — Hyprland keybinding provider
+    apps.rs      — Desktop application launcher (XDG .desktop files)
+    calculator.rs — Expression evaluator (recursive descent)
 ```

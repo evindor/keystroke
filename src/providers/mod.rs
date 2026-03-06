@@ -1,3 +1,4 @@
+pub mod apps;
 pub mod calculator;
 pub mod hyprland;
 
@@ -12,6 +13,8 @@ pub struct Command {
     pub keywords: Vec<String>,
     /// Human-readable hotkey: "SUPER + W"
     pub hotkey: Option<String>,
+    /// Icon: theme name (e.g. "firefox") or absolute path (e.g. "/path/to/icon.png")
+    pub icon: Option<String>,
     /// Which provider owns this command
     pub provider: String,
     /// Provider-specific execution data (e.g., "killactive " or "exec omarchy-launch-browser")

@@ -223,6 +223,7 @@ impl HyprlandProvider {
             label,
             keywords,
             hotkey,
+            icon: None,
             provider: "hyprland".to_string(),
             data,
         }

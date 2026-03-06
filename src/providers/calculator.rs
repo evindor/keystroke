@@ -47,6 +47,7 @@ impl Provider for CalculatorProvider {
                     label: format!("= {}", display),
                     keywords: vec![],
                     hotkey: Some("Copy to clipboard".to_string()),
+                    icon: Some("accessories-calculator".to_string()),
                     provider: "calculator".to_string(),
                     data: display,
                 }]
