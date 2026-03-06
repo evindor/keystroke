@@ -1,3 +1,4 @@
+pub mod calculator;
 pub mod hyprland;
 
 /// A command that can be executed by the launcher.
@@ -22,8 +23,13 @@ pub struct Command {
 pub trait Provider {
     /// Unique provider identifier
     fn id(&self) -> &str;
-    /// Fetch all available commands (may do I/O)
+    /// Fetch all available commands (may do I/O). Called once on show.
     fn commands(&self) -> Vec<Command>;
     /// Execute a command by its provider-specific data
     fn execute(&self, command: &Command);
+    /// Generate dynamic commands based on the current query.
+    /// Default: no dynamic commands. Override for providers like calculator.
+    fn query_commands(&self, _query: &str) -> Vec<Command> {
+        Vec::new()
+    }
 }

@@ -48,6 +48,8 @@ fn build_providers(config: &Config) -> Vec<Box<dyn Provider>> {
         let hp = providers::hyprland::HyprlandProvider::new(HashMap::new());
         active.push(Box::new(hp));
     }
+    // Calculator is always available.
+    active.push(Box::new(providers::calculator::CalculatorProvider::new()));
     active
 }
 
@@ -239,6 +241,7 @@ fn main() {
                             st.engine.rank_query(
                                 &query,
                                 &st.commands,
+                                &st.providers,
                                 &st.store,
                                 max_results,
                             )

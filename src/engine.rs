@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher, Utf32Str};
 
-use crate::providers::Command;
+use crate::providers::{Command, Provider};
 use crate::store::Store;
 
 /// A scored command ready for display.
@@ -85,14 +85,26 @@ impl Engine {
 
     /// Rank commands for a non-empty query: fuzzy match + frecency boost.
     ///
-    /// If the query matches an alias exactly, that command is pinned to #1.
+    /// Dynamic commands from providers (e.g. calculator results) are prepended
+    /// at the top with maximum score. If the query matches an alias exactly,
+    /// that command is pinned to #1 (after dynamic commands).
     pub fn rank_query(
         &self,
         query: &str,
         commands: &[Command],
+        providers: &[Box<dyn Provider>],
         store: &Store,
         max_results: usize,
     ) -> Vec<ScoredCommand> {
+        // Collect dynamic commands from providers (calculator, etc.)
+        let mut dynamic: Vec<ScoredCommand> = providers
+            .iter()
+            .flat_map(|p| p.query_commands(query))
+            .map(|cmd| ScoredCommand {
+                command: cmd,
+                score: f64::MAX,
+            })
+            .collect();
         let normalized_query = query.trim().to_lowercase();
 
         // Check for alias match.
@@ -176,6 +188,12 @@ impl Engine {
                     );
                 }
             }
+        }
+
+        // Prepend dynamic results (calculator, etc.) at the top.
+        if !dynamic.is_empty() {
+            dynamic.append(&mut results);
+            results = dynamic;
         }
 
         results.truncate(max_results);
