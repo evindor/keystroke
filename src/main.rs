@@ -46,7 +46,10 @@ fn fetch_all_commands(providers: &[Box<dyn Provider>]) -> Vec<Command> {
 fn build_providers(config: &Config) -> Vec<Box<dyn Provider>> {
     let mut active: Vec<Box<dyn Provider>> = Vec::new();
     if config.providers.hyprland {
-        let hp = providers::hyprland::HyprlandProvider::new(HashMap::new());
+        let hp = providers::hyprland::HyprlandProvider::new(
+            HashMap::new(),
+            config.commands.clone(),
+        );
         active.push(Box::new(hp));
     }
     // Apps provider (desktop entries).

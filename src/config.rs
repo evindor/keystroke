@@ -13,6 +13,8 @@ pub struct Config {
     pub scoring: ScoringConfig,
     pub providers: ProvidersConfig,
     pub aliases: HashMap<String, String>,
+    #[serde(default, rename = "commands")]
+    pub commands: Vec<CustomCommand>,
 }
 
 impl Default for Config {
@@ -22,6 +24,7 @@ impl Default for Config {
             scoring: ScoringConfig::default(),
             providers: ProvidersConfig::default(),
             aliases: HashMap::new(),
+            commands: Vec::new(),
         }
     }
 }
@@ -118,4 +121,22 @@ impl Default for ProvidersConfig {
     fn default() -> Self {
         Self { hyprland: true }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Custom commands
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CustomCommand {
+    pub dispatcher: String,
+    #[serde(default)]
+    pub arg: String,
+    pub label: String,
+    #[serde(default)]
+    pub keywords: Vec<String>,
+    #[serde(default)]
+    pub arg_template: Option<String>,
+    #[serde(default)]
+    pub hidden: bool,
 }
