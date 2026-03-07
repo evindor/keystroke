@@ -6,7 +6,6 @@ mod theme;
 mod ui;
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use gdk4;
@@ -45,12 +44,10 @@ fn fetch_all_commands(providers: &[Box<dyn Provider>]) -> Vec<Command> {
 /// Build the list of active providers from the current config.
 fn build_providers(config: &Config) -> Vec<Box<dyn Provider>> {
     let mut active: Vec<Box<dyn Provider>> = Vec::new();
-    if config.providers.hyprland {
-        let hp = providers::hyprland::HyprlandProvider::new(
-            HashMap::new(),
-            config.commands.clone(),
-        );
-        active.push(Box::new(hp));
+    if config.providers.dispatches {
+        let entries = config.load_catalog();
+        let dp = providers::hyprland::DispatchProvider::new(entries);
+        active.push(Box::new(dp));
     }
     // Apps provider (desktop entries).
     active.push(Box::new(providers::apps::AppsProvider::new()));

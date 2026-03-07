@@ -6,50 +6,51 @@ A Raycast-like launcher for Hyprland/Omarchy that replaces hotkey memorization w
 
 ## Core Concept
 
-User presses ALT+SPACE (configurable). A centered overlay appears with a text input. Below it: the most recently/frequently used commands. As the user types, results fuzzy-filter in real time. Select one → it executes. Over time, the system learns the user's personal mnemonics: "VS" → "Toggle window split", "br" → "Browser", etc.
+User presses ALT+SPACE (configurable). A centered overlay appears with a text input. Below it: the most recently/frequently used commands. As the user types, results fuzzy-filter in real time. Select one → it executes. Over time, the system learns the user's personal mnemonics: "mwl" → "Move window left", "cr" → "Resize column", etc.
 
 ---
 
-## Data Source
+## Data Source: Dispatch Catalog
 
-### Hyprland Bindings (first module)
+Keystroke uses a **curated dispatch catalog** as its primary data source. The catalog lives at `~/.local/share/keystroke/catalog.toml` and contains ~70 human-authored dispatch entries organized by category.
 
-Fetch all bindings from `hyprctl binds -j` on launch. Returns 188 entries with:
+**Key insight:** Dispatches are the primitive, keybindings are just one (limited) trigger mechanism. Hyprland has 60+ core dispatchers, 20+ layoutmsg sub-commands, and plugin dispatchers — most of which will never have keybindings. Keystroke surfaces the entire dispatch API as a command palette.
 
-```json
-{
-  "modmask": 64,
-  "key": "W",
-  "has_description": true,
-  "description": "Close window",
-  "dispatcher": "killactive",
-  "arg": "",
-  "mouse": false,
-  "release": false
-}
+### Parameter Tiers
+
+**Tier 1 — Finite sets (pre-expanded):** Directions, workspace numbers, on/off states get separate catalog entries. Each is a distinct action with mnemonic potential.
+
+```toml
+[[dispatch]]
+dispatcher = "movewindow"
+arg = "l"
+label = "Move window left"
+keywords = ["move", "left", "window"]
 ```
 
-**Modmask is a bitmask:**
-- `4` = CTRL
-- `8` = ALT
-- `64` = SUPER
-- `1` = SHIFT
-- Combined: `65` = SUPER+SHIFT, `68` = SUPER+CTRL, `72` = SUPER+ALT, etc.
+**Tier 2 — Open-ended (parameterized):** Rename text, resize values, and other arbitrary input use templates with trigger prefixes.
 
-We render this as human-readable: `SUPER + W`, `SUPER + SHIFT + F`, etc.
+```toml
+[[dispatch]]
+dispatcher = "renameworkspace"
+label = "Rename workspace"
+keywords = ["rename", "name", "workspace"]
+arg_template = "{active_workspace} {input}"
+triggers = ["rw", "rename"]
+```
 
-For entries without descriptions (`has_description: false`), we auto-generate a label from `dispatcher + arg` (e.g., `exec ~/.config/hypr/scripts/foo.sh` → `foo.sh`). Users can later assign custom descriptions via the app.
+Trigger flow: `rw awesome` → "Rename workspace → 'awesome'" → executes `hyprctl dispatch renameworkspace 1 awesome`
 
-### Future Modules
+### Layout-Aware Filtering
 
-The architecture is modular. The Hyprland dispatcher is the first "provider." Future providers could include:
-- Application launcher (desktop entries)
-- System commands (shutdown, reboot, lock)
-- Custom user commands
-- Clipboard history
-- File search
+Entries can be tagged with a `layout` field. Only entries matching the configured layout (or untagged entries) appear. Set `dispatches.layout = "scrolling"` in config to see scrolling-specific layoutmsg commands.
 
-Each provider implements a trait that returns a list of `Command` items.
+### Other Providers
+
+The architecture is modular via the Provider trait:
+- **Apps provider**: Scans desktop entries for application launching
+- **Calculator**: Evaluates math expressions inline
+- Future: clipboard history, file search, system commands
 
 ---
 
@@ -59,7 +60,7 @@ Each provider implements a trait that returns a list of `Command` items.
 ┌─────────────────────────────────────────┐
 │                  main.rs                │
 │  App init, layer shell, signal handler  │
-│  PID file, CSS loading                  │
+│  Catalog loading, provider construction │
 ├─────────────────────────────────────────┤
 │                  ui.rs                  │
 │  GTK overlay window, input field,       │
@@ -71,8 +72,10 @@ Each provider implements a trait that returns a list of `Command` items.
 │  Combines provider results              │
 ├─────────────────────────────────────────┤
 │              providers/                 │
-│  mod.rs     — Provider trait            │
-│  hyprland.rs — hyprctl binds provider   │
+│  mod.rs      — Provider trait           │
+│  hyprland.rs — Dispatch catalog provider│
+│  apps.rs     — Desktop entry provider   │
+│  calculator.rs — Math expression eval   │
 ├─────────────────────────────────────────┤
 │               store.rs                  │
 │  JSON persistence for frecency data     │
@@ -80,7 +83,8 @@ Each provider implements a trait that returns a list of `Command` items.
 ├─────────────────────────────────────────┤
 │               config.rs                 │
 │  ~/.config/keystroke/config.toml        │
-│  Visible results count, appearance      │
+│  Catalog loading from data dir          │
+│  CatalogEntry struct, layout filtering  │
 ├─────────────────────────────────────────┤
 │               theme.rs                  │
 │  Parse Omarchy waybar.css theme colors  │
@@ -91,29 +95,65 @@ Each provider implements a trait that returns a list of `Command` items.
 
 ```rust
 trait Provider {
-    fn id(&self) -> &str;                    // "hyprland"
+    fn id(&self) -> &str;                    // "dispatch", "apps", "calculator"
     fn commands(&self) -> Vec<Command>;      // fetch/refresh command list
     fn execute(&self, command: &Command);    // run the selected command
+    fn query_commands(&self, query: &str) -> Vec<Command>; // dynamic commands
 }
 
 struct Command {
-    id: String,           // unique: "hyprland:killactive"
-    label: String,        // "Close window"
-    description: String,  // secondary text, optional
+    id: String,           // unique: "dispatch:killactive", "dispatch:movewindow:l"
+    label: String,        // "Close active window", "Move window left"
     keywords: Vec<String>,// extra searchable terms
-    hotkey: Option<String>,// "SUPER + W" (display only)
-    provider: String,     // "hyprland"
-    data: String,         // provider-specific payload (dispatcher + arg)
+    hotkey: Option<String>,// display only
+    icon: Option<String>, // theme name or path
+    provider: String,     // "dispatch"
+    data: String,         // execution payload: "killactive", "movewindow l"
 }
 ```
 
-### Hyprland Provider
+### Dispatch Provider
 
-- On `commands()`: runs `hyprctl binds -j`, parses JSON, builds `Command` list
+- On `commands()`: builds Command list from parsed catalog entries (static entries only)
+- On `query_commands()`: matches trigger prefixes, resolves templates, returns parameterized commands
 - On `execute()`: runs `hyprctl dispatch <dispatcher> <arg>`
-- Filters out: mouse bindings, media keys (XF86*), release-only bindings
-  - Actually — we keep everything. Let the user decide what's useful. Media keys are valid commands ("Volume up", "Next track")
-- Refreshes on every show (bindings might change after hyprctl reload)
+- Catalog loaded once per show, filtered by layout
+
+---
+
+## Catalog Format
+
+### Default Catalog: `~/.local/share/keystroke/catalog.toml`
+
+Written on first run from embedded defaults. ~68 entries organized by category:
+
+| Category | Count | Examples |
+|---|---|---|
+| Window Management | 10 | killactive, togglefloating, pin, centerwindow |
+| Window Movement | 8 | movefocus l/r/u/d, movewindow l/r/u/d |
+| Window Focus | 4 | cyclenext, focusurgentorlast |
+| Workspaces | 12 | workspace 1-10, togglespecialworkspace, renameworkspace |
+| Groups | 6 | togglegroup, changegroupactive, lockgroups |
+| System | 4 | dpms off/on, exit, forcerendererreload |
+| Monitor | 3 | focusmonitor, movecurrentworkspacetomonitor |
+| Layout: Scrolling | 10 | colresize, fit, swapcol, promote |
+| Layout: Dwindle | 3 | togglesplit, swapsplit, preselect |
+| Layout: Master | 8 | swapwithmaster, focusmaster, mfact |
+
+Only ~55 entries visible at once (layout-specific entries filtered by config).
+
+### Entry Fields
+
+```toml
+[[dispatch]]
+dispatcher = "layoutmsg"        # required: Hyprland dispatcher name
+arg = "colresize all 0.5"       # optional: fixed argument
+label = "Resize all columns"    # required: human-readable label
+keywords = ["resize", "column"] # optional: extra searchable terms
+arg_template = "colresize {input}" # optional: parameterized template
+triggers = ["cr"]               # optional: trigger prefixes for parameterized
+layout = "scrolling"            # optional: only show when this layout is active
+```
 
 ---
 
@@ -121,70 +161,66 @@ struct Command {
 
 ### Fuzzy Matching: `nucleo-matcher`
 
-Smith-Waterman with affine gaps. Same scoring constants as FZF:
-- +16 per matched char
-- +8–10 for boundary matches (after space, delimiter, camelCase)
-- +4 for consecutive matches
-- -3 gap start, -1 gap extension
+Smith-Waterman with affine gaps. Matches against: `label` (primary), `keywords`, and `hotkey`. Word-boundary bonuses make mnemonic shortcuts work: "mwl" matches **M**ove **W**indow **L**eft.
 
-We match against: `label` (primary), `keywords`, and `hotkey`.
+### Frecency: Exponential Decay
 
-### Frecency: Exponential Decay (inspired by `fre`)
-
-```rust
-struct FrecencyEntry {
-    score: f64,           // accumulated score
-    reference_time: u64,  // epoch when score was last updated
-}
-```
-
-On access:
 ```
 current_score = stored_score / 2^((now - reference_time) / half_life)
-new_score = current_score + 1.0
 ```
 
-Half-life: **7 days** (604800 seconds). An item used once a week maintains steady score. Items not used for a month fade to ~6% of peak.
+Half-life: **7 days**. Items not used for a month fade to ~6% of peak.
 
 ### Combined Ranking
 
-**When query is empty** (just opened): pure frecency order. Show the user's most-used commands.
+**Empty query:** pure frecency order (most-used commands first).
 
-**When query has text:**
+**With query:**
 ```
 final_score = fuzzy_score × (1.0 + 0.2 × ln(frecency + 1))
 ```
 
-- Fuzzy score dominates (it's the multiplied base)
-- Frecency provides a mild boost — enough to break ties and surface learned mnemonics
-- Weight `0.2` is tunable in config
+### Per-Query Frecency (Mnemonic Learning)
 
-### Per-Query Frecency
+Frecency stored per (query → command) pair. Typing "mwl" → selecting "Move window left" → next time "mwl" instantly surfaces it at #1.
 
-This is the key insight for mnemonic learning. We store frecency **per (query → command) pair**, not just per command globally.
+---
 
-```json
-{
-  "global": {
-    "hyprland:killactive": { "score": 15.0, "ref_time": 1709740800 }
-  },
-  "queries": {
-    "vs": {
-      "hyprland:togglesplit": { "score": 42.0, "ref_time": 1709740800 }
-    },
-    "br": {
-      "hyprland:exec:omarchy-launch-browser": { "score": 30.0, "ref_time": 1709740800 }
-    }
-  }
-}
+## Configuration
+
+### Config: `~/.config/keystroke/config.toml`
+
+```toml
+[appearance]
+max_visible_results = 10
+width = 680
+border_radius = 16
+
+[scoring]
+frecency_weight = 0.2
+half_life_days = 7
+
+[providers]
+dispatches = true
+
+[dispatches]
+layout = "scrolling"
+
+# User-defined dispatches (added to catalog)
+[[dispatches.add]]
+dispatcher = "exec"
+arg = "my-script.sh"
+label = "Run my script"
+keywords = ["script"]
+
+# Hide default catalog entries by ID
+[dispatches.hide]
+ids = ["dispatch:exit", "dispatch:dpms:off"]
+
+[aliases]
+mwl = "dispatch:movewindow:l"
+cr = "dispatch:layoutmsg:colresize"
 ```
-
-When ranking with query "vs":
-1. Get fuzzy scores for all commands against "vs"
-2. Look up per-query frecency for "vs" → boost matching commands
-3. Also fold in global frecency with lower weight
-
-This means typing "VS" eventually guarantees "Toggle window split" is #1, even though "VS" is a terrible fuzzy match for those words — the per-query frecency overwhelms it.
 
 ---
 
@@ -194,8 +230,8 @@ This means typing "VS" eventually guarantees "Toggle window split" is #1, even t
 
 - **Layer**: Overlay (above everything)
 - **Position**: Centered on active monitor
-- **Size**: 680px wide, height adapts to results (max 10 visible by default)
-- **Keyboard mode**: Exclusive (captures all input)
+- **Size**: 680px wide, height adapts to results (max 10 visible)
+- **Keyboard mode**: Exclusive
 - **Namespace**: `keystroke`
 
 ### Layout
@@ -203,45 +239,22 @@ This means typing "VS" eventually guarantees "Toggle window split" is #1, even t
 ```
 ┌──────────────────────────────────────────────┐
 │  ┌────────────────────────────────────────┐   │
-│  │  🔍  Type a command...                │   │  ← input field
+│  │  Type a command...                     │   │  ← input field
 │  └────────────────────────────────────────┘   │
 │                                              │
 │  ┌────────────────────────────────────────┐   │
-│  │ ▸ Close window              SUPER + W  │   │  ← selected (highlighted)
+│  │ ▸ Close active window                  │   │  ← selected
 │  ├────────────────────────────────────────┤   │
-│  │   Toggle floating/tiling    SUPER + T  │   │
+│  │   Move window left                     │   │
 │  ├────────────────────────────────────────┤   │
-│  │   Full screen               SUPER + F  │   │
+│  │   Toggle floating                      │   │
 │  ├────────────────────────────────────────┤   │
-│  │   Terminal              SUPER + Return  │   │
+│  │   Switch to workspace 1               │   │
 │  ├────────────────────────────────────────┤   │
-│  │   Browser         SUPER + SHIFT + B    │   │
-│  ├────────────────────────────────────────┤   │
-│  │   ...                                  │   │
+│  │   Pin window to all workspaces        │   │
 │  └────────────────────────────────────────┘   │
 │                                              │
 └──────────────────────────────────────────────┘
-```
-
-### Visual Style (Raycast-inspired)
-
-- **Background**: semi-transparent dark with blur (compositor-side blur via Hyprland layer rules)
-- **Corners**: generous border-radius (16px) (configurable)
-- **Input**: large font (18-20px), prominent, with subtle border-bottom separator
-- **Results**: clean rows, ~44px height each
-  - Left: command label (primary text, white/foreground)
-  - Right: hotkey in faded secondary color, monospace
-  - Selected row: subtle highlight background
-- **Typography**: system sans-serif, clean weights
-- **Colors**: pulled from Omarchy theme (`waybar.css`) for consistency
-- **Transitions**: no heavy animation — instant show/hide (speed is king for a launcher)
-- **Drop shadow**: subtle box-shadow for floating feel
-
-### Hyprland Layer Rules (for blur)
-
-```conf
-layerrule = blur, keystroke
-layerrule = ignorealpha 0.3, keystroke
 ```
 
 ### Interaction
@@ -255,88 +268,45 @@ layerrule = ignorealpha 0.3, keystroke
 | Ctrl+J / Ctrl+K | Navigate results (vim-style) |
 | Ctrl+N / Ctrl+P | Navigate results (emacs-style) |
 
-On execute: record the (query, command) pair in frecency store, then dismiss.
+### Visual Style
 
----
+- Semi-transparent dark background with compositor blur
+- 16px border-radius, drop shadow
+- Colors from Omarchy theme (`waybar.css`)
+- Clean typography, no heavy animation
 
-## Configuration
+### Hyprland Layer Rules
 
-File: `~/.config/keystroke/config.toml`
-
-```toml
-[appearance]
-max_visible_results = 10    # how many results to show
-width = 680                 # window width in pixels
-border_radius = 16          # corner radius in pixels
-
-[scoring]
-frecency_weight = 0.2      # how much frecency boosts fuzzy score
-half_life_days = 7          # frecency decay half-life
-
-[providers]
-hyprland = true             # enable hyprland bindings provider
-
-[aliases]
-vs = "hyprland:togglesplit"
-br = "hyprland:exec:omarchy-launch-browser"
-term = "hyprland:exec:uwsm-app -- xdg-terminal-exec"
+```conf
+layerrule = blur, keystroke
+layerrule = ignorealpha 0.3, keystroke
 ```
-
-Sane defaults for everything. Config file is optional — app works with zero configuration. Aliases are explicit mnemonics — typing "vs" will always show "Toggle window split" at #1 regardless of frecency.
 
 ---
 
 ## Lifecycle
 
-1. **Start**: app launches (autostart or manual), loads config, creates hidden GTK window
-2. **Activate** (ALT+SPACE via Hyprland bind):
+1. **Start**: app launches, loads config, creates hidden GTK window
+2. **Activate** (ALT+SPACE):
    - Show overlay
-   - Fetch `hyprctl binds -j` (fresh every time)
-   - Load frecency data from JSON
-   - Focus input field
-   - Display top frecency commands (empty query state)
-3. **Search**: user types → nucleo scores all commands → combine with frecency → display ranked results
-4. **Execute**: user hits Enter →
-   - Provider executes the command (`hyprctl dispatch ...`)
-   - Frecency store updated with (query, command) and (global, command)
+   - Load catalog from disk, filter by layout
+   - Load frecency data
+   - Display top frecency commands (empty query)
+3. **Search**: user types → fuzzy match + frecency → ranked results
+4. **Execute**: Enter →
+   - `hyprctl dispatch <dispatcher> <arg>`
+   - Frecency updated with (query, command) pair
    - Overlay hides
-5. **Dismiss**: Escape → hide, no side effects
+5. **Dismiss**: Escape → hide
 
-### Show/Hide Mechanism: GApplication Daemon (same pattern as Walker)
-
-Following the established Omarchy pattern, keystroke runs as a **GTK GApplication daemon**:
-
-1. **Daemon mode**: `keystroke --gapplication-service` runs persistently, creates the hidden overlay window
-2. **Activation**: running `keystroke` again (without `--gapplication-service`) acts as a **client** — GTK's GApplication detects the running instance via D-Bus and sends an `activate` signal to the daemon, which toggles the overlay
-3. **No PID files, no signals** — D-Bus handles all IPC
+### GApplication Daemon Pattern
 
 ```conf
-# In hyprland config:
+# Hyprland config:
 bindd = ALT, SPACE, Keystroke launcher, exec, keystroke
 ```
 
-Each press runs the binary. If the daemon is running, it receives an `activate` signal and toggles visibility. If not running, the binary becomes the daemon and shows immediately.
-
-### Autostart (systemd)
-
-XDG autostart desktop entry at `~/.config/autostart/keystroke.desktop`:
-
-```ini
-[Desktop Entry]
-Name=Keystroke
-Exec=keystroke --gapplication-service
-Type=Application
-X-GNOME-Autostart-enabled=true
-```
-
-systemd picks this up via `systemd-xdg-autostart-generator`. Add a restart drop-in for resilience:
-
-```ini
-# ~/.config/systemd/user/app-keystroke@autostart.service.d/restart.conf
-[Service]
-Restart=always
-RestartSec=2
-```
+Each press runs the binary. GTK GApplication detects the running instance via D-Bus and toggles visibility.
 
 ---
 
@@ -344,57 +314,18 @@ RestartSec=2
 
 ### Frecency: `~/.local/share/keystroke/history.json`
 
-```json
-{
-  "version": 1,
-  "global": {
-    "<command_id>": { "score": 15.0, "ref_time": 1709740800 }
-  },
-  "queries": {
-    "<normalized_query>": {
-      "<command_id>": { "score": 42.0, "ref_time": 1709740800 }
-    }
-  }
-}
-```
+### Catalog: `~/.local/share/keystroke/catalog.toml`
 
-### User Descriptions: `~/.local/share/keystroke/descriptions.json`
-
-For overriding/adding descriptions to bindings that lack them:
-
-```json
-{
-  "hyprland:exec:~/.config/hypr/scripts/window-list-show.sh": "Window list overlay"
-}
-```
+Written on first run from embedded defaults. User-editable. Overrides via `config.toml` preferred.
 
 ---
 
-## Crate Dependencies
+## Command IDs
 
-```toml
-[dependencies]
-gtk4 = "0.10"
-gtk4-layer-shell = { version = "0.7", features = ["v1_3"] }
-glib = "0.21"
-gio = "0.21"
-gdk4 = "0.10"
-nucleo-matcher = "0.3"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-toml = "0.8"
-libc = "0.2"
+Format: `dispatch:{dispatcher}` or `dispatch:{dispatcher}:{arg}`
 
-[profile.release]
-strip = true
-lto = true
-```
-
----
-
-## Open Questions for Later
-
-1. **Multi-word queries**: "close win" should match "Close window". Nucleo handles this natively with space-separated pattern tokens.
-2. **Provider priority**: when multiple providers return similar commands, how to rank across providers? (solve when we add provider #2)
-3. **Explicit aliases/mnemonics UI**: how does the user set "vs = toggle split" from within the app? (v2 feature — maybe Ctrl+A on a selected result to "alias" it)
-4. **Submap support**: Hyprland submaps create nested binding contexts. Parse `submap` field from binds JSON if non-empty. (handle when needed)
+Examples:
+- `dispatch:killactive`
+- `dispatch:movewindow:l`
+- `dispatch:layoutmsg:colresize all 0.5`
+- `dispatch:workspace:3`

@@ -1,0 +1,465 @@
+# Keystroke Default Dispatch Catalog
+# Each [[dispatch]] entry defines a Hyprland dispatch command.
+# Edit this file to customize, or use config.toml for overrides.
+
+# ==========================================================================
+# Window Management
+# ==========================================================================
+
+[[dispatch]]
+dispatcher = "killactive"
+label = "Close active window"
+keywords = ["close", "kill", "window"]
+
+[[dispatch]]
+dispatcher = "forcekillactive"
+label = "Force kill active window"
+keywords = ["force", "kill", "xkill", "window"]
+
+[[dispatch]]
+dispatcher = "togglefloating"
+label = "Toggle floating"
+keywords = ["float", "tile", "toggle"]
+
+[[dispatch]]
+dispatcher = "setfloating"
+label = "Set window to floating"
+keywords = ["float", "floating"]
+
+[[dispatch]]
+dispatcher = "settiled"
+label = "Set window to tiled"
+keywords = ["tile", "tiled"]
+
+[[dispatch]]
+dispatcher = "fullscreen"
+arg = "0"
+label = "Toggle fullscreen"
+keywords = ["fullscreen", "maximize"]
+
+[[dispatch]]
+dispatcher = "fullscreen"
+arg = "1"
+label = "Toggle maximize"
+keywords = ["maximize", "fullscreen"]
+
+[[dispatch]]
+dispatcher = "centerwindow"
+label = "Center floating window"
+keywords = ["center", "middle", "window"]
+
+[[dispatch]]
+dispatcher = "pin"
+label = "Pin window to all workspaces"
+keywords = ["pin", "sticky", "window"]
+
+[[dispatch]]
+dispatcher = "toggleswallow"
+label = "Toggle window swallowing"
+keywords = ["swallow", "toggle"]
+
+# ==========================================================================
+# Window Movement
+# ==========================================================================
+
+[[dispatch]]
+dispatcher = "movefocus"
+arg = "l"
+label = "Focus window left"
+keywords = ["focus", "left", "window"]
+
+[[dispatch]]
+dispatcher = "movefocus"
+arg = "r"
+label = "Focus window right"
+keywords = ["focus", "right", "window"]
+
+[[dispatch]]
+dispatcher = "movefocus"
+arg = "u"
+label = "Focus window up"
+keywords = ["focus", "up", "window"]
+
+[[dispatch]]
+dispatcher = "movefocus"
+arg = "d"
+label = "Focus window down"
+keywords = ["focus", "down", "window"]
+
+[[dispatch]]
+dispatcher = "movewindow"
+arg = "l"
+label = "Move window left"
+keywords = ["move", "left", "window"]
+
+[[dispatch]]
+dispatcher = "movewindow"
+arg = "r"
+label = "Move window right"
+keywords = ["move", "right", "window"]
+
+[[dispatch]]
+dispatcher = "movewindow"
+arg = "u"
+label = "Move window up"
+keywords = ["move", "up", "window"]
+
+[[dispatch]]
+dispatcher = "movewindow"
+arg = "d"
+label = "Move window down"
+keywords = ["move", "down", "window"]
+
+# ==========================================================================
+# Window Focus
+# ==========================================================================
+
+[[dispatch]]
+dispatcher = "cyclenext"
+label = "Focus next window"
+keywords = ["cycle", "next", "focus"]
+
+[[dispatch]]
+dispatcher = "cyclenext"
+arg = "prev"
+label = "Focus previous window"
+keywords = ["cycle", "previous", "focus"]
+
+[[dispatch]]
+dispatcher = "focusurgentorlast"
+label = "Focus urgent or last window"
+keywords = ["urgent", "last", "focus"]
+
+[[dispatch]]
+dispatcher = "focuscurrentorlast"
+label = "Focus current or last window"
+keywords = ["current", "last", "focus"]
+
+# ==========================================================================
+# Workspaces
+# ==========================================================================
+
+[[dispatch]]
+dispatcher = "workspace"
+arg = "1"
+label = "Switch to workspace 1"
+keywords = ["workspace", "switch"]
+
+[[dispatch]]
+dispatcher = "workspace"
+arg = "2"
+label = "Switch to workspace 2"
+keywords = ["workspace", "switch"]
+
+[[dispatch]]
+dispatcher = "workspace"
+arg = "3"
+label = "Switch to workspace 3"
+keywords = ["workspace", "switch"]
+
+[[dispatch]]
+dispatcher = "workspace"
+arg = "4"
+label = "Switch to workspace 4"
+keywords = ["workspace", "switch"]
+
+[[dispatch]]
+dispatcher = "workspace"
+arg = "5"
+label = "Switch to workspace 5"
+keywords = ["workspace", "switch"]
+
+[[dispatch]]
+dispatcher = "workspace"
+arg = "6"
+label = "Switch to workspace 6"
+keywords = ["workspace", "switch"]
+
+[[dispatch]]
+dispatcher = "workspace"
+arg = "7"
+label = "Switch to workspace 7"
+keywords = ["workspace", "switch"]
+
+[[dispatch]]
+dispatcher = "workspace"
+arg = "8"
+label = "Switch to workspace 8"
+keywords = ["workspace", "switch"]
+
+[[dispatch]]
+dispatcher = "workspace"
+arg = "9"
+label = "Switch to workspace 9"
+keywords = ["workspace", "switch"]
+
+[[dispatch]]
+dispatcher = "workspace"
+arg = "10"
+label = "Switch to workspace 10"
+keywords = ["workspace", "switch"]
+
+[[dispatch]]
+dispatcher = "togglespecialworkspace"
+label = "Toggle special workspace"
+keywords = ["special", "scratchpad", "toggle"]
+
+[[dispatch]]
+dispatcher = "renameworkspace"
+label = "Rename workspace"
+keywords = ["rename", "name", "workspace"]
+arg_template = "{active_workspace} {input}"
+triggers = ["rw", "rename"]
+
+# ==========================================================================
+# Groups
+# ==========================================================================
+
+[[dispatch]]
+dispatcher = "togglegroup"
+label = "Toggle group"
+keywords = ["group", "toggle"]
+
+[[dispatch]]
+dispatcher = "changegroupactive"
+arg = "f"
+label = "Next window in group"
+keywords = ["group", "next", "forward"]
+
+[[dispatch]]
+dispatcher = "changegroupactive"
+arg = "b"
+label = "Previous window in group"
+keywords = ["group", "previous", "back"]
+
+[[dispatch]]
+dispatcher = "moveoutofgroup"
+label = "Move window out of group"
+keywords = ["group", "move", "out"]
+
+[[dispatch]]
+dispatcher = "moveintogroup"
+label = "Move window into group"
+keywords = ["group", "move", "into"]
+arg_template = "{input}"
+triggers = ["mig"]
+
+[[dispatch]]
+dispatcher = "lockgroups"
+arg = "toggle"
+label = "Toggle group lock"
+keywords = ["lock", "group", "toggle"]
+
+# ==========================================================================
+# System
+# ==========================================================================
+
+[[dispatch]]
+dispatcher = "dpms"
+arg = "off"
+label = "Turn off monitors"
+keywords = ["dpms", "monitor", "screen", "off"]
+
+[[dispatch]]
+dispatcher = "dpms"
+arg = "on"
+label = "Turn on monitors"
+keywords = ["dpms", "monitor", "screen", "on"]
+
+[[dispatch]]
+dispatcher = "forcerendererreload"
+label = "Force reload renderer"
+keywords = ["renderer", "reload", "refresh"]
+
+[[dispatch]]
+dispatcher = "exit"
+label = "Exit Hyprland"
+keywords = ["exit", "quit", "logout"]
+
+# ==========================================================================
+# Monitor
+# ==========================================================================
+
+[[dispatch]]
+dispatcher = "focusmonitor"
+label = "Focus monitor"
+keywords = ["monitor", "focus", "screen"]
+arg_template = "{input}"
+triggers = ["fm"]
+
+[[dispatch]]
+dispatcher = "movecurrentworkspacetomonitor"
+label = "Move workspace to monitor"
+keywords = ["monitor", "move", "workspace"]
+arg_template = "{input}"
+triggers = ["mwm"]
+
+[[dispatch]]
+dispatcher = "swapactiveworkspaces"
+label = "Swap active workspaces"
+keywords = ["swap", "workspace", "monitor"]
+arg_template = "{input}"
+triggers = ["saw"]
+
+# ==========================================================================
+# Layout: Scrolling
+# ==========================================================================
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+label = "Resize column"
+keywords = ["resize", "column"]
+arg_template = "colresize {input}"
+triggers = ["cr"]
+layout = "scrolling"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "colresize all 0.5"
+label = "Resize all columns to half"
+keywords = ["resize", "column", "half", "equal"]
+layout = "scrolling"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "fit active"
+label = "Fit active window"
+keywords = ["fit", "active"]
+layout = "scrolling"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "fit visible"
+label = "Fit visible windows"
+keywords = ["fit", "visible"]
+layout = "scrolling"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "fit all"
+label = "Fit all windows"
+keywords = ["fit", "all"]
+layout = "scrolling"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+label = "Move window"
+keywords = ["move", "scroll"]
+arg_template = "move {input}"
+triggers = ["sm"]
+layout = "scrolling"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "swapcol l"
+label = "Swap column left"
+keywords = ["swap", "column", "left"]
+layout = "scrolling"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "swapcol r"
+label = "Swap column right"
+keywords = ["swap", "column", "right"]
+layout = "scrolling"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "promote"
+label = "Promote window"
+keywords = ["promote"]
+layout = "scrolling"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "togglefit"
+label = "Toggle fit"
+keywords = ["fit", "toggle"]
+layout = "scrolling"
+
+# ==========================================================================
+# Layout: Dwindle
+# ==========================================================================
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "togglesplit"
+label = "Toggle split direction"
+keywords = ["split", "toggle"]
+layout = "dwindle"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "swapsplit"
+label = "Swap split"
+keywords = ["swap", "split"]
+layout = "dwindle"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+label = "Preselect direction"
+keywords = ["preselect"]
+arg_template = "preselect {input}"
+triggers = ["ps"]
+layout = "dwindle"
+
+# ==========================================================================
+# Layout: Master
+# ==========================================================================
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "swapwithmaster"
+label = "Swap with master"
+keywords = ["swap", "master"]
+layout = "master"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "focusmaster"
+label = "Focus master"
+keywords = ["focus", "master"]
+layout = "master"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "addmaster"
+label = "Add master"
+keywords = ["add", "master"]
+layout = "master"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "removemaster"
+label = "Remove master"
+keywords = ["remove", "master"]
+layout = "master"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "orientationnext"
+label = "Next orientation"
+keywords = ["orientation", "next", "rotate"]
+layout = "master"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "orientationprev"
+label = "Previous orientation"
+keywords = ["orientation", "previous", "rotate"]
+layout = "master"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+label = "Set master factor"
+keywords = ["master", "factor", "size"]
+arg_template = "mfact {input}"
+triggers = ["mf"]
+layout = "master"
+
+[[dispatch]]
+dispatcher = "layoutmsg"
+arg = "rollnext"
+label = "Roll next"
+keywords = ["roll", "next"]
+layout = "master"
