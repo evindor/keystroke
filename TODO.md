@@ -1,0 +1,3 @@
+- [ ] Implement categories in search results
+- [ ] Implement dispatcher icons (via nerd font)
+- [ ] Implement user-configurable opacity

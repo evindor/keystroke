@@ -20,16 +20,24 @@ use store::Store;
 use theme::Theme;
 use ui::DisplayRow;
 
+// Keep the file monitor alive so the signal stays connected.
+#[allow(dead_code)]
+struct CssMonitor(gio::FileMonitor);
+
 // ---------------------------------------------------------------------------
 // Application state (single-threaded, shared via Rc<RefCell<...>>)
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)] // user_css + _css_monitor kept alive for GTK provider lifetime
 struct AppState {
     commands: Vec<Command>,
     config: Config,
     store: Store,
     engine: Engine,
     providers: Vec<Box<dyn Provider>>,
+    base_css: gtk4::CssProvider,
+    user_css: gtk4::CssProvider,
+    _css_monitor: Option<CssMonitor>,
 }
 
 // ---------------------------------------------------------------------------
@@ -68,22 +76,41 @@ fn scored_to_display(scored: &[ScoredCommand]) -> Vec<DisplayRow> {
         .collect()
 }
 
-/// Load (or reload) the CSS theme into the GTK display.
-fn apply_css(config: &Config) {
+/// Load theme-derived CSS into an existing provider.
+fn load_base_css(provider: &gtk4::CssProvider, config: &Config) {
     let theme = Theme::load();
     let css_string = theme.generate_css(
         config.appearance.border_radius,
         config.appearance.width,
     );
-
-    let provider = gtk4::CssProvider::new();
     provider.load_from_data(&css_string);
+}
 
-    gtk4::style_context_add_provider_for_display(
-        &gdk4::Display::default().unwrap(),
-        &provider,
-        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-    );
+/// Load user CSS into an existing provider (clears if file is absent).
+fn load_user_css(provider: &gtk4::CssProvider) {
+    let css = theme::load_user_css().unwrap_or_default();
+    provider.load_from_data(&css);
+}
+
+/// Set up a `gio::FileMonitor` on the user CSS file.  Returns `None` if the
+/// path cannot be resolved.
+fn setup_css_monitor(user_provider: &gtk4::CssProvider) -> Option<CssMonitor> {
+    let path = theme::user_css_path()?;
+    let file = gio::File::for_path(&path);
+    let monitor = file.monitor_file(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE).ok()?;
+
+    let provider = user_provider.clone();
+    monitor.connect_changed(move |_monitor, _file, _other, event| {
+        use gio::FileMonitorEvent::*;
+        match event {
+            Changed | Created | Deleted | MovedIn | MovedOut => {
+                load_user_css(&provider);
+            }
+            _ => {}
+        }
+    });
+
+    Some(CssMonitor(monitor))
 }
 
 // ---------------------------------------------------------------------------
@@ -101,8 +128,8 @@ fn on_show(
     // Reload config (in case it changed on disk).
     st.config = Config::load();
 
-    // Reload CSS (theme may have changed).
-    apply_css(&st.config);
+    // Reload base CSS (theme may have changed).
+    load_base_css(&st.base_css, &st.config);
 
     // Rebuild engine with potentially-updated config.
     st.engine = Engine::new(
@@ -187,8 +214,27 @@ fn main() {
                 // Load config.
                 let config = Config::load();
 
-                // Apply theme CSS.
-                apply_css(&config);
+                // --- CSS: two-layer setup ---
+                let display = gdk4::Display::default().unwrap();
+
+                let base_css = gtk4::CssProvider::new();
+                load_base_css(&base_css, &config);
+                gtk4::style_context_add_provider_for_display(
+                    &display,
+                    &base_css,
+                    gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+                );
+
+                let user_css = gtk4::CssProvider::new();
+                theme::ensure_default_user_css();
+                load_user_css(&user_css);
+                gtk4::style_context_add_provider_for_display(
+                    &display,
+                    &user_css,
+                    gtk4::STYLE_PROVIDER_PRIORITY_USER,
+                );
+
+                let css_monitor = setup_css_monitor(&user_css);
 
                 // Set up engine.
                 let engine_inst = Engine::new(
@@ -325,6 +371,9 @@ fn main() {
                     store: store_inst,
                     engine: engine_inst,
                     providers: active_providers,
+                    base_css,
+                    user_css,
+                    _css_monitor: css_monitor,
                 });
 
                 // Store launcher reference.

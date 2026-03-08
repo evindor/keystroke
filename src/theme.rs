@@ -1,6 +1,59 @@
 use std::path::PathBuf;
 
 // ---------------------------------------------------------------------------
+// User CSS
+// ---------------------------------------------------------------------------
+
+const USER_CSS_TEMPLATE: &str = r#"/* Keystroke User Stylesheet
+ * Overrides the auto-generated theme CSS.
+ * Changes apply live — no restart needed.
+ *
+ * Available selectors:
+ *   window               — outer transparent window
+ *   .container           — launcher box (background, border, shadow, border-radius)
+ *   .search-input        — text input field (font-size, color, padding)
+ *   .separator           — line between input and results
+ *   .results-list        — scrollable results container
+ *   .result-row          — individual result item
+ *   .result-row.selected — highlighted/active result
+ *   .result-label        — command name text
+ *   .result-hotkey       — hotkey badge (right side)
+ *   .result-icon         — app icon
+ *
+ * Example:
+ *   .container { border-radius: 24px; }
+ *   .search-input { font-size: 18px; }
+ *   .result-row.selected { background-color: rgba(255, 100, 50, 0.2); }
+ */
+"#;
+
+/// Returns `~/.config/keystroke/style.css`.
+pub fn user_css_path() -> Option<PathBuf> {
+    let home = std::env::var("HOME").ok()?;
+    Some(PathBuf::from(home).join(".config/keystroke/style.css"))
+}
+
+/// On first run, writes the starter template to `~/.config/keystroke/style.css`.
+/// Does nothing if the file already exists.
+pub fn ensure_default_user_css() {
+    let Some(path) = user_css_path() else { return };
+    if path.exists() {
+        return;
+    }
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(&path, USER_CSS_TEMPLATE);
+}
+
+/// Reads the user CSS file and returns its contents, or `None` if it doesn't
+/// exist or can't be read.
+pub fn load_user_css() -> Option<String> {
+    let path = user_css_path()?;
+    std::fs::read_to_string(path).ok()
+}
+
+// ---------------------------------------------------------------------------
 // Default fallback colors (Catppuccin Mocha-ish)
 // ---------------------------------------------------------------------------
 
