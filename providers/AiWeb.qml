@@ -1,14 +1,17 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../core/AiTargets.js" as AiTargets
 
 // Fallbacks for queries nothing else answers. Typing never contacts a
-// provider; every hand-off is an explicit activation. Targets are detected at
-// query time and modes whose target is missing fall back to the browser.
+// provider; every hand-off is an explicit activation that opens the target
+// with the prompt already in its composer (see core/AiTargets.js for the
+// verified links). Targets are detected once at load and re-checked when the
+// desktop entries change; a missing app or CLI falls back to the browser.
 Item {
   id: root
   property var host: null
-  property var cliAvailable: ({})
+  property var available: ({})
 
   readonly property var provider: ({
     apiVersion: 1,
@@ -16,65 +19,50 @@ Item {
     name: "AI & Web Search",
     icon: "✳",
     color: "#e79c85",
-    description: "Continue any query with Google, ChatGPT or Claude",
+    description: "Continue any query in Claude, ChatGPT/Codex or Google",
     settings: [
-      { key: "provider", type: "enum", label: "Preferred AI provider", "default": "chatgpt", options: ["chatgpt", "claude"] },
+      { key: "provider", type: "enum", label: "Preferred assistant", "default": "chatgpt", options: ["chatgpt", "claude"],
+        description: "Listed first among the fallbacks" },
       { key: "mode", type: "enum", label: "Open conversations in", "default": "desktop", options: ["desktop", "cli", "browser"],
-        description: "Falls back to the browser when the app or CLI is not installed" }
+        description: "Desktop opens Claude or Codex with the prompt filled in; falls back to the browser when the app or CLI is not installed" },
+      { key: "autoSend", type: "boolean", label: "Send immediately in the browser", "default": false,
+        description: "ChatGPT only. Claude and the desktop apps always let you review the prompt first" }
     ],
     query: function(ctx) { return root.query(ctx) }
   })
 
   Process {
-    command: ["bash", "-lc", "for c in claude codex; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done"]
+    id: detect
+    command: ["bash", "-lc", "for c in claude-desktop chatgpt claude codex; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done"]
     running: true
     stdout: StdioCollector {
       onStreamFinished: {
         var found = ({})
         var lines = text.split("\n")
         for (var i = 0; i < lines.length; i++) if (lines[i].trim()) found[lines[i].trim()] = true
-        root.cliAvailable = found
+        root.available = found
       }
     }
   }
 
-  function desktopEntry(needle) {
-    var values = DesktopEntries.applications.values || []
-    for (var i = 0; i < values.length; i++) {
-      var e = values[i]
-      var id = String(e.id || "").toLowerCase(), name = String(e.name || "").toLowerCase()
-      if (e.noDisplay) continue
-      if (id.indexOf(needle) >= 0 || name.indexOf(needle) >= 0) return e
-    }
-    return null
-  }
-
-  function actionFor(providerId, name, mode, q) {
-    var cli = providerId === "chatgpt" ? "codex" : "claude"
-    var url = providerId === "chatgpt" ? "https://chatgpt.com/" : "https://claude.ai/new"
-    var notify = { type: "notify", glyph: "󰅍", headline: "Prompt copied", body: "Paste it into a new chat in " + name + "." }
-    if (mode === "cli" && root.cliAvailable[cli])
-      return { effect: { type: "exec", argv: ["omarchy-launch-terminal", cli, q] }, subtitle: "New " + cli + " session · prompt passed as an argument" }
-    if (mode === "desktop") {
-      var entry = root.desktopEntry(providerId)
-      if (entry) return { effect: { type: "compound", actions: [{ type: "copy", text: q }, { type: "app", id: String(entry.id), name: String(entry.name) }, notify] },
-                          subtitle: "Desktop app · prompt copied, paste to start" }
-    }
-    var reason = mode === "browser" ? "Browser" : (mode === "cli" ? cli + " CLI not found · browser" : "Desktop app not found · browser")
-    return { effect: { type: "compound", actions: [{ type: "copy", text: q }, { type: "url", url: url }, notify] }, subtitle: reason + " · prompt copied, paste to start" }
+  // Installing or removing one of the apps changes the desktop entries; that is
+  // the moment to look again instead of forking bash on every open.
+  Connections {
+    target: DesktopEntries.applications
+    function onValuesChanged() { if (!detect.running) detect.running = true }
   }
 
   function query(ctx) {
     if (ctx.scope || !ctx.query.trim()) return []
     var q = ctx.query.trim()
     var rows = [{ id: "google", title: "Search Google", subtitle: q, icon: "󰊭", section: "Continue with", verb: "Search", tier: "fallback", score: 2,
-                  action: { type: "url", url: "https://www.google.com/search?q=" + encodeURIComponent(q).replace(/%20/g, "+") } }]
-    var providers = [["chatgpt", "ChatGPT", "󰭹"], ["claude", "Claude", "󰛄"]]
-    for (var i = 0; i < providers.length; i++) {
-      var p = providers[i]
-      var a = root.actionFor(p[0], p[1], ctx.settings.mode, q)
-      rows.push({ id: p[0], title: "Start a new chat in " + p[1], subtitle: a.subtitle, icon: p[2], section: "Continue with", verb: "Open " + p[1],
-                  tier: "fallback", score: p[0] === ctx.settings.provider ? 3 : 2, action: a.effect })
+                  action: { type: "url", url: AiTargets.googleUrl(q) } }]
+    var order = ctx.settings.provider === "claude" ? ["claude", "chatgpt"] : ["chatgpt", "claude"]
+    for (var i = 0; i < order.length; i++) {
+      var p = AiTargets.plan(order[i], ctx.settings.mode, ctx.settings.autoSend === true, root.available, q)
+      rows.push({ id: p.id, title: p.title, subtitle: p.subtitle, icon: order[i] === "claude" ? "󰛄" : "󰭹", section: "Continue with",
+                  verb: p.verb, tier: "fallback", score: i === 0 ? 3 : 2, action: p.effect,
+                  preview: q, previewLabel: "PROMPT", previewDetail: "Opens with this prompt in the composer" })
     }
     return rows
   }
