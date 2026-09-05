@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "community.flint",
+  "name": "Flint",
+  "version": "0.1.0",
+  "author": "Flint contributors",
+  "description": "An extension-first command palette for Omarchy",
+  "kinds": [
+    "menu",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "menu": "Flint.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Flint",
+    "description": "Your command palette",
+    "category": "Compositor",
+    "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.menu"
+  },
+  "license": "MIT"
+}

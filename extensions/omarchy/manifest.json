@@ -1,0 +1,21 @@
+{
+  "apiVersion": 1,
+  "id": "flint.omarchy",
+  "name": "Omarchy",
+  "version": "0.1.0",
+  "description": "The complete, live Omarchy menu",
+  "icon": "󰣇",
+  "color": "#d4a774",
+  "permissions": [
+    "process"
+  ],
+  "settings": [
+    {
+      "key": "confirmDestructive",
+      "type": "boolean",
+      "label": "Confirm destructive actions",
+      "default": true,
+      "description": "Confirm shutdown, removal and configuration resets"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "apiVersion": 1,
+  "id": "flint.converter",
+  "name": "Converter",
+  "version": "0.1.0",
+  "description": "Units and daylight-saving aware time zones",
+  "icon": "󰯍",
+  "color": "#81c8b6",
+  "permissions": [
+    "clipboard.write"
+  ],
+  "settings": [
+    {
+      "key": "timezone",
+      "type": "string",
+      "label": "Your time zone",
+      "default": "Europe/Tallinn",
+      "description": "IANA name, for example Europe/Tallinn or America/New_York"
+    }
+  ]
+}

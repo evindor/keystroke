@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Local review launcher. Production plugins are hosted by omarchy-shell."""
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+root = Path(__file__).resolve().parent.parent
+args = sys.argv[1:]
+verb = args[0] if args else "toggle"
+ipc = ["quickshell", "ipc", "-p", str(root), "call", "flint"]
+if verb == "validate":
+    raise SystemExit(subprocess.call(["omarchy", "plugin", "validate", str(root)]))
+if verb in {"help", "--help", "-h"}:
+    print("Flint review build\n  bin/flint                 Toggle palette\n  bin/flint open [query]    Open with a query\n  bin/flint settings        Extension settings\n  bin/flint close           Close palette\n  bin/flint stop            Stop review instance\n  bin/flint validate        Validate Omarchy plugin manifest")
+    raise SystemExit(0)
+if verb == "stop":
+    raise SystemExit(subprocess.call(["quickshell", "kill", "-p", str(root)]))
+if subprocess.run(ipc + ["ping"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+    subprocess.run(["quickshell", "-p", str(root), "--daemonize", "--no-duplicate"], check=True)
+    for _ in range(40):
+        if subprocess.run(ipc + ["ping"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+            break
+        time.sleep(.05)
+    else:
+        raise SystemExit("Flint did not start. Inspect: quickshell log -p " + str(root))
+if verb == "settings":
+    argv = ["open", json.dumps({"scope": "flint.settings", "title": "Settings"})]
+elif verb == "open":
+    argv = ["open", json.dumps({"query": " ".join(args[1:])})]
+elif verb in {"toggle", "close", "inspect"}:
+    argv = [verb]
+else:
+    raise SystemExit("Unknown command. See bin/flint --help")
+raise SystemExit(subprocess.call(ipc + argv))

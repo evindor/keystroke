@@ -1,0 +1,23 @@
+{
+  "apiVersion": 1,
+  "id": "flint.calculator",
+  "name": "Calculator",
+  "version": "0.1.0",
+  "description": "Private, instant arithmetic",
+  "icon": "󰃬",
+  "color": "#b1a2e8",
+  "permissions": [
+    "clipboard.write"
+  ],
+  "settings": [
+    {
+      "key": "precision",
+      "type": "number",
+      "label": "Significant digits",
+      "default": 12,
+      "min": 2,
+      "max": 15,
+      "integer": true
+    }
+  ]
+}

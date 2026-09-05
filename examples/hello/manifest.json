@@ -1,0 +1,15 @@
+{
+  "apiVersion": 1,
+  "id": "example.hello",
+  "name": "Hello Extension",
+  "version": "0.1.0",
+  "description": "A minimal JSON protocol example for this review build",
+  "command": ["python", "./main.py"],
+  "prefix": "hello",
+  "minQueryLength": 5,
+  "timeoutMs": 500,
+  "permissions": ["clipboard.write"],
+  "settings": [
+    {"key": "greeting", "type": "string", "label": "Greeting", "default": "Hello"}
+  ]
+}

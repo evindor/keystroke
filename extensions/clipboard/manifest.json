@@ -1,0 +1,25 @@
+{
+  "apiVersion": 1,
+  "id": "flint.clipboard",
+  "name": "Clipboard History",
+  "version": "0.1.0",
+  "description": "Uses Omarchy's existing history",
+  "icon": "󰅌",
+  "color": "#8dbaec",
+  "permissions": [
+    "clipboard.read",
+    "clipboard.write",
+    "process"
+  ],
+  "settings": [
+    {
+      "key": "limit",
+      "type": "number",
+      "label": "Maximum entries",
+      "default": 100,
+      "min": 1,
+      "max": 300,
+      "integer": true
+    }
+  ]
+}

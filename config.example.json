@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "extensions": {
+    "flint.ai": {
+      "enabled": true,
+      "provider": "chatgpt",
+      "mode": "desktop"
+    },
+    "flint.applications": {
+      "enabled": true
+    },
+    "flint.calculator": {
+      "enabled": true,
+      "precision": 12
+    },
+    "flint.clipboard": {
+      "enabled": true,
+      "limit": 100
+    },
+    "flint.colors": {
+      "enabled": true,
+      "format": "hex"
+    },
+    "flint.converter": {
+      "enabled": true,
+      "timezone": "Europe/Tallinn"
+    },
+    "flint.emoji": {
+      "enabled": true
+    },
+    "flint.omarchy": {
+      "enabled": true,
+      "confirmDestructive": true
+    },
+    "flint.settings": {
+      "enabled": true,
+      "density": "compact",
+      "accent": "ember",
+      "showPreview": true
+    }
+  }
+}

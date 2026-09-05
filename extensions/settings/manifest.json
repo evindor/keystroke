@@ -1,0 +1,42 @@
+{
+  "apiVersion": 1,
+  "id": "flint.settings",
+  "name": "Appearance",
+  "version": "0.1.0",
+  "description": "Flint's layout, colors and previews",
+  "icon": "󰒓",
+  "color": "#a5a4ad",
+  "permissions": [
+    "process"
+  ],
+  "settings": [
+    {
+      "key": "density",
+      "type": "enum",
+      "label": "Layout density",
+      "default": "compact",
+      "options": [
+        "compact",
+        "comfortable"
+      ],
+      "description": "Compact uses a narrower window and shorter rows"
+    },
+    {
+      "key": "accent",
+      "type": "enum",
+      "label": "Accent color",
+      "default": "ember",
+      "options": [
+        "ember",
+        "violet",
+        "mint"
+      ]
+    },
+    {
+      "key": "showPreview",
+      "type": "boolean",
+      "label": "Show result previews",
+      "default": true
+    }
+  ]
+}
