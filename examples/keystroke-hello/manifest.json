@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "example.keystroke-hello",
+  "name": "Keystroke Hello",
+  "version": "1.0.0",
+  "author": "Keystroke contributors",
+  "description": "Minimal community provider for the Keystroke command palette",
+  "kinds": ["service"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml"
+  },
+  "x-keystroke": {
+    "apiVersion": 1
+  },
+  "license": "MIT"
+}

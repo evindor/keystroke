@@ -1,86 +1,52 @@
-# Flint
+# Keystroke
 
-A Raycast-inspired command palette for Omarchy 4. A review prototype: native QML UI, keyboard navigation, and nine capability extensions.
+A Raycast-inspired command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin, written in QML/JavaScript, running inside the existing `omarchy-shell` process. No extra runtime, no resident helper, nothing running while it is hidden.
 
-![Flint](assets/home.png)
+Every capability is a provider: applications, the complete Omarchy menu, calculator, unit and time-zone conversion, colors, emoji, clipboard history, AI/web continuation, and the settings screens themselves. Community providers are ordinary Omarchy plugins.
 
-## Review it
-
-From this checkout:
+## Install
 
 ```sh
-./bin/flint
-./bin/flint open '2m in feet'
-./bin/flint settings
+omarchy plugin add https://github.com/<you>/keystroke.git --enable   # once published
+# from this checkout, for development:
+bin/keystroke install
 ```
 
-The review launcher runs a separate Quickshell configuration. It does **not** install Flint, change keybindings, or replace the current menu. Use `./bin/flint stop` to terminate the review instance.
+Enabling Keystroke makes it the menu: `Super+Space`, every `omarchy-menu` binding, `omarchy menu summon <route>`, and the `omarchy-menu-select`/`omarchy-menu-input` pickers all route to it. Disabling or removing it (`omarchy plugin disable evindor.keystroke`, `omarchy plugin remove evindor.keystroke`, or `bin/keystroke uninstall`) restores the stock menu. This works because the manifest declares `omarchy.clonedFrom: "omarchy.menu"`; Omarchy's plugin registry uses that field to route calls for `omarchy.menu` to the enabled replacement and to restore the original afterwards. Keep it.
 
-Production integration is an **Omarchy menu plugin**: `manifest.json` declares `entryPoints.menu: Flint.qml` and `omarchy.clonedFrom: omarchy.menu`. Omarchy's existing shell can host it and route menu calls to it. The separate `shell.qml` is a development harness only. Live installation, replacement, disable/restore, and shell-restart testing remain to be done after the architecture review.
+**Bar-widget quirk (Omarchy 4.0.x).** Keystroke also ships the menu button as a bar widget, so enabling it puts a button in your bar (replacing the stock one in place if you had it). For a third-party plugin, "enabled" means "referenced in shell.json", so removing that button from the bar also disables the menu. If you do not want the button, keep the plugin listed under `plugins[]` in `~/.config/omarchy/shell.json` instead. An upstream issue proposing that clone replacements stay enabled independently of the bar is part of the follow-ups.
 
-Requirements already available on the development machine: Omarchy 4, Quickshell 0.3, Qt 6.11, Python 3.11+, `wl-copy`, `hyprpicker`, `gtk-launch`, and Omarchy's launch helpers. No pip/npm dependencies or build step.
+The plugin id is `evindor.keystroke` for now; the permanent publishing id may change before the marketplace listing.
 
-## What works
+## Using it
 
-| Extension | Try it |
-| --- | --- |
-| Applications | Search an app by name, or open Applications |
-| Omarchy | Browse the live menu, or search `nightlight`, `theme`, `screenshot` |
-| Calculator | `sqrt(144) + 15% of 80`, `128 * 1.24` |
-| Converter | `2m in feet`, `32 F to C`, `1 GiB in MiB` |
-| Time zones | `10 am in London`, `11 pm in New York to Tokyo on 2026-09-06` |
-| Clipboard | Open Clipboard History; text and images use Omarchy's existing history |
-| Emoji | `:smile`, `:rocket`, or open Emoji Picker |
-| Colors | `#ff6644` for HEX/RGB/HSL, or Pick a Color |
-| AI and web | An unmatched query offers Google, ChatGPT and Claude |
-| Settings | `Ctrl+,`; change extension settings or open the config file |
+- Type anything: apps, Omarchy commands, `sqrt(144) + 15% of 80`, `2m in feet`, `32 F to C`, `10 am in London`, `#ff6644`, `:smile`.
+- Computed answers appear first as answer rows with a preview; matches next; Google/ChatGPT/Claude last.
+- `↑`/`↓` or `Ctrl+P`/`Ctrl+N` move, `PageUp`/`PageDown` jump six rows, `↵` or `→` activates, `Esc` closes immediately, `Ctrl+U` clears the query, `←`/`Backspace` on an empty query goes back, `Del` on an application offers to uninstall it, `Ctrl+,` opens Settings, `Ctrl+K` opens the selected provider's settings.
+- Destructive Omarchy actions (shutdown, reboot, logout, hibernate, removals, config resets) ask for confirmation; turn this off in Settings → Omarchy.
+- Selections of apps and Omarchy commands earn a bounded frecency bonus (14-day half-life). State lives in `~/.local/state/keystroke/usage.json` as hashed ids only.
 
-Time conversion interprets `10 am in London` as 10:00 **in London**, converted to your configured local zone, on today's date in London. The example config uses Europe/Tallinn. DST gaps and repeated times are rejected instead of guessed. Gallons are US liquid gallons; KB/MB/GB are decimal and KiB/MiB/GiB are binary. Currency and broad natural-language parsing are not implemented.
+Every `omarchy menu` route works as before: submenus open scoped (`omarchy menu toggle system`), leaf aliases run immediately (`omarchy menu summon reminder-set`), `apps` opens the Applications provider. Pickers honor `width`/`maxHeight`; a new picker request cancels a pending one (the stock menu left the first caller waiting).
 
-`↑`/`↓` or `Ctrl+P`/`Ctrl+N` select; `Enter` activates; **Escape closes immediately**. Left Arrow or Backspace goes back when the search field is empty; Left Arrow otherwise edits text normally. Every submenu and back-navigation starts at the first row. `Ctrl+K` opens the selected extension's settings. Destructive menu actions have a confirmation step (`Ctrl+Enter` or the Confirm button).
+## Settings
 
-The default **Compact** layout is 640 logical pixels wide with shorter rows. Change it at **Flint Settings → Appearance → Layout density**; Comfortable is 760 pixels wide. Both adapt to smaller screens. The search icon is drawn geometrically and the header labels share a text baseline.
+One file, hand-editable and hot-reloaded: `~/.config/omarchy/keystroke.json` (see [keystroke.example.json](keystroke.example.json)). Settings screens are generated from each provider's schema; writes are atomic, preserve unknown fields, and are refused while the file fails to parse. Bundled providers default to enabled, community providers to disabled. Appearance: density (compact/comfortable), accent (theme accent or ember/violet/mint), previews on/off. Colors, fonts, radius and spacing follow the active Omarchy theme.
 
-Typing keeps the existing rows in place while the next results arrive. Fast providers are coalesced into one update; a loading hint only appears after 180 ms. Bare numbers such as `22` show a calculator result; an unfinished expression such as `22 +` keeps a non-actionable calculator preview until the next operand is entered.
+## Providers
 
-Strong application-name matches rank ahead of menu configuration commands. App and Omarchy command selections learn a **frecency** bonus: frequency weighted by recency, halving every 14 days. Learning starts with selections made by this version. The score is bounded and cannot promote unrelated matches or outrank computed answers. `~/.local/state/flint/usage.json` (respecting `XDG_STATE_HOME`, or `FLINT_USAGE` for tests) contains hashed result IDs, decaying weights and timestamps; no query text, prompts or clipboard contents are recorded. A dispatch counts as a selection, even if the external application subsequently fails to start.
+Bundled providers live in [providers/](providers/) and are the reference implementation of the contract in [docs/providers.md](docs/providers.md). A community provider is an Omarchy plugin of kind `service` with an `x-keystroke` marker; Omarchy installs, enables, reloads and removes it, and Keystroke finds it through `shell.serviceFor()`. See [examples/keystroke-hello](examples/keystroke-hello/).
 
-The host uses Omarchy's actual menu definitions, including user JSONC overrides, aliases, links, conditions and dynamic font/power-profile providers. The inspected stock definition contains **320 entries and 263 actions**. Those actions were indexed, not all executed. Direct leaf routes currently display the command for explicit activation instead of executing on summon. Caller-specified dmenu width/height is currently normalized to Flint's card size.
+Community providers run unsandboxed inside your shell with your permissions, like every Omarchy plugin. Keystroke shows their provenance in Settings and keeps them off until you enable them.
 
-## AI behavior
-
-- **Desktop:** copy the prompt and open the app. Claude's installed desktop entry advertises a New Chat link, which Flint uses. ChatGPT currently opens the app; choose New chat and paste. Automatic prompt insertion or submission is not implemented.
-- **CLI:** open an interactive Codex or Claude session with the prompt as a literal argument. Normal CLI permissions remain in effect.
-- **Browser:** copy the prompt and open the provider's conversation page.
-- Google opens the default browser with a URL-encoded query.
-
-Selecting an AI action is required. Typing does not send queries to a provider. Desktop/CLI launches have not been exercised end to end; inspect the configured mode before using them. Desktop mode requires the appropriate app executable on PATH.
-
-## Configuration
-
-Flint reads `~/.config/flint/config.json` (or `$XDG_CONFIG_HOME/flint/config.json`). `FLINT_CONFIG` overrides the path for testing. Missing keys take the extension defaults. [config.example.json](config.example.json) includes every setting.
-
-The settings screens are generated from each extension's manifest. Writes preserve unknown fields and use an atomic replacement with mode 0600. Invalid config files are reported and not overwritten. Config edits are picked up at the next query/open; extension discovery currently requires restarting Flint.
-
-## Architecture is under review
-
-This build uses a resident Python process for query orchestration, arithmetic, time zones, and a language-independent external-extension protocol. That was an early implementation choice, **not a requirement of QML or Omarchy**. QML already embeds JavaScript in Qt.
-
-The proposed next direction is an Omarchy-native menu clone with QML/JS capability modules and community extensions distributed as ordinary Omarchy plugins. Keep this implementation as a visual and behavioral reference while deciding the integration contract. See [architecture.md](docs/architecture.md).
-
-[Fable's review handoff](docs/fable-review.md) collects the deliberations, performance evidence, open decisions and a ready-to-use review prompt. Further fuzzy-matching work is deferred until the architecture is settled.
-
-The prototype's external protocol is documented in [extensions.md](docs/extensions.md); it is experimental, not the planned public ecosystem contract.
-
-## Verification
+## Verify
 
 ```sh
-python -m unittest discover -s tests -v
-omarchy plugin validate "$PWD"
-./bin/flint open
-python tests/ui_smoke.py
+bin/keystroke validate     # omarchy plugin validate
+bin/keystroke test         # qmltestrunner unit tests, time-zone helper checks, qmllint
 ```
 
-The UI smoke test operates only this review instance, opens several views, and writes temporary picker replies. It closes the palette afterward. It does not execute menu actions, launch AI sessions, or modify desktop configuration.
+[docs/verification.md](docs/verification.md) records what was run on the reference machine, including the temporary in-shell install. [docs/architecture.md](docs/architecture.md) describes the design; [docs/history/](docs/history/) keeps the prototype review that led to it.
 
-See [verification.md](docs/verification.md) for test results, measurements, and remaining integration work. This is not yet a production-complete menu replacement.
+## Requirements
+
+Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). `python3` is used only for IANA time-zone conversion, on demand. Omarchy's MIT-licensed menu model is vendored in [omarchy/MenuModel.js](omarchy/MenuModel.js); see [LICENSE](LICENSE).

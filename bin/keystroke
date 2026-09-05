@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Developer/installer helper for Keystroke. Production loading is done by
+# omarchy-shell; this script only wraps the Omarchy plugin CLI.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ID="$(jq -r .id "$ROOT/manifest.json")"
+TARGET="$HOME/.config/omarchy/plugins/$ID"
+
+usage() {
+  cat <<USAGE
+Usage: bin/keystroke <command>
+
+  install     Copy this checkout (no symlinks, no tests/docs) to $TARGET, rescan and enable
+  uninstall   Disable, remove the copy, restore the stock Omarchy menu
+  enable      omarchy plugin enable $ID
+  disable     omarchy plugin disable $ID (restores omarchy.menu)
+  toggle      Toggle the palette (routes through omarchy.menu)
+  open <q>    Open the palette with a query
+  validate    omarchy plugin validate on this checkout
+  test        Run the QML unit tests, the time-zone helper checks, and qmllint
+USAGE
+}
+
+sync_copy() {
+  mkdir -p "$(dirname "$TARGET")"
+  local stage
+  stage="$(mktemp -d "$(dirname "$TARGET")/.keystroke.XXXXXX")"
+  # -L dereferences any symlink so the installed tree never contains one.
+  rsync -aL --delete --exclude .git --exclude tests --exclude docs --exclude assets --exclude examples \
+    --exclude '__pycache__' --exclude '*.pyc' "$ROOT/" "$stage/"
+  if [[ -e $TARGET ]]; then rm -rf "$TARGET"; fi
+  mv "$stage" "$TARGET"
+}
+
+case "${1:-help}" in
+  install)
+    omarchy plugin validate "$ROOT"
+    sync_copy
+    omarchy-shell shell rescanPlugins >/dev/null
+    for _ in $(seq 1 40); do
+      if omarchy-plugin-list --json | jq -e --arg id "$ID" 'any(.[]; .id == $id)' >/dev/null; then break; fi
+      sleep 0.05
+    done
+    omarchy plugin enable "$ID"
+    echo "Keystroke is now the Omarchy menu. Super+Space and every omarchy-menu caller route to it."
+    ;;
+  uninstall)
+    omarchy plugin disable "$ID" || true
+    rm -rf "$TARGET"
+    omarchy-shell shell rescanPlugins >/dev/null
+    echo "Removed $TARGET; the stock Omarchy menu is active again."
+    ;;
+  enable) omarchy plugin enable "$ID" ;;
+  disable) omarchy plugin disable "$ID" ;;
+  toggle) exec omarchy-shell shell toggle omarchy.menu '{"menu":"root"}' ;;
+  open)
+    shift
+    exec omarchy-shell shell summon omarchy.menu "$(jq -nc --arg q "${*:-}" '{query: $q}')"
+    ;;
+  validate) exec omarchy plugin validate "$ROOT" ;;
+  test)
+    (cd "$ROOT/tests" && /usr/lib/qt6/bin/qmltestrunner -silent -input .)
+    python3 "$ROOT/tests/tz_helper_check.py"
+    "$ROOT/tests/lint.sh"
+    ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

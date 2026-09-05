@@ -1,22 +1,27 @@
 import QtQuick
-import Quickshell
-import qs.Ui as OmarchyUi
+import qs.Ui
 
-OmarchyUi.BarWidget {
-    id: root
-    moduleName: "community.flint"
-    implicitWidth: button.implicitWidth
-    implicitHeight: button.implicitHeight
-    OmarchyUi.WidgetButton {
-        id: button
-        anchors.fill: parent
-        bar: root.bar
-        text: "\ue900"
-        fontFamily: "omarchy"
-        horizontalMargin: 7.5
-        onPressed: function(buttonCode) {
-            if (buttonCode === Qt.RightButton) Quickshell.execDetached(["xdg-terminal-exec"])
-            else Quickshell.execDetached(["omarchy-shell", "shell", "toggle", "community.flint", "{}"])
-        }
+// Adapted from Omarchy's menu bar widget. Toggling through `omarchy.menu`
+// lets PluginRegistry route the call to whichever menu implementation is
+// enabled, so this button keeps working if Keystroke is disabled.
+BarWidget {
+  id: root
+  moduleName: "evindor.keystroke"
+
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
+
+  WidgetButton {
+    id: button
+    anchors.fill: parent
+    bar: root.bar
+    text: ""
+    fontFamily: "omarchy"
+    horizontalMargin: 7.5
+    onPressed: function(pressedButton) {
+      if (!root.bar) return
+      if (pressedButton === Qt.RightButton) root.bar.run("xdg-terminal-exec")
+      else root.bar.run("omarchy-shell shell toggle omarchy.menu '{\"menu\":\"root\"}'")
     }
+  }
 }

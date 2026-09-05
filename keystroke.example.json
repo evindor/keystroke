@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "palette": {
+    "density": "compact",
+    "accent": "theme",
+    "showPreview": true
+  },
+  "providers": {
+    "omarchy": { "enabled": true, "confirmDestructive": true },
+    "applications": { "enabled": true },
+    "calculator": { "enabled": true, "precision": 12 },
+    "converter": { "enabled": true, "timezone": "" },
+    "colors": { "enabled": true, "format": "hex" },
+    "emoji": { "enabled": true },
+    "clipboard": { "enabled": true, "limit": 100 },
+    "ai": { "enabled": true, "provider": "chatgpt", "mode": "desktop" },
+    "settings": { "enabled": true },
+    "example.keystroke-hello": { "enabled": false, "greeting": "Hello" }
+  }
+}

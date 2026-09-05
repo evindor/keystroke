@@ -1,24 +1,25 @@
 {
   "schemaVersion": 1,
-  "id": "community.flint",
-  "name": "Flint",
-  "version": "0.1.0",
-  "author": "Flint contributors",
-  "description": "An extension-first command palette for Omarchy",
+  "id": "evindor.keystroke",
+  "name": "Keystroke",
+  "version": "0.2.0",
+  "author": "Arseniy Zarechnev",
+  "description": "An extension-first command palette that replaces the Omarchy menu",
   "kinds": [
     "menu",
     "bar-widget"
   ],
   "keepLoaded": true,
   "entryPoints": {
-    "menu": "Flint.qml",
+    "menu": "Keystroke.qml",
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {
-    "displayName": "Flint",
-    "description": "Your command palette",
+    "displayName": "Keystroke",
+    "description": "Opens the Keystroke command palette",
     "category": "Compositor",
-    "allowMultiple": false
+    "allowMultiple": false,
+    "defaultSection": "left"
   },
   "omarchy": {
     "clonedFrom": "omarchy.menu"
