@@ -1,0 +1,14 @@
+{
+  "model": "gpt-5.6-luna",
+  "requested_tier": "fast",
+  "thread_tier": "priority",
+  "first_text_ms": 9158.4,
+  "first_action_ms": 5731.77,
+  "total_ms": 9372.32,
+  "actions": [
+    "/usr/bin/bash -lc 'cat /etc/os-release'"
+  ],
+  "answer": "The operating system is Omarchy.",
+  "status": "completed",
+  "error": null
+}

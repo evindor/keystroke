@@ -1,0 +1,236 @@
+[
+  {
+    "model": "gpt-5.6-luna",
+    "requested_tier": "fast",
+    "thread_tier": "priority",
+    "effort": "low",
+    "phrase": "Open my browser please.",
+    "repeat": 0,
+    "thread_setup_ms": 46.7,
+    "ttft_ms": 2898.9,
+    "turn_ms": 3737.4,
+    "total_ms": 3784.1,
+    "status": "completed",
+    "error": null,
+    "output": {
+      "route": "browser",
+      "summary": "Open the browser"
+    },
+    "tool_observed": false,
+    "correct": true,
+    "usage": {
+      "total": {
+        "totalTokens": 10506,
+        "inputTokens": 10485,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 21,
+        "reasoningOutputTokens": 0
+      },
+      "last": {
+        "totalTokens": 10506,
+        "inputTokens": 10485,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 21,
+        "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+    }
+  },
+  {
+    "model": "gpt-5.6-luna",
+    "requested_tier": "fast",
+    "thread_tier": "priority",
+    "effort": "low",
+    "phrase": "Make my window corners more rounded.",
+    "repeat": 0,
+    "thread_setup_ms": 428.31,
+    "ttft_ms": 2714.02,
+    "turn_ms": 2984.32,
+    "total_ms": 3412.63,
+    "status": "completed",
+    "error": null,
+    "output": {
+      "route": "agent",
+      "summary": "Modify window corner rounding settings"
+    },
+    "tool_observed": false,
+    "correct": true,
+    "usage": {
+      "total": {
+        "totalTokens": 10701,
+        "inputTokens": 10678,
+        "cachedInputTokens": 2816,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 23,
+        "reasoningOutputTokens": 0
+      },
+      "last": {
+        "totalTokens": 10701,
+        "inputTokens": 10678,
+        "cachedInputTokens": 2816,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 23,
+        "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+    }
+  },
+  {
+    "model": "gpt-5.6-luna",
+    "requested_tier": "fast",
+    "thread_tier": "priority",
+    "effort": "low",
+    "phrase": "Copy what I just dictated to the clipboard.",
+    "repeat": 0,
+    "thread_setup_ms": 35.9,
+    "ttft_ms": 4834.79,
+    "turn_ms": 5201.4,
+    "total_ms": 5237.3,
+    "status": "completed",
+    "error": null,
+    "output": {
+      "route": "clipboard",
+      "summary": "Copy dictated text to clipboard"
+    },
+    "tool_observed": false,
+    "correct": true,
+    "usage": {
+      "total": {
+        "totalTokens": 10703,
+        "inputTokens": 10680,
+        "cachedInputTokens": 9984,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 23,
+        "reasoningOutputTokens": 0
+      },
+      "last": {
+        "totalTokens": 10703,
+        "inputTokens": 10680,
+        "cachedInputTokens": 9984,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 23,
+        "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+    }
+  },
+  {
+    "model": "gpt-5.6-luna",
+    "requested_tier": "default",
+    "thread_tier": "default",
+    "effort": "low",
+    "phrase": "Open my browser please.",
+    "repeat": 0,
+    "thread_setup_ms": 35.22,
+    "ttft_ms": 2866.14,
+    "turn_ms": 3178.37,
+    "total_ms": 3213.59,
+    "status": "completed",
+    "error": null,
+    "output": {
+      "route": "browser",
+      "summary": "Open the browser"
+    },
+    "tool_observed": false,
+    "correct": true,
+    "usage": {
+      "total": {
+        "totalTokens": 10697,
+        "inputTokens": 10676,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 21,
+        "reasoningOutputTokens": 0
+      },
+      "last": {
+        "totalTokens": 10697,
+        "inputTokens": 10676,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 21,
+        "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+    }
+  },
+  {
+    "model": "gpt-5.6-luna",
+    "requested_tier": "default",
+    "thread_tier": "default",
+    "effort": "low",
+    "phrase": "Make my window corners more rounded.",
+    "repeat": 0,
+    "thread_setup_ms": 37.29,
+    "ttft_ms": 2565.22,
+    "turn_ms": 2949.19,
+    "total_ms": 2986.47,
+    "status": "completed",
+    "error": null,
+    "output": {
+      "route": "agent",
+      "summary": "Adjust window corner rounding"
+    },
+    "tool_observed": false,
+    "correct": true,
+    "usage": {
+      "total": {
+        "totalTokens": 10700,
+        "inputTokens": 10678,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 22,
+        "reasoningOutputTokens": 0
+      },
+      "last": {
+        "totalTokens": 10700,
+        "inputTokens": 10678,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 22,
+        "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+    }
+  },
+  {
+    "model": "gpt-5.6-luna",
+    "requested_tier": "default",
+    "thread_tier": "default",
+    "effort": "low",
+    "phrase": "Copy what I just dictated to the clipboard.",
+    "repeat": 0,
+    "thread_setup_ms": 38.6,
+    "ttft_ms": 2434.85,
+    "turn_ms": 2750.77,
+    "total_ms": 2789.37,
+    "status": "completed",
+    "error": null,
+    "output": {
+      "route": "clipboard",
+      "summary": "Copy the dictated text"
+    },
+    "tool_observed": false,
+    "correct": true,
+    "usage": {
+      "total": {
+        "totalTokens": 10702,
+        "inputTokens": 10680,
+        "cachedInputTokens": 9984,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 22,
+        "reasoningOutputTokens": 0
+      },
+      "last": {
+        "totalTokens": 10702,
+        "inputTokens": 10680,
+        "cachedInputTokens": 9984,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 22,
+        "reasoningOutputTokens": 0
+      },
+      "modelContextWindow": 258400
+    }
+  }
+]

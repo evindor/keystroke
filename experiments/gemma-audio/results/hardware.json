@@ -1,0 +1,13 @@
+{
+  "python": "3.12.14",
+  "render_nodes": [
+    "/dev/dri/renderD128"
+  ],
+  "level_zero_init": "0x0",
+  "torch": "2.13.0+xpu",
+  "xpu_available": true,
+  "xpu_device": "Intel(R) Arc(TM) B390 GPU",
+  "xpu_compute": 16.0,
+  "vllm": "0.28.1rc1.dev451+g1970f3ed4",
+  "vllm_device": "xpu"
+}

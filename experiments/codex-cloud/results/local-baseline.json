@@ -1,0 +1,59 @@
+[
+  {
+    "ttft_ms": 1154.77,
+    "total_ms": 1783.84,
+    "output": "{\n  \"route\": \"browser\",\n  \"summary\": \"Open the user's browser.\"\n}",
+    "parsed": {
+      "route": "browser",
+      "summary": "Open the user's browser."
+    },
+    "usage": {
+      "completion_tokens": 31,
+      "prompt_tokens": 89,
+      "total_tokens": 120,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "phrase": "Open my browser please.",
+    "correct": true
+  },
+  {
+    "ttft_ms": 213.98,
+    "total_ms": 846.05,
+    "output": "{\n  \"route\": \"agent\",\n  \"summary\": \"Modify window corner rounding.\"\n}",
+    "parsed": {
+      "route": "agent",
+      "summary": "Modify window corner rounding."
+    },
+    "usage": {
+      "completion_tokens": 30,
+      "prompt_tokens": 91,
+      "total_tokens": 121,
+      "prompt_tokens_details": {
+        "cached_tokens": 75
+      }
+    },
+    "phrase": "Make my window corners more rounded.",
+    "correct": true
+  },
+  {
+    "ttft_ms": 209.4,
+    "total_ms": 828.67,
+    "output": "{\n  \"route\": \"clipboard\",\n  \"summary\": \"Copy dictated text to clipboard\"\n}",
+    "parsed": {
+      "route": "clipboard",
+      "summary": "Copy dictated text to clipboard"
+    },
+    "usage": {
+      "completion_tokens": 31,
+      "prompt_tokens": 93,
+      "total_tokens": 124,
+      "prompt_tokens_details": {
+        "cached_tokens": 75
+      }
+    },
+    "phrase": "Copy what I just dictated to the clipboard.",
+    "correct": true
+  }
+]

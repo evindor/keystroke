@@ -1,0 +1,6 @@
+[
+  {"id":"browser","title":"Open browser"},
+  {"id":"terminal","title":"Open terminal"},
+  {"id":"settings","title":"Open settings"},
+  {"id":"clipboard","title":"Copy dictated text to clipboard"}
+]
