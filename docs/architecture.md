@@ -8,10 +8,13 @@ omarchy-shell
        ├─ window, keys, navigation stack, dmenu protocol, effects, config, frecency
        ├─ providers/Registry.qml
        │    ├─ bundled: OmarchyMenu, Applications, Calculator, Converter, Colors,
-       │    │           Emoji, Clipboard, Files, Codex, AiWeb, SettingsProvider
+       │    │           Emoji, Clipboard, Files, Codex, AiWeb, Extensions, SettingsProvider
        │    └─ community: shell.serviceFor(<plugin id>) for every enabled plugin
        │                  whose manifest carries "x-keystroke"
-       ├─ core/*.js   Match (fuzzy matcher + tiers), SettingsTree, Frecency, Settings, VoiceBindings, Intent, Calculator, Units, Colors, Emoji, AiTargets, Files
+       ├─ providers/Extensions.qml   install/update/remove/toggle community providers through
+       │                             Omarchy's plugin scripts; discovery from extensions/index.json
+       │                             and the marketplace catalog (core/Extensions.js)
+       ├─ core/*.js   Match (fuzzy matcher + tiers), SettingsTree, Frecency, Settings, VoiceBindings, Intent, Calculator, Units, Colors, Emoji, AiTargets, Files, Extensions
        ├─ omarchy/MenuModel.js   vendored stock menu model (parse, merge, routes, guards)
        ├─ voice/VoiceSession.qml   voxtype recording lifecycle, live transcript and audio levels
        ├─ codex/      AppServer, CodexSession, ConversationView, Policy

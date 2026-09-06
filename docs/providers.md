@@ -15,7 +15,11 @@ An Omarchy plugin of kind `service` whose root object exposes `provider`, with a
 }
 ```
 
-Omarchy loads `Service.qml` into `omarchy-shell`, injects `shell` and `manifest`, and destroys it on disable or removal. Keystroke enumerates `pluginRegistry.installedPlugins`, keeps plugins that carry `x-keystroke` and are enabled, and calls `shell.serviceFor(id)`. Re-enumeration happens on every registry change. A plugin whose service is missing, exposes no `provider`, or declares another `apiVersion` is listed under "Plugins needing attention" in Settings instead of loading. Community providers start disabled in Keystroke; the user enables them in Settings → <provider>. Complete example: [examples/keystroke-hello](../examples/keystroke-hello/).
+Omarchy loads `Service.qml` into `omarchy-shell`, injects `shell`, `manifest` and `omarchyPath`, and destroys it on disable or removal. Keystroke enumerates `pluginRegistry.installedPlugins`, keeps plugins that carry `x-keystroke` and are enabled, and calls `shell.serviceFor(id)`. Re-enumeration happens on every registry change. A plugin whose service is missing, exposes no `provider`, or declares another `apiVersion` is listed under "Plugins needing attention" in Settings instead of loading. Community providers installed out of band (`omarchy plugin add`) start disabled in Keystroke; the user enables them under Extensions → <name> or Settings → <name>. Extensions installed from the palette's own Extensions screen are enabled immediately. Minimal example: [examples/keystroke-hello](../examples/keystroke-hello/); complete, published example: [keystroke-timer](https://github.com/evindor/keystroke-timer). The step-by-step guide is [AGENTS.md](../AGENTS.md).
+
+## Extensions screen
+
+`providers/Extensions.qml` (logic in `core/Extensions.js`) is the in-palette manager for community providers. It lists every installed plugin carrying `x-keystroke`, loaded or not, with Keystroke's own on/off switch (`providers.<id>.enabled` in keystroke.json) and Omarchy's (`PluginRegistry.setEnabled`, the same call `omarchy plugin enable/disable` makes). Install, update and remove run Omarchy's scripts as one background job at a time: `omarchy-plugin-add <url> --yes --enable`, `omarchy-plugin-update <id> --yes`, `omarchy-plugin-remove <id> --yes`. Update checks are a `git fetch` per extension without merging. Discovery merges two sources, cached for an hour under `~/.cache/keystroke`: the Keystroke index ([extensions/index.json](../extensions/index.json), raw from GitHub; the URL is a setting) and the Omarchy marketplace catalog (`plugins.omarchy.org/catalog.json`), where an extension is recognised by the word *keystroke* in its id, name, description or tags. Any git URL or `owner/repo` shorthand typed on the Extensions screen offers an install row. Every install and removal asks for confirmation first. `tests/extensions_check.py` drives all of it through the real scripts against a local bare repository.
 
 ## Provider object
 
@@ -58,7 +62,9 @@ Legacy `catalog(ctx)` fields are ignored; the local model command classifier has
 
 ### Effects
 
-`{type:"navigate", scope, title}` · `{type:"exec", argv}` (literal argv, login-shell env) · `{type:"shell", command}` (trusted strings only) · `{type:"copy", text}` · `{type:"url", url}` · `{type:"app", id, name}` (launch via AppLibrary) · `{type:"notify", glyph, headline, body}` · `{type:"setting", path, key, value, schema}` · `{type:"compound", actions}` · `{type:"noop"}`. The host closes the palette before anything that launches.
+`{type:"navigate", scope, title}` · `{type:"exec", argv}` (literal argv, login-shell env) · `{type:"shell", command}` (trusted strings only) · `{type:"copy", text}` · `{type:"url", url}` · `{type:"app", id, name}` (launch via AppLibrary) · `{type:"notify", glyph, headline, body}` · `{type:"setting", path, key, value, schema}` · `{type:"compound", actions}` · `{type:"close"}` (dismiss the palette, nothing else) · `{type:"noop"}` (stay open; pair it with `host.requery()` when your rows changed). The host closes the palette before anything that launches.
+
+A provider's own `activate(row, ctx)` may perform work itself (start a process, mutate its state) and return one of the effects above; private action types are fine as long as `activate` translates them (see `providers/Extensions.qml`). `ctx.host` is the palette: `host.requery()`, `host.statusMessage = "…"`, `host.errorMessage = "…"`, `host.opened`, `host.scope`, `host.config`, `host.pluginRegistry`.
 
 ## Scopes and settings
 

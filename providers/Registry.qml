@@ -23,9 +23,10 @@ Item {
   Files { id: files; host: root.host }
   AiWeb { id: aiWeb; host: root.host }
   Codex { id: codex; host: root.host }
+  Extensions { id: extensions; host: root.host }
   SettingsProvider { id: settingsProvider; host: root.host }
 
-  readonly property var bundled: [omarchyMenu, applications, calculator, converter, colors, emoji, clipboard, dictation, files, codex, aiWeb, settingsProvider]
+  readonly property var bundled: [omarchyMenu, applications, calculator, converter, colors, emoji, clipboard, dictation, files, codex, aiWeb, extensions, settingsProvider]
 
   function rebuild() {
     var out = [], issues = []
@@ -57,6 +58,14 @@ Item {
   Connections {
     target: root.host ? root.host.pluginRegistry : null
     function onPluginsChanged() { root.rebuild(); if (root.host) root.host.requery() }
+  }
+  // The shell injects pluginRegistry after creating the palette, and it
+  // recreates the palette on every plugin rescan: rebuild when the registry
+  // arrives, and again on every summon so a service that finished loading
+  // after the last rebuild is picked up.
+  Connections {
+    target: root.host
+    function onPluginRegistryChanged() { root.rebuild() }
   }
 
   onHostChanged: rebuild()

@@ -2,9 +2,11 @@
   "schemaVersion": 1,
   "id": "evindor.keystroke",
   "name": "Keystroke",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "author": "Arseniy Zarechnev",
-  "description": "An extension-first command palette that replaces the Omarchy menu",
+  "license": "MIT",
+  "description": "A Raycast-style command palette that replaces the Omarchy menu, with voice, Codex and community extensions",
+  "homepage": "https://github.com/evindor/keystroke",
   "kinds": [
     "menu",
     "bar-widget"
@@ -23,6 +25,5 @@
   },
   "omarchy": {
     "clonedFrom": "omarchy.menu"
-  },
-  "license": "MIT"
+  }
 }

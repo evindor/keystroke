@@ -84,9 +84,10 @@ TestCase {
         compare(titles(SettingsTree.rows(t.nodes, "settings", "")), ["Appearance", "Open config file", "AI & Web Search", "Clipboard History", "Hello", "broken.plugin"])
         compare(titles(SettingsTree.rows(t.nodes, "settings/ai", "")), ["Enabled", "Preferred assistant", "Open conversations in", "Send immediately in the browser"])
         var hello = SettingsTree.rows(t.nodes, "settings/example.hello", "")
-        compare(hello[1].title, "Provided by example.hello")
-        verify(hello[1].disabled)
-        compare(SettingsTree.rows(t.nodes, "settings/example.hello", "byex").length, 0)   // "Provided by example.hello" is list-only, never a search hit
+        compare(hello[1].title, "Manage extension")
+        compare(hello[1].action.type, "navigate")
+        compare(hello[1].action.scope, "extensions/example.hello")
+        compare(SettingsTree.rows(t.nodes, "settings/example.hello", "manext").length, 0)   // "Manage extension" is list-only, never a search hit
         var options = SettingsTree.rows(t.nodes, "settings/ai/provider", "").map(function(r) { return r.title + " " + r.icon })
         compare(options, ["Chatgpt ✓", "Claude ○"])
         verify(t.screens["settings/clipboard/limit"] !== undefined)

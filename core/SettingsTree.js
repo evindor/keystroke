@@ -131,8 +131,8 @@ function build(model) {
       accessory: e.enabled ? "On" : "Off", keywords: "enabled", description: "enable disable toggle on off " + enabledSchema.description,
       action: settingAction(path, "enabled", !e.enabled, enabledSchema) }))
     if (community)
-      nodes.push(node(scope, parts.concat(["Provided by " + e.pluginId]), { id: e.key + "/provenance", subtitle: "Community plugin · manage with omarchy plugin",
-        icon: "󰏓", verb: "", order: 900, disabled: true, badge: "plugin", listOnly: true, action: { type: "noop" } }))
+      nodes.push(node(scope, parts.concat(["Manage extension"]), { id: e.key + "/provenance", subtitle: "Plugin " + e.pluginId + " · update, load or remove it",
+        icon: "󰏓", verb: "Open", order: 900, badge: "plugin", listOnly: true, keywords: e.pluginId, action: navigate("extensions/" + e.pluginId, e.name) }))
     schemaNodes(nodes, screens, path, e.schemas || [], e.values || {}, scope, parts, e.key)
   }
   var problems = model.problems || []

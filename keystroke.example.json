@@ -63,6 +63,17 @@
       "fast": true,
       "destination": "desktop",
       "workspace": ""
+    },
+    "extensions": {
+      "enabled": true,
+      "marketplace": true,
+      "autoCheck": true,
+      "indexUrl": "https://raw.githubusercontent.com/evindor/keystroke/main/extensions/index.json"
+    },
+    "io.github.evindor.keystroke-timer": {
+      "enabled": true,
+      "defaultMinutes": 5,
+      "notify": true
     }
   }
 }

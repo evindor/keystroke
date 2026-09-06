@@ -70,6 +70,7 @@ case "${1:-help}" in
     python3 "$ROOT/tests/codex_session_check.py"
     python3 "$ROOT/tests/palette_dictation_check.py"
     python3 "$ROOT/tests/tz_helper_check.py"
+    python3 "$ROOT/tests/extensions_check.py"
     "$ROOT/tests/lint.sh"
     ;;
   voice-setup) shift; exec "$ROOT/helpers/voice-setup.sh" "$@" ;;

@@ -365,6 +365,7 @@ Item {
   }
 
   function notifyOpened() {
+    providerRegistry.rebuild()
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var p = providerRegistry.entries[i].provider
       if (typeof p.opened === "function") { try { p.opened() } catch (e) { console.warn("keystroke: provider opened() threw", e) } }
@@ -681,6 +682,7 @@ Item {
     }
     if (type === "notify") { Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-notification-send", "-g", String(effect.glyph || "󰵅"), String(effect.headline || ""), String(effect.body || "")]); return }
     if (type === "voice-bindings") { root.installVoiceBindings(); return }
+    if (type === "close") { root.cancel(); return }
     // Everything below leaves the palette: drop the keyboard-grabbing layer first, like the stock menu.
     root.cancel()
     if (type === "shell") Util.execDetached(String(effect.command || ""))
