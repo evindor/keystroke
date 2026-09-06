@@ -11,7 +11,7 @@ omarchy-shell
        │    │           Emoji, Clipboard, AiWeb, SettingsProvider
        │    └─ community: shell.serviceFor(<plugin id>) for every enabled plugin
        │                  whose manifest carries "x-keystroke"
-       ├─ core/*.js   Match (matcher + tiers), Frecency, Settings, Calculator, Units, Colors, Emoji
+       ├─ core/*.js   Match (fuzzy matcher + tiers), SettingsTree, Frecency, Settings, Calculator, Units, Colors, Emoji, AiTargets
        ├─ omarchy/MenuModel.js   vendored stock menu model (parse, merge, routes, guards)
        └─ ui/         ResultRow, PreviewPane, Keycap
 ```
@@ -36,6 +36,12 @@ All from Omarchy 4.0.2 source: property injection of `shell`, `manifest`, `plugi
 
 `~/.config/omarchy/keystroke.json` (FileView, watched, atomic writes; `core/Settings.js` validates against provider schemas, preserves unknown fields, refuses to overwrite a file that does not parse). `~/.local/state/keystroke/usage.json` holds frecency (`core/Frecency.js`: md5 of provider/row id, decaying weights, 2000-entry cap). Enable/disable of the plugin itself stays in Omarchy's `shell.json`.
 
+## Matching
+
+`core/Match.js` is fzf's FuzzyMatchV2 (Smith-Waterman with affine gaps and bonuses for word starts, camelCase and digits) tuned for a palette: the per-letter score is smaller than fzf's so letters on word starts dominate, a gap never costs more than a few letters so skipping a whole breadcrumb segment is cheap, and matches below 40 % of a perfect prefix are dropped. A row is scored on up to four haystacks: its title, its breadcrumb path below the current scope (× 0.97), its identifiers such as aliases, ids and config keys (× 0.92), and its description, which is prose and only matches when every query word is a prefix of a word in it (flat 50). Query words are AND-ed in any order. Normalised scores put a whole-word prefix at 100 and an exact title at 120; providers add small constant lifts on top (actions +3, confident app matches +45) and frecency reorders within the item tier only.
+
+Every provider that owns a tree searches all of it when a query is present: the Omarchy menu scores descendants of the active submenu against their relative breadcrumb, and `core/SettingsTree.js` flattens every settings screen, setting and enum choice into nodes with breadcrumbs so `keysepro` reaches Keystroke Settings › AI & Web Search › Preferred assistant from the root and `prefcla` selects its Claude choice directly. Prepared haystacks and joined strings are cached per distinct string, and providers cache their breadcrumbs, so a keystroke costs one DP pass per candidate; the test suite times a 700-row worst case (every row matching) at about 10 ms in the QML engine.
+
 ## Deferred
 
-Better fuzzy matching: all scoring goes through `Match.match()`; frecency is a separate bonus that only reorders within the item tier. Arbitrary provider views and a permanent publishing id are also deferred.
+Match highlighting in rows, arbitrary provider views and a permanent publishing id.

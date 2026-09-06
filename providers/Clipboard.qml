@@ -39,10 +39,10 @@ Item {
       var parsed = JSON.parse(String(raw || "[]"))
       for (var i = 0; Array.isArray(parsed) && i < parsed.length; i++) {
         var v = parsed[i]
-        if (typeof v === "string") { if (v.trim()) out.push({ type: "text", text: v }); continue }
+        if (typeof v === "string") { if (v.trim()) out.push({ type: "text", text: v, search: v.slice(0, 4000) }); continue }
         if (!v || typeof v !== "object") continue
         var type = String(v.type || v.kind || "")
-        if (type === "text" && String(v.text || "").trim()) out.push({ type: "text", text: String(v.text) })
+        if (type === "text" && String(v.text || "").trim()) out.push({ type: "text", text: String(v.text), search: String(v.text).slice(0, 4000) })
         else if (type === "image" && v.path) out.push({ type: "image", path: String(v.path), mime: String(v.mime || "image/png"), capturedAt: v.capturedAt === undefined ? "" : String(v.capturedAt) })
       }
     } catch (e) { out = [] }
@@ -64,7 +64,8 @@ Item {
       var image = e.type === "image"
       var text = image ? "" : e.text
       var title = image ? "Image · " + (e.capturedAt || "Clipboard") : text.replace(/\s+/g, " ").slice(0, 120)
-      var score = Match.match(ctx.query, title, text.slice(0, 4000))
+      // The title (first line) is fuzzy; the body is prose, matched by word.
+      var score = Match.match(ctx.query, title, "", "", image ? "" : e.search)
       if (!score) continue
       rows.push({
         id: Qt.md5(image ? e.path : text), title: title, subtitle: image ? "Image" : text.length + " characters", icon: "󰅌",

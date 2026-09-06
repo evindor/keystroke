@@ -11,6 +11,14 @@ Run on 2026-09-06 on Omarchy 4.0.2-1 (Quickshell 0.3.1-1, Qt 6.11.2, Python 3.14
 
 `bin/keystroke test` runs all three.
 
+### Fuzzy matching (2026-09-06, later the same day)
+
+- `qmltestrunner -input tests`: **62 passed, 0 failed**. New: `tst_match.qml` covers the fzf-style scorer (word starts and exact titles first, gaps and mid-word letters cost, single mid-word letters and scattered letters in prose never match, paths and keywords rank below titles, the abbreviations `prefp`, `keysepro`, `setaiprv`, `kspa`, `ai prov`/`prov ai`, `sysshut`), and `tst_settingstree.qml` drives the flattened settings tree with the real AI schema: every abbreviation above ranks Keystroke Settings › AI & Web Search › Preferred assistant first from the root, `prefcla` selects its Claude choice, `dens comf` selects Comfortable density, scoped searches use breadcrumbs relative to the screen, list-only rows never match, ids are unique, `chrome` finds nothing in settings.
+- Timing probe inside the suite: a keystroke over 700 rows where every row matches on three haystacks costs about 10 ms in the QML engine (Qt 6.11); queries that match few rows cost well under 1 ms. The real root has roughly 550 candidates.
+- `tests/tz_helper_check.py`: 6/6. `tests/lint.sh`: only the pre-existing Quickshell token noise. `omarchy plugin validate`: pass.
+- Not verified live in the shell this round (the checkout was being committed from another session at the time): the ranking above is exercised through the same provider code paths in the unit tests, but the in-shell journey (typing `keysepro` at the root and pressing ↵) is still owed.
+- Found while committing: `.gitignore` carried a bare `core` line (a core-dump pattern) that also ignored `core/`, so none of the JavaScript modules had ever been committed. Fixed in the same branch; the files were added byte-identical to the working checkout.
+
 ## Temporary in-shell install
 
 The checkout was copied (no symlinks) to `~/.config/omarchy/plugins/evindor.keystroke` with a **menu-only manifest variant** for the test, so that enable/disable would leave `shell.json` byte-identical (a bar-widget kind would have re-inserted the stock menu button into the bar on restore). Then `rescanPlugins`, `omarchy plugin enable`. Observed:

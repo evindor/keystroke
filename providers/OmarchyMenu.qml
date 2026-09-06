@@ -27,6 +27,7 @@ Item {
   property var providerQueue: []
   property int providerRevision: 0
   property string lastEnteredMenu: ""
+  property var pathCache: ({})
 
   readonly property var destructiveIds: ({ "system.shutdown": true, "system.reboot": true, "system.logout": true, "system.hibernate": true })
 
@@ -70,6 +71,7 @@ Item {
     root.providerQueue = []
     root.items = merged.items
     root.itemOrder = merged.itemOrder
+    root.pathCache = ({})
     root.rowsLoaded = true
     root.lastEnteredMenu = ""
     root.evaluateGuards()
@@ -186,6 +188,7 @@ Item {
     var merged = MenuModel.swapProviderRows(root.items, root.itemOrder, menuId, providerRows)
     root.items = merged.items
     root.itemOrder = merged.itemOrder
+    root.pathCache = ({})
   }
 
   function startNextProvider() {
@@ -264,6 +267,33 @@ Item {
     return root.destructiveIds[id] === true || id.indexOf("remove.") === 0 || id.indexOf("update.config.") === 0
   }
 
+  // Breadcrumb labels and search tokens per entry, kept until the model
+  // changes so every keystroke hands the matcher the same strings.
+  function searchInfo(id) {
+    var hit = root.pathCache[id]
+    if (hit) return hit
+    var labels = [], current = root.item(id), guard = 0
+    while (current && current.id !== "root" && guard < 32) { labels.unshift(current.label); current = root.item(current.parent); guard++ }
+    var entry = root.item(id)
+    hit = { labels: labels, path: labels.join(" › "), relative: ({}),
+            keywords: entry ? (entry.aliases.join(" ") + " " + MenuModel.searchableToken(MenuModel.leafIdFor(id))).trim() : "" }
+    root.pathCache[id] = hit
+    return hit
+  }
+
+  // Breadcrumb below the menu being searched: `path` ends in the entry's own
+  // label, `parent` is what the row shows as its subtitle.
+  function relativeTo(id, activeId) {
+    var info = root.searchInfo(id)
+    var hit = info.relative[activeId]
+    if (hit) return hit
+    var depth = activeId === "root" ? 0 : root.searchInfo(activeId).labels.length
+    var rel = info.labels.slice(depth)
+    hit = { path: rel.join(" › "), parent: rel.slice(0, -1).join(" › ") }
+    info.relative[activeId] = hit
+    return hit
+  }
+
   function rowFor(entry, subtitle, score, confirmDestructive) {
     var action, verb
     if (entry.kind === "action") {
@@ -277,12 +307,11 @@ Item {
       action = { type: "navigate", scope: "omarchy/" + target, title: entry.title || entry.label }
       verb = "Open"
     }
-    var path = MenuModel.pathFor(root.items, entry.id)
     return {
       id: entry.id, title: entry.label, subtitle: subtitle || "", icon: entry.icon || "\udb82\udcc7", iconFont: entry.iconFont || "",
       section: "Omarchy", verb: verb, tier: "item", score: score, order: entry.order,
       accessory: entry.checked && root.checkedResults[entry.id] ? "✓" : "",
-      remember: true, action: action, previewDetail: path,
+      remember: true, action: action, previewDetail: root.searchInfo(entry.id).path,
       confirm: entry.kind === "action" && confirmDestructive && root.isDestructive(entry.id) ? "Run “" + entry.label + "”?" : ""
     }
   }
@@ -318,10 +347,12 @@ Item {
       if (!entry || entry.id === "root") continue
       if (active !== "root" && !MenuModel.isDescendantOf(root.items, entry.id, active)) continue
       if (!root.isVisible(entry)) continue
-      var path = MenuModel.pathFor(root.items, entry.id)
-      var s = Match.match(ctx.query, entry.label, path + " " + entry.aliases.join(" ") + " " + MenuModel.searchableToken(MenuModel.leafIdFor(entry.id)))
+      // Fuzzy over the label, the breadcrumb below this menu ("sysshut" →
+      // System › Shutdown) and the aliases; the description by whole word.
+      var rel = root.relativeTo(entry.id, active)
+      var s = Match.match(ctx.query, entry.label, root.searchInfo(entry.id).keywords, rel.parent ? rel.path : "", entry.description)
       if (!s) continue
-      rows.push(root.rowFor(entry, MenuModel.parentPathFor(root.items, entry.id), s + (entry.kind === "action" ? 3 : 0), confirmDestructive))
+      rows.push(root.rowFor(entry, rel.parent || entry.description, s + (entry.kind === "action" ? 3 : 0), confirmDestructive))
     }
     return rows
   }

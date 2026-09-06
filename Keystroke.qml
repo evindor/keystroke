@@ -300,7 +300,7 @@ Item {
     out.section = String(row.section || entry.provider.name)
     out.verb = String(row.verb || (row.action && row.action.type === "navigate" ? "Open" : "Run"))
     out.tier = row.tier === "answer" || row.tier === "fallback" ? row.tier : "item"
-    out.score = typeof row.score === "number" ? row.score : Match.match(q, row.title, row.keywords || "")
+    out.score = typeof row.score === "number" ? row.score : Match.match(q, row.title, row.keywords || "", row.path || "", row.description || "")
     out.accessory = String(row.accessory || "")
     out.badge = String(row.badge || (entry.source === "community" ? "plugin" : ""))
     out.hint = String(row.hint || "")

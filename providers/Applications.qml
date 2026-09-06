@@ -2,11 +2,13 @@ import QtQuick
 import "../core/Match.js" as Match
 
 // Installed applications through Omarchy's shared AppLibrary (hidden-entry
-// filtering, icon index, launch feedback, uninstall).
+// filtering, icon index, launch feedback, uninstall). Matching is Keystroke's
+// own, at the root and inside the Applications screen alike.
 Item {
   id: root
   property var host: null
   readonly property var library: host ? host.appLibrary : null
+  property var searchCache: ({})
 
   readonly property var provider: ({
     apiVersion: 1,
@@ -22,13 +24,21 @@ Item {
 
   Connections {
     target: root.library
-    function onAppsChanged() { if (root.host) root.host.requery() }
+    function onAppsChanged() { root.searchCache = ({}); if (root.host) root.host.requery() }
   }
 
-  function keywords(entry) {
+  // The name is fuzzy-matched; GenericName, Keywords and Comment are words
+  // ("Web Browser", "internet") and match by word prefix, as the stock menu
+  // does. Built once per entry, not per keystroke.
+  function searchText(entry) {
+    var id = String(entry.id)
+    var hit = root.searchCache[id]
+    if (hit) return hit
     var parts = [entry.genericName || "", entry.comment || ""]
     try { if (entry.keywords && typeof entry.keywords.join === "function") parts.push(entry.keywords.join(" ")) } catch (e) { }
-    return parts.join(" ")
+    hit = parts.join(" ").trim()
+    root.searchCache[id] = hit
+    return hit
   }
 
   function rowFor(entry, score, order) {
@@ -47,18 +57,14 @@ Item {
       return [{ id: "apps", title: "Applications", subtitle: "Every app, one shortcut away", icon: "󰀻", section: "Applications",
                 verb: "Open", tier: "item", score: 30, order: 0, action: { type: "navigate", scope: "applications", title: "Applications" } }]
     if (!root.library) return []
-    var rows = [], i
-    if (!ctx.scope) {
-      var all = root.library.sortedEntries("")
-      for (i = 0; i < all.length; i++) {
-        var entry = all[i].entry
-        var s = Match.match(ctx.query, root.library.entryName(entry), root.keywords(entry))
-        if (s) rows.push(root.rowFor(entry, s + (s >= 78 ? 45 : 8), i))
-      }
-      return rows
+    var all = root.library.sortedEntries(""), rows = []
+    for (var i = 0; i < all.length; i++) {
+      var entry = all[i].entry
+      if (!ctx.query) { rows.push(root.rowFor(entry, 1, i)); continue }
+      var s = Match.match(ctx.query, root.library.entryName(entry), "", "", root.searchText(entry))
+      // At the root a confident app match outranks Omarchy entries with the same name.
+      if (s) rows.push(root.rowFor(entry, ctx.scope ? s : s + (s >= 78 ? 45 : 8), i))
     }
-    var scored = root.library.sortedEntries(ctx.query)
-    for (i = 0; i < scored.length; i++) rows.push(root.rowFor(scored[i].entry, 1000 - i, i))
     return rows
   }
 }
