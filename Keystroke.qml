@@ -659,14 +659,15 @@ Item {
             required property bool answer
             required property string hint
             width: resultList.width
-            readonly property bool showHeader: !root.dmenuActive && sectionStart && !!section
+            // Top level lists one row per provider, so section headers would only add noise there.
+            readonly property bool showHeader: !root.dmenuActive && !!root.scope && sectionStart && !!section
             Item {
               width: parent.width
               height: delegateRoot.showHeader ? Style.space(root.compact ? 22 : 26) : 0
               visible: delegateRoot.showHeader
               Text {
                 x: Style.space(14); anchors.bottom: parent.bottom; anchors.bottomMargin: Style.space(3)
-                text: !root.scope && !search.text && delegateRoot.index === 0 ? "Everyday essentials" : delegateRoot.section
+                text: delegateRoot.section
                 textFormat: Text.PlainText
                 color: Util.alpha(root.foreground, 0.5)
                 font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.weight: Font.Medium; font.letterSpacing: 0.5
