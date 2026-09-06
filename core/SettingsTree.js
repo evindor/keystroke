@@ -23,7 +23,7 @@ function settingAction(path, key, value, schema) { return { type: "setting", pat
 function node(parentScope, parts, fields) {
   var n = { parentScope: parentScope, parts: parts, path: parts.join(" › "), title: parts[parts.length - 1], subtitle: "", icon: GEAR, iconFont: "",
             tint: "", section: "Settings", verb: "Open", order: 0, accessory: "", badge: "", keywords: "", description: "", disabled: false,
-            lift: 0, listScore: 1, listOnly: false, relative: ({}) }
+            lift: 0, listScore: 1, listOnly: false, confirm: "", relative: ({}) }
   for (var k in fields) n[k] = fields[k]
   return n
 }
@@ -49,7 +49,52 @@ function schemaNodes(nodes, screens, path, schemas, values, scope, parentParts, 
   }
 }
 
-// model: { configPath, paletteSchema, paletteValues,
+// The Voice screen (settings/voice): the voxtype integration. Its rows are
+// searchable like any setting; the Hyprland bindings row carries a
+// confirmation because it edits the user's bindings.lua.
+// voice: { schemas, values, detected, version, daemonState,
+//          bindings: "installed" | "outdated" | "missing", bindingsPath }
+function daemonLabel(voice) {
+  var d = String(voice.daemonState || "")
+  if (!d) return "daemon not running"
+  return d === "idle" ? "daemon ready" : "daemon " + d
+}
+
+function voiceNodes(nodes, screens, rootParts, voice) {
+  if (!voice) return
+  var parts = rootParts.concat(["Voice"])
+  var scope = "settings/voice"
+  var values = voice.values || {}
+  var on = !!(voice.detected && values.enabled)
+  nodes.push(node("settings", parts, { id: "voice", icon: "󰍬", section: "Keystroke", order: 1, lift: 1,
+    subtitle: voice.detected ? (on ? "On" : "Off") + " · voxtype " + (voice.version || "") + " · " + daemonLabel(voice) : "Voxtype is not installed",
+    keywords: "voxtype dictation speech microphone", description: "voice dictation voxtype speech microphone hold to talk transcribe",
+    action: navigate(scope, "Voice") }))
+  if (!voice.detected) {
+    nodes.push(node(scope, parts.concat(["Voxtype is not installed"]), { id: "voice/missing", subtitle: "Voice entry uses Omarchy's dictation package",
+      icon: "󰀦", verb: "", order: 0, disabled: true, listOnly: true, action: { type: "noop" } }))
+    nodes.push(node(scope, parts.concat(["Install dictation (voxtype)"]), { id: "voice/install", subtitle: "Runs Omarchy's voxtype installer in a floating terminal",
+      icon: "", verb: "Install", order: 1, keywords: "voxtype install", description: "install voxtype dictation",
+      action: { type: "shell", command: "omarchy-launch-floating-terminal-with-presentation omarchy-voxtype-install" } }))
+    return
+  }
+  schemaNodes(nodes, screens, ["voice"], voice.schemas || [], values, scope, parts, "voice")
+  var st = String(voice.bindings || "missing")
+  var path = String(voice.bindingsPath || "~/.config/hypr/bindings.lua")
+  nodes.push(node(scope, parts.concat(["Hold-to-talk bindings"]), { id: "voice/bindings", icon: "󰌌", order: 50,
+    verb: st === "installed" ? "Reinstall" : st === "outdated" ? "Update" : "Install",
+    subtitle: st === "installed" ? "Long-press and release binds are in " + path
+            : st === "outdated" ? "The block in " + path + " does not match the hotkeys above"
+            : "Adds long-press and release binds for the hotkeys above to " + path,
+    accessory: st === "installed" ? "Installed" : st === "outdated" ? "Outdated" : "Missing",
+    keywords: "hyprland bindings hold", description: "hyprland keybinding long press release install bindings.lua",
+    confirm: (st === "missing" ? "Add" : "Rewrite") + " the Keystroke voice block in " + path + " and reload Hyprland?",
+    action: { type: "voice-bindings" } }))
+  nodes.push(node(scope, parts.concat(["Voxtype " + (voice.version || "")]), { id: "voice/status", icon: "󰍬", verb: "", order: 60, disabled: true, listOnly: true,
+    subtitle: daemonLabel(voice) + " · tap the hotkey again or hold it while the palette is open", action: { type: "noop" } }))
+}
+
+// model: { configPath, paletteSchema, paletteValues, voice,
 //          entries: [{ key, name, description, icon, iconFont, color, source, pluginId, enabled, schemas, values }],
 //          problems: [{ pluginId, message }] }
 function build(model) {
@@ -61,8 +106,9 @@ function build(model) {
   nodes.push(node("settings", appearance, { id: "palette", subtitle: "Density, accent and previews", icon: "󰏘", section: "Keystroke", order: 0, lift: 1,
     description: "layout density accent preview theme", action: navigate("settings/palette", "Appearance") }))
   schemaNodes(nodes, screens, ["palette"], model.paletteSchema || [], model.paletteValues || {}, "settings/palette", appearance, "palette")
+  voiceNodes(nodes, screens, rootParts, model.voice)
   nodes.push(node("settings", rootParts.concat(["Open config file"]), { id: "config", subtitle: String(model.configPath || ""), icon: "", section: "Keystroke",
-    verb: "Open file", order: 1, keywords: "json", description: "edit", action: { type: "edit" } }))
+    verb: "Open file", order: 2, keywords: "json", description: "edit", action: { type: "edit" } }))
   var entries = model.entries || []
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i]
@@ -112,7 +158,7 @@ function relativePath(n, depth) {
 
 function row(n, score, subtitle, section) {
   return { id: n.id, title: n.title, subtitle: subtitle, icon: n.icon, iconFont: n.iconFont, tint: n.tint, section: section, verb: n.verb, tier: "item",
-           score: score, order: n.order, accessory: n.accessory, badge: n.badge, disabled: n.disabled, action: n.action, previewDetail: n.path }
+           score: score, order: n.order, accessory: n.accessory, badge: n.badge, disabled: n.disabled, confirm: n.confirm || "", action: n.action, previewDetail: n.path }
 }
 
 // Empty query: the screen at `scope`. Otherwise every node at or below it,

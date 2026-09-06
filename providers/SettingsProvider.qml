@@ -33,16 +33,16 @@ Item {
                  color: e.provider.color || "", source: e.source, pluginId: e.pluginId || "", enabled: h.providerEnabled(e), schemas: schemas,
                  values: Settings.values(h.config, ["providers", e.key], schemas) })
     }
-    return { configPath: h.configPath, paletteSchema: h.paletteSchema, paletteValues: h.paletteValues(), entries: out, problems: h.registry.problems }
+    return { configPath: h.configPath, paletteSchema: h.paletteSchema, paletteValues: h.paletteValues(), voice: h.voiceModel(), entries: out, problems: h.registry.problems }
   }
 
   // Rebuilt only when the config or the registry changes; every keystroke
   // reuses the same nodes and breadcrumb strings.
   function current() {
     var h = root.host
-    var stamp = [h.config, h.registry.entries, h.registry.problems]
+    var stamp = [h.config, h.registry.entries, h.registry.problems, h.voiceStamp]
     var old = root.treeStamp
-    if (root.tree && old.length === 3 && old[0] === stamp[0] && old[1] === stamp[1] && old[2] === stamp[2]) return root.tree
+    if (root.tree && old.length === 4 && old[0] === stamp[0] && old[1] === stamp[1] && old[2] === stamp[2] && old[3] === stamp[3]) return root.tree
     root.tree = SettingsTree.build(root.model())
     root.treeStamp = stamp
     return root.tree

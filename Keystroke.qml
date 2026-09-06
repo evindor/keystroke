@@ -7,9 +7,11 @@ import qs.Commons
 import qs.Ui
 import "ui"
 import "providers"
+import "voice"
 import "core/Match.js" as Match
 import "core/Frecency.js" as Frecency
 import "core/Settings.js" as Settings
+import "core/VoiceBindings.js" as VoiceBindings
 
 // Keystroke: an extension-first command palette that replaces the Omarchy
 // menu. Hosted by omarchy-shell as a `menu` plugin (see manifest.json).
@@ -35,9 +37,34 @@ Item {
     if (payload.mode === "select" || payload.mode === "input") root.openDmenu(payload)
     else root.openRoute(payload.initialMenu || payload.menu || "root", payload)
   }
-  function close() { root.cancel() }
+  // The hotkey's second tap reaches us as the shell's close(): with the voice
+  // integration on, that tap starts dictation and a third one stops it; Esc
+  // and the scrim still close. (An explicit `omarchy menu close` takes the
+  // same path; nothing in Omarchy calls it.)
+  function close() {
+    if (root.opened && !root.dmenuActive && root.voiceEnabled && !root.confirmPending) {
+      if (voice.phase === "starting" || voice.phase === "listening") { root.voiceStop(); return }
+      if (voice.phase === "transcribing") return
+      if (root.voiceSettings.secondTap === "voice" && root.voiceBegin("tap")) return
+    }
+    root.cancel()
+  }
   function refresh() { providerRegistry.bundled[0].reload(); root.requery(); return "ok" }
   function ping() { return "ok" }
+  // Hyprland long-press bind on the hotkey: the key is still down 250 ms
+  // after the palette opened, so this is a hold, not a tap.
+  function voiceHold(arg) {
+    if (!root.opened || root.dmenuActive) return "ignored"
+    if (voice.active) { root.voiceTrigger = "hold"; return "listening" }
+    return root.voiceBegin("hold") ? "listening" : "ignored"
+  }
+  // Hyprland release bind on the hotkey (fires while the modifier is still
+  // held; the modifier's own release is caught in the search field).
+  function voiceRelease(arg) {
+    if (!voice.active || root.voiceTrigger !== "hold") return "ignored"
+    root.voiceStop()
+    return "stopping"
+  }
 
   // -------------------------------------------------------------- settings
   property var config: Settings.empty()
@@ -76,6 +103,87 @@ Item {
     onLoaded: root.applyConfigText(text())
     onLoadFailed: root.applyConfigText("")
     onFileChanged: reload()
+  }
+
+  // ----------------------------------------------------------------- voice
+  // Dictation through the voxtype daemon Omarchy ships. Two ways in: hold the
+  // palette hotkey (Hyprland long-press bind → voiceHold; its release bind or
+  // the modifier's own release → stop), or tap the hotkey again while the
+  // palette is open (a further tap stops). Enter while listening stops and
+  // then accepts the result. The transcript replaces the query; nothing is
+  // activated on its own.
+  VoiceSession {
+    id: voice
+    host: root
+    onTranscribed: function(text) { root.voiceTranscribed(text) }
+    onNothingHeard: { root.voiceActivateAfter = false; if (root.opened) root.statusMessage = "Nothing heard" }
+    onFailed: function(message) { root.voiceActivateAfter = false; if (root.opened) root.errorMessage = message }
+  }
+  readonly property var voiceSchema: [
+    { key: "enabled", type: "boolean", label: "Voxtype voice command integration", "default": voice.detected,
+      description: "Hold the palette hotkey, or tap it again while the palette is open, to dictate the query" },
+    { key: "secondTap", type: "enum", label: "Second tap of the hotkey", "default": "voice", options: ["voice", "close"],
+      description: "Voice starts dictation and a third tap stops it (Esc closes); Close is the stock toggle" },
+    { key: "keys", type: "string", label: "Hotkeys to hold", "default": "SUPER + SPACE",
+      description: "Hyprland combos for the long-press bindings, comma-separated, e.g. SUPER + SPACE, SUPER + SHIFT + code:201" }
+  ]
+  property var voiceSettings: Settings.values(root.config, ["voice"], root.voiceSchema)
+  readonly property bool voiceEnabled: voice.detected && voiceSettings.enabled === true
+  property string voiceTrigger: "tap"      // hold | tap
+  property bool voiceActivateAfter: false  // Enter arrived while listening: accept the transcript's top result
+  property bool voiceDiscard: false        // the user typed while transcribing: the transcript loses
+  readonly property string bindingsPath: home + "/.config/hypr/bindings.lua"
+  property string bindingsText: ""
+  property bool bindingsKnown: false       // read, or confirmed absent: safe to rewrite
+  FileView {
+    id: bindingsFile
+    path: root.bindingsPath
+    watchChanges: true
+    atomicWrites: true
+    printErrors: false
+    onLoaded: { root.bindingsText = text(); root.bindingsKnown = true }
+    onLoadFailed: function(error) { root.bindingsText = ""; root.bindingsKnown = error === FileViewError.FileNotFound }
+    onFileChanged: reload()
+  }
+  readonly property string voiceBindingsStatus: root.bindingsKnown ? VoiceBindings.status(root.bindingsText, root.voiceSettings.keys) : "missing"
+  readonly property string voiceStamp: [voice.detected, voice.version, voice.daemonState, root.voiceBindingsStatus, root.bindingsKnown].join("|")
+  function voiceModel() {
+    return { schemas: root.voiceSchema, values: root.voiceSettings, detected: voice.detected, version: voice.version, daemonState: voice.daemonState,
+             bindings: root.voiceBindingsStatus, bindingsPath: "~/.config/hypr/bindings.lua" }
+  }
+  function installVoiceBindings() {
+    if (!root.bindingsKnown) { root.errorMessage = "Could not read " + root.bindingsPath; return }
+    var next = VoiceBindings.apply(root.bindingsText, root.voiceSettings.keys)
+    root.bindingsText = next
+    bindingsFile.setText(next)
+    Quickshell.execDetached(["hyprctl", "reload"])
+    root.statusMessage = "Bindings written · Hyprland reloaded"
+    root.requery()
+  }
+  function voiceBegin(trigger) {
+    if (!root.voiceEnabled || !root.opened || root.dmenuActive || root.confirmPending || voice.active) return false
+    root.voiceTrigger = trigger
+    root.voiceActivateAfter = false
+    root.voiceDiscard = false
+    root.errorMessage = ""
+    root.statusMessage = ""
+    return voice.start()
+  }
+  function voiceStop() { if (voice.phase === "starting" || voice.phase === "listening") voice.stop() }
+  function voiceCancel() { root.voiceActivateAfter = false; if (voice.active) voice.cancel() }
+  function voiceTranscribed(text) {
+    var accept = root.voiceActivateAfter
+    root.voiceActivateAfter = false
+    if (!root.opened || root.voiceDiscard) return
+    search.text = text
+    search.cursorPosition = text.length
+    root.edited()
+    root.statusMessage = "Transcribed"
+    if (accept) { debounce.stop(); root.runQuery(); root.activate() }
+  }
+  function isSuperKey(key) { return key === Qt.Key_Super_L || key === Qt.Key_Super_R || key === Qt.Key_Meta || key === Qt.Key_Hyper_L || key === Qt.Key_Hyper_R }
+  function isModifierKey(key) {
+    return root.isSuperKey(key) || key === Qt.Key_Shift || key === Qt.Key_Control || key === Qt.Key_Alt || key === Qt.Key_AltGr || key === Qt.Key_CapsLock
   }
 
   // -------------------------------------------------------------- frecency
@@ -162,6 +270,7 @@ Item {
       Util.execDetached(route.action)
       return
     }
+    root.voiceCancel()
     root.mode = "palette"
     root.requestActive = false
     root.history = []
@@ -192,10 +301,12 @@ Item {
       var p = providerRegistry.entries[i].provider
       if (typeof p.opened === "function") { try { p.opened() } catch (e) { console.warn("keystroke: provider opened() threw", e) } }
     }
+    voice.refresh()
   }
 
   function openDmenu(payload) {
     if (root.dmenuActive && root.requestActive) root.finishRequest(null)   // a new caller cancels the previous one
+    root.voiceCancel()
     root.mode = payload.mode === "input" ? "input" : "select"
     root.dmenuPrompt = String(payload.prompt || (root.mode === "input" ? "Input" : "Select"))
     root.dmenuOptions = Array.isArray(payload.options) ? payload.options : []
@@ -228,6 +339,7 @@ Item {
 
   function cancel() {
     if (root.dmenuActive) root.finishRequest(null)
+    root.voiceCancel()
     root.opened = false
     root.confirmPending = null
     root.pending = false
@@ -474,6 +586,7 @@ Item {
       return
     }
     if (type === "notify") { Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-notification-send", "-g", String(effect.glyph || "󰵅"), String(effect.headline || ""), String(effect.body || "")]); return }
+    if (type === "voice-bindings") { root.installVoiceBindings(); return }
     // Everything below leaves the palette: drop the keyboard-grabbing layer first, like the stock menu.
     root.cancel()
     if (type === "shell") Util.execDetached(String(effect.command || ""))
@@ -491,7 +604,9 @@ Item {
     return JSON.stringify({ opened: root.opened, mode: root.mode, scope: root.scope, query: search.text, count: root.rows.length,
       titles: root.rows.map(function(r) { return r.title }), selected: root.selected, pending: root.pending,
       modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems,
-      error: root.errorMessage, configError: root.configError })
+      error: root.errorMessage, configError: root.configError, status: root.statusMessage,
+      voice: { state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
+               daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length } })
   }
 
   // ------------------------------------------------------------------ view
@@ -545,8 +660,31 @@ Item {
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           width: Style.space(22); height: width
-          Rectangle { x: 1; y: 1; width: Style.space(15); height: width; radius: width / 2; color: "transparent"; border.color: root.accent; border.width: 1.8 }
-          Rectangle { x: Style.space(13); y: Style.space(13); width: Style.space(9); height: 1.8; radius: 0.9; rotation: 45; transformOrigin: Item.Left; color: root.accent }
+          Rectangle { visible: !voice.active; x: 1; y: 1; width: Style.space(15); height: width; radius: width / 2; color: "transparent"; border.color: root.accent; border.width: 1.8 }
+          Rectangle { visible: !voice.active; x: Style.space(13); y: Style.space(13); width: Style.space(9); height: 1.8; radius: 0.9; rotation: 45; transformOrigin: Item.Left; color: root.accent }
+          // Recording dot, swelling with the microphone.
+          Rectangle {
+            visible: voice.active
+            anchors.centerIn: parent
+            width: Style.space(10); height: width; radius: width / 2
+            color: voice.phase === "listening" ? root.accent : Util.alpha(root.accent, 0.55)
+            scale: voice.phase === "listening" ? 1 + 0.6 * voice.level : 1
+            Behavior on scale { NumberAnimation { duration: 60 } }
+          }
+        }
+        VoiceWave {
+          visible: voice.active
+          anchors.left: glyph.right
+          anchors.leftMargin: Style.space(14)
+          anchors.right: escCap.left
+          anchors.rightMargin: Style.space(12)
+          anchors.verticalCenter: parent.verticalCenter
+          height: Style.space(40)
+          mode: voice.phase
+          level: voice.level
+          history: voice.history
+          accent: root.accent
+          foreground: root.foreground
         }
         TextInput {
           id: search
@@ -565,6 +703,7 @@ Item {
           selectByMouse: true
           clip: true
           focus: true
+          opacity: voice.active ? 0 : 1        // the string takes the field; focus and keys stay here
           Accessible.name: root.dmenuActive ? root.dmenuPrompt : "Search commands, apps and extensions"
           Text {
             anchors.fill: parent
@@ -572,13 +711,26 @@ Item {
             text: root.dmenuActive ? root.dmenuPrompt + "…" : root.scope ? "Search " + root.scopeTitle.toLowerCase() + "…" : "What would you like to do?"
             color: Util.alpha(root.foreground, 0.42)
             font: parent.font
-            visible: !parent.text && !parent.preeditText
+            visible: !parent.text && !parent.preeditText && !voice.active
             elide: Text.ElideRight
           }
           onTextEdited: root.edited()
           Keys.priority: Keys.BeforeItem
+          Keys.onReleased: function(event) {
+            // Hold mode ends when the modifier comes up (Hyprland swallows the
+            // hotkey's own release, and its release bind only fires while the
+            // modifier is still down). A tap's release must not end anything.
+            if (voice.active && root.voiceTrigger === "hold" && root.isSuperKey(event.key)) { root.voiceStop(); event.accepted = true }
+          }
           Keys.onPressed: function(event) {
             if (root.confirmPending) { confirmDialog.handleKey(event); event.accepted = true; return }
+            if (voice.active) {
+              if (event.key === Qt.Key_Escape) { root.cancel(); event.accepted = true; return }
+              if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { root.voiceActivateAfter = true; root.voiceStop(); event.accepted = true; return }
+              if (root.isModifierKey(event.key)) { event.accepted = true; return }
+              if (voice.phase === "transcribing") root.voiceDiscard = true    // typing wins over a transcript still on its way
+              else root.voiceCancel()                                          // and over a recording; the key then behaves as usual
+            }
             var ctrl = event.modifiers & Qt.ControlModifier
             var atEnd = cursorPosition === text.length
             if (event.key === Qt.Key_Escape) { root.cancel(); event.accepted = true }
@@ -725,7 +877,9 @@ Item {
         Row {
           anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
           Text {
-            text: root.pending && root.showLoading ? "Searching…" : root.errorMessage ? "Needs attention: " + root.errorMessage : root.statusMessage || (root.current.providerName ? root.current.providerName : "Keystroke")
+            text: voice.phase === "listening" ? (root.voiceTrigger === "hold" ? "Listening… release to finish" : "Listening… tap the hotkey again or press ↵ to finish")
+                : voice.phase === "transcribing" ? "Transcribing…" : voice.phase === "starting" ? "Starting voxtype…"
+                : root.pending && root.showLoading ? "Searching…" : root.errorMessage ? "Needs attention: " + root.errorMessage : root.statusMessage || (root.current.providerName ? root.current.providerName : "Keystroke")
             textFormat: Text.PlainText; elide: Text.ElideRight; width: Math.min(implicitWidth, card.width * 0.5)
             color: root.errorMessage ? Color.urgent : root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
             anchors.verticalCenter: parent.verticalCenter

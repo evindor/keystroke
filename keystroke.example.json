@@ -5,6 +5,11 @@
     "accent": "theme",
     "showPreview": true
   },
+  "voice": {
+    "enabled": true,
+    "secondTap": "voice",
+    "keys": "SUPER + SPACE"
+  },
   "providers": {
     "omarchy": { "enabled": true, "confirmDestructive": true },
     "applications": { "enabled": true },

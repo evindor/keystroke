@@ -27,12 +27,33 @@ The plugin id is `evindor.keystroke` for now; the permanent publishing id may ch
 - `↑`/`↓` or `Ctrl+P`/`Ctrl+N` move, `PageUp`/`PageDown` jump six rows, `↵` or `→` activates, `Esc` closes immediately, `Ctrl+U` clears the query, `←`/`Backspace` on an empty query goes back, `Del` on an application offers to uninstall it, `Ctrl+,` opens Settings, `Ctrl+K` opens the selected provider's settings.
 - Destructive Omarchy actions (shutdown, reboot, logout, hibernate, removals, config resets) ask for confirmation; turn this off in Settings → Omarchy.
 - Selections of apps and Omarchy commands earn a bounded frecency bonus (14-day half-life). State lives in `~/.local/state/keystroke/usage.json` as hashed ids only.
+- Speak the query instead of typing it (see [Voice](#voice)): hold the hotkey, or tap it a second time, and the query field becomes a string that moves with your voice.
 
 Every `omarchy menu` route works as before: submenus open scoped (`omarchy menu toggle system`), leaf aliases run immediately (`omarchy menu summon reminder-set`), `apps` opens the Applications provider. Pickers honor `width`/`maxHeight`; a new picker request cancels a pending one (the stock menu left the first caller waiting).
 
+## Voice
+
+Keystroke dictates through [voxtype](https://voxtype.io), the dictation daemon Omarchy installs from Install › AI › Dictation. Nothing else is needed: Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the PATH, and the screen offers Omarchy's installer when it is not.
+
+Two ways in, both while the palette is open:
+
+- **Tap the hotkey again.** The second tap of `Super+Space` starts listening instead of closing the palette; a third tap stops. `Esc` and clicking outside still close. Set **Second tap of the hotkey** to *Close* to keep the stock toggle.
+- **Hold the hotkey.** Press `Super+Space` and keep it down: after Hyprland's key-repeat delay (250 ms in Omarchy) the palette starts listening, and releasing the chord stops it, in either order. This needs two Hyprland bindings on the same key: a long-press bind and a release bind. Settings › Voice › **Hold-to-talk bindings** writes them into `~/.config/hypr/bindings.lua` inside a marked block (confirmation first, then `hyprctl reload`); **Hotkeys to hold** lists the combos, comma-separated, if you open the palette with more than one key. The block is plain Lua you can also paste yourself:
+
+  ```lua
+  -- >>> keystroke voice: hold the palette hotkey to dictate (written by Keystroke Settings › Voice)
+  o.bind("SUPER + SPACE", nil, "omarchy-shell shell call omarchy.menu voiceHold '{}'", { long_press = true })
+  o.bind("SUPER + SPACE", nil, "omarchy-shell shell call omarchy.menu voiceRelease '{}'", { release = true })
+  -- <<< keystroke voice
+  ```
+
+While listening, the query field shows a string plucked by the microphone (levels come from voxtype's own audio bridge) and the footer says how to finish. Releasing or tapping stops the recording and shows *Transcribing…*; the transcript then **replaces the query** and the matches update. Nothing is activated on its own: `↵` runs the selected row as usual. Pressing `↵` while still listening stops the recording first and runs the top match once the text is in. Typing while listening cancels the recording; typing while transcribing keeps what you type. voxtype's own overlay stays hidden for these recordings (`--no-osd`), the transcript never goes through the clipboard or the virtual keyboard, and the temporary transcript file in `$XDG_RUNTIME_DIR` is removed after every recording.
+
+Model, language, VAD and everything else are voxtype's settings (`voxtype configure`). Whisper transcribes silence as "Thank you." now and then; voxtype's VAD filters that when enabled. With the daemon stopped the palette says so instead of listening.
+
 ## Settings
 
-One file, hand-editable and hot-reloaded: `~/.config/omarchy/keystroke.json` (see [keystroke.example.json](keystroke.example.json)). Settings screens are generated from each provider's schema; writes are atomic, preserve unknown fields, and are refused while the file fails to parse. Bundled providers default to enabled, community providers to disabled. Appearance: density (compact/comfortable), accent (theme accent or ember/violet/mint), previews on/off. Colors, fonts, radius and spacing follow the active Omarchy theme.
+One file, hand-editable and hot-reloaded: `~/.config/omarchy/keystroke.json` (see [keystroke.example.json](keystroke.example.json)). The `voice` section holds the integration switch, the second-tap behaviour and the hotkeys the Hyprland block is generated for. Settings screens are generated from each provider's schema; writes are atomic, preserve unknown fields, and are refused while the file fails to parse. Bundled providers default to enabled, community providers to disabled. Appearance: density (compact/comfortable), accent (theme accent or ember/violet/mint), previews on/off. Colors, fonts, radius and spacing follow the active Omarchy theme.
 
 ## Providers
 

@@ -11,10 +11,22 @@ omarchy-shell
        │    │           Emoji, Clipboard, AiWeb, SettingsProvider
        │    └─ community: shell.serviceFor(<plugin id>) for every enabled plugin
        │                  whose manifest carries "x-keystroke"
-       ├─ core/*.js   Match (fuzzy matcher + tiers), SettingsTree, Frecency, Settings, Calculator, Units, Colors, Emoji, AiTargets
+       ├─ core/*.js   Match (fuzzy matcher + tiers), SettingsTree, Frecency, Settings, VoiceBindings, Calculator, Units, Colors, Emoji, AiTargets
        ├─ omarchy/MenuModel.js   vendored stock menu model (parse, merge, routes, guards)
-       └─ ui/         ResultRow, PreviewPane, Keycap
+       ├─ voice/VoiceSession.qml   voxtype recording lifecycle and audio levels
+       └─ ui/         ResultRow, PreviewPane, Keycap, VoiceWave
 ```
+
+## Voice
+
+`voice/VoiceSession.qml` drives the voxtype daemon that Omarchy ships, one recording at a time: `voxtype record start --file <runtime>/keystroke-voice.txt --no-osd` (voxtype hides its own overlay for tools that draw their own), `voxtype-audio-bridge` for peak/RMS frames at 100 Hz while listening (it reads the daemon's audio socket; nothing else touches the microphone), then `voxtype record stop --wait --json` whose `text` becomes the query. The daemon's state file is watched so a recording the daemon ends on its own (its max duration) is still collected, with the transcript file as fallback. Idle cost: one `FileView` on the state file; detection (`command -v voxtype`) runs at load and at most every 30 s on open.
+
+Two triggers, both host-owned in `Keystroke.qml`:
+
+- **Tap.** The hotkey's second press reaches the plugin as the shell's `close()` (toggle → hide). With the integration on and the palette in palette mode, that call starts a recording instead of closing, and the next one stops it. `Esc`, the scrim and `omarchy menu summon` still close or reset. An explicit `omarchy menu close` takes the same path; nothing in Omarchy calls it.
+- **Hold.** Hyprland is the only party that knows the key is still down, so two user-side bindings feed IPC methods: a long-press bind (`bindo`, fires after the keyboard repeat delay whichever order the keys are released in later) calls `voiceHold`, and a release bind (`bindr`) calls `voiceRelease`. Hyprland's release bind only fires while the modifier is still held (`handleKeybinds` compares the current modmask), and it swallows the hotkey's own release, so the palette also ends a hold when the modifier's release (`Key_Super_L`/`Key_Meta`) reaches the search field, which Hyprland does deliver. A tap's release must not end anything, so the modifier release only counts when the recording was started by a hold. `core/VoiceBindings.js` generates the block for `~/.config/hypr/bindings.lua`, recognises it by its markers and rewrites it in place; the Settings row confirms, writes atomically and runs `hyprctl reload`.
+
+`↵` while listening stops the recording and activates the top match once the transcript is in; any other non-modifier key cancels a recording (the key then behaves as usual) or, during transcription, marks the transcript as superseded. The transcript replaces the query through the normal `edited()` path, so ranking, previews and frecency are untouched.
 
 ## Query flow
 

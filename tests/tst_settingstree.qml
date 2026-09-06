@@ -95,6 +95,62 @@ TestCase {
         var seen = ({})
         for (var i = 0; i < t.nodes.length; i++) { verify(!seen[t.nodes[i].id], "duplicate id " + t.nodes[i].id); seen[t.nodes[i].id] = true }
     }
+    function voiceModel(detected, bindings) {
+        var m = model()
+        m.voice = { detected: detected, version: "1.0.1", daemonState: "idle", bindings: bindings, bindingsPath: "~/.config/hypr/bindings.lua",
+                    schemas: [
+                        { key: "enabled", type: "boolean", label: "Voxtype voice command integration", "default": true, description: "Hold the palette hotkey to dictate" },
+                        { key: "secondTap", type: "enum", label: "Second tap of the hotkey", "default": "voice", options: ["voice", "close"] },
+                        { key: "keys", type: "string", label: "Hotkeys to hold", "default": "SUPER + SPACE" }
+                    ],
+                    values: { enabled: true, secondTap: "voice", keys: "SUPER + SPACE" } }
+        return m
+    }
+    function test_voice_screen_lists_its_settings_and_the_bindings_row() {
+        var t = SettingsTree.build(voiceModel(true, "missing"))
+        compare(titles(SettingsTree.rows(t.nodes, "settings", "")).slice(0, 3), ["Appearance", "Voice", "Open config file"])
+        var screen = SettingsTree.rows(t.nodes, "settings/voice", "")
+        compare(titles(screen), ["Voxtype voice command integration", "Second tap of the hotkey", "Hotkeys to hold", "Hold-to-talk bindings", "Voxtype 1.0.1"])
+        compare(screen[0].accessory, "On")
+        compare(screen[0].action.path, ["voice"])
+        compare(screen[0].action.value, false)
+        compare(screen[3].accessory, "Missing")
+        compare(screen[3].verb, "Install")
+        compare(screen[3].action.type, "voice-bindings")
+        verify(screen[3].confirm.indexOf("Add the Keystroke voice block") === 0)
+        verify(screen[4].disabled)
+        verify(t.screens["settings/voice/keys"] !== undefined)
+        var rows = Match.rank(SettingsTree.rows(t.nodes, "", "voice"), null)
+        compare(rows[0].title, "Voice")
+        rows = Match.rank(SettingsTree.rows(t.nodes, "", "voxtype"), null)
+        verify(["Voice", "Voxtype voice command integration"].indexOf(rows[0].title) >= 0, rows[0].title)
+        rows = Match.rank(SettingsTree.rows(t.nodes, "", "hold bind"), null)
+        compare(rows[0].title, "Hold-to-talk bindings")
+        compare(rows[0].subtitle, "Keystroke Settings › Voice")
+        rows = Match.rank(SettingsTree.rows(t.nodes, "", "second tap clo"), null)
+        compare(rows[0].title, "Close")
+        compare(rows[0].action.path, ["voice"])
+        compare(rows[0].action.value, "close")
+        t = SettingsTree.build(voiceModel(true, "outdated"))
+        var bindings = SettingsTree.rows(t.nodes, "settings/voice", "")[3]
+        compare(bindings.accessory, "Outdated")
+        compare(bindings.verb, "Update")
+        verify(bindings.confirm.indexOf("Rewrite") === 0)
+    }
+    function test_voice_screen_without_voxtype_offers_the_installer() {
+        var t = SettingsTree.build(voiceModel(false, "missing"))
+        var entry = SettingsTree.rows(t.nodes, "settings", "")[1]
+        compare(entry.title, "Voice")
+        compare(entry.subtitle, "Voxtype is not installed")
+        var screen = SettingsTree.rows(t.nodes, "settings/voice", "")
+        compare(titles(screen), ["Voxtype is not installed", "Install dictation (voxtype)"])
+        verify(screen[0].disabled)
+        compare(screen[1].action.type, "shell")
+        compare(SettingsTree.rows(t.nodes, "", "hold bind").length, 0)
+        compare(t.screens["settings/voice/keys"], undefined)
+        t = SettingsTree.build(model())                                              // no voice model at all: nothing changes
+        compare(titles(SettingsTree.rows(t.nodes, "settings", "")).slice(0, 2), ["Appearance", "Open config file"])
+    }
     function test_unrelated_queries_find_nothing() {
         compare(search("", "chrome").length, 0)
         compare(search("", "zzzz").length, 0)
