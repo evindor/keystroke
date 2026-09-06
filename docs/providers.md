@@ -26,7 +26,7 @@ readonly property var provider: ({
   prefix: "th",                 // optional, documentation only for now
   settings: [ { key, type: "boolean"|"enum"|"number"|"string", label, "default", options, min, max, integer, description } ],
   query: function(ctx) { ... return rows },       // required
-  activate: function(row, ctx) { ... return effect }, // optional; defaults to row.action
+  activate: function(row, ctx) { ... return effect }, // optional; defaults to row.action (row.altAction when ctx.alternate)
   opened: function() { }                          // optional; called on every summon
 })
 ```
@@ -47,8 +47,10 @@ Return quickly. `query` runs on the UI thread for every keystroke; anything that
   score: 100, order: 0, keywords: "ids aliases", path: "Parent › Child › …", description: "prose", accessory: "✓", hint: "↵ copies",
   disabled: false, remember: false, confirm: "Really?", 
   preview: "text", previewLabel: "RESULT", previewDetail: "…", previewImage: "/path.png", swatch: "#hex",
-  action: effect }
+  action: effect, altAction: effect }
 ```
+
+`altAction` is optional and runs on `Ctrl+↵` (a row without one runs `action` again). Say what it does in `hint` ("ctrl ↵ terminal"). A provider's `activate(row, ctx)` receives `ctx.alternate === true` for that key so it can compute the effect itself.
 
 `id` must be stable for a logical result: it drives in-place delegate updates and frecency. `score` orders only within the tier; omit it to use the default matcher, `Match.match(query, title, keywords, path, description)`, which is fuzzy over `title`, over `path` (the breadcrumb ending in the title, for rows that live in submenus; matched slightly below the title) and over `keywords` (identifiers a user may abbreviate: aliases, ids, config keys; matched below the path), and word-prefix only over `description` (prose). Put synonyms and sentences in `description`, not `keywords`: scattered letters would match any sentence. Rows with a zero score are dropped when the query is non-empty. A provider that owns a tree should return every descendant when the query is non-empty, with `path` relative to the current scope, so abbreviations reach deep items from the root. `remember: true` opts into frecency (never use query text as the id).
 

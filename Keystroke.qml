@@ -533,7 +533,9 @@ Item {
   }
 
   // --------------------------------------------------------------- actions
-  function activate() {
+  // Ctrl+↵ is the alternate activation: a row's altAction when it has one,
+  // otherwise its action; the provider's activate() sees ctx.alternate.
+  function activate(alternate) {
     if (root.confirmPending) return
     if (debounce.running) { debounce.stop(); root.runQuery() }
     if (root.dmenuActive) {
@@ -545,9 +547,9 @@ Item {
     if (!row || !row.uid || row.disabled) return
     var entry = root.registryEntry(row.providerKey)
     if (!entry) return
-    var effect = row.action
+    var effect = alternate && row.altAction ? row.altAction : row.action
     if (typeof entry.provider.activate === "function") {
-      try { effect = entry.provider.activate(row, { host: root, settings: root.settingsFor(entry) }) || effect } catch (e) { root.errorMessage = entry.provider.name + ": " + e; return }
+      try { effect = entry.provider.activate(row, { host: root, settings: root.settingsFor(entry), alternate: alternate === true }) || effect } catch (e) { root.errorMessage = entry.provider.name + ": " + e; return }
     }
     if (!effect) return
     var run = function() { root.remember(row); root.perform(effect, row) }
@@ -739,6 +741,7 @@ Item {
             else if (event.key === Qt.Key_Up || (ctrl && event.key === Qt.Key_P)) { root.select(-1); event.accepted = true }
             else if (event.key === Qt.Key_PageDown) { root.selectPage(6); event.accepted = true }
             else if (event.key === Qt.Key_PageUp) { root.selectPage(-6); event.accepted = true }
+            else if (ctrl && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) { root.activate(true); event.accepted = true }
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { root.activate(); event.accepted = true }
             else if (event.key === Qt.Key_Right && (atEnd || !text) && !root.dmenuActive && root.rows.length) { root.activate(); event.accepted = true }
             else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Backspace) && !text && !preeditText && (root.scope || root.history.length)) { root.goBack(); event.accepted = true }
@@ -858,7 +861,7 @@ Item {
           Text { anchors.horizontalCenter: parent.horizontalCenter; text: "✳"; color: root.accent; font.pixelSize: Style.space(40) }
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: root.pending ? "Finding your next move…" : search.text ? "No matches for “" + search.text + "”" : root.scope === "clipboard" ? "Your clipboard is empty" : "Nothing here yet"
+            text: root.pending ? "Finding your next move…" : search.text ? "No matches for “" + search.text + "”" : root.scope === "clipboard" ? "Your clipboard is empty" : root.scope === "files" ? "Type to search your home folder" : "Nothing here yet"
             textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: root.fontFamily; font.pixelSize: Style.font.title
           }
           Text {

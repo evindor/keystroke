@@ -18,6 +18,7 @@
     "colors": { "enabled": true, "format": "hex" },
     "emoji": { "enabled": true },
     "clipboard": { "enabled": true, "limit": 100 },
+    "files": { "enabled": true, "files": true, "folders": true, "hidden": false, "limit": 10 },
     "ai": { "enabled": true, "provider": "chatgpt", "mode": "desktop", "autoSend": false },
     "settings": { "enabled": true },
     "example.keystroke-hello": { "enabled": false, "greeting": "Hello" }

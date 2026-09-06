@@ -8,10 +8,10 @@ omarchy-shell
        ├─ window, keys, navigation stack, dmenu protocol, effects, config, frecency
        ├─ providers/Registry.qml
        │    ├─ bundled: OmarchyMenu, Applications, Calculator, Converter, Colors,
-       │    │           Emoji, Clipboard, AiWeb, SettingsProvider
+       │    │           Emoji, Clipboard, Files, AiWeb, SettingsProvider
        │    └─ community: shell.serviceFor(<plugin id>) for every enabled plugin
        │                  whose manifest carries "x-keystroke"
-       ├─ core/*.js   Match (fuzzy matcher + tiers), SettingsTree, Frecency, Settings, VoiceBindings, Calculator, Units, Colors, Emoji, AiTargets
+       ├─ core/*.js   Match (fuzzy matcher + tiers), SettingsTree, Frecency, Settings, VoiceBindings, Calculator, Units, Colors, Emoji, AiTargets, Files
        ├─ omarchy/MenuModel.js   vendored stock menu model (parse, merge, routes, guards)
        ├─ voice/VoiceSession.qml   voxtype recording lifecycle and audio levels
        └─ ui/         ResultRow, PreviewPane, Keycap, VoiceWave
@@ -40,9 +40,13 @@ Keystrokes debounce 16 ms, then the host calls `query(ctx)` on every enabled pro
 
 All from Omarchy 4.0.2 source: property injection of `shell`, `manifest`, `pluginRegistry` (`shell.qml`), `open/close/opened` and `shell call` methods, `PluginRegistry.resolveEnabledId` and `restoreCloneSource` keyed by `omarchy.clonedFrom`, `shell.serviceFor` for service plugins, `Color.menu.*`, `Style.font.menuFamily`, `Style.space`, `Style.cornerRadius`, `Style.gapsOut`, `Border.surfaceSpec`, `BorderSurface`, `ConfirmDialog`, `PointerMoveGate`, `Util.execDetached/execArgv/alpha/fileUrl/shellQuote`. The layer namespace is `omarchy-menu` so the stock no-animation layer rule applies.
 
+## Files
+
+`providers/Files.qml` runs `fd` (in Omarchy's base packages) once per distinct query, bounded by `--max-results 400`, from the home folder, with the query words AND-ed as case-insensitive literal substrings of the path, the last one anchored to the final segment (otherwise one matching folder floods the list with its children); a newer query kills a run still walking, a 3 s watchdog keeps whatever was printed, and results are cached for the length of one summon. `core/Files.js` builds the argv (regex-escaped words after `--and=` and `--`, so nothing is read as a flag), parses the output, re-checks the words against the path below `~` (fd matched the absolute path), scores the candidates with `Match.match` on the file name and the relative path at 0.55 weight with a floor of 12, and keeps the best `limit` (default 10 at the root, 60 in the Files screen). No index lives in the heap: a gitignore-respecting walk of a typical home takes tens of milliseconds, a hidden-inclusive one of 280 k entries about 200 ms. `↵` is `xdg-open`; `Ctrl+↵` is the host's alternate activation (`row.altAction`), here `setsid uwsm-app -- xdg-terminal-exec --dir=…` as Omarchy's own launchers do.
+
 ## Helpers
 
-`helpers/timezone.py` is the only out-of-process helper. QML's JavaScript has no IANA zone data; the converter spawns the helper once per distinct time query after a regex gate matches, with a 1 s timeout, and caches the answer.
+`helpers/timezone.py` and `fd` are the only out-of-process helpers. `helpers/timezone.py` QML's JavaScript has no IANA zone data; the converter spawns the helper once per distinct time query after a regex gate matches, with a 1 s timeout, and caches the answer.
 
 ## Settings and state
 

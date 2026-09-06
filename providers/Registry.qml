@@ -19,10 +19,11 @@ Item {
   Colors { id: colors; host: root.host }
   Emoji { id: emoji; host: root.host }
   Clipboard { id: clipboard; host: root.host }
+  Files { id: files; host: root.host }
   AiWeb { id: aiWeb; host: root.host }
   SettingsProvider { id: settingsProvider; host: root.host }
 
-  readonly property var bundled: [omarchyMenu, applications, calculator, converter, colors, emoji, clipboard, aiWeb, settingsProvider]
+  readonly property var bundled: [omarchyMenu, applications, calculator, converter, colors, emoji, clipboard, files, aiWeb, settingsProvider]
 
   function rebuild() {
     var out = [], issues = []
