@@ -1,0 +1,110 @@
+[
+  {
+    "fixture": "browser",
+    "model": "small",
+    "total_ms": 607,
+    "text": "Open my browser please.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "browser",
+    "model": "/tmp/keystroke-whisper-turbo-q5.bin",
+    "total_ms": 1642,
+    "text": "Open my browser, please.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "settings",
+    "model": "small",
+    "total_ms": 571,
+    "text": "Open the settings.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "settings",
+    "model": "/tmp/keystroke-whisper-turbo-q5.bin",
+    "total_ms": 960,
+    "text": "Open the settings.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "clipboard",
+    "model": "small",
+    "total_ms": 571,
+    "text": "Copy what I dictated to the clipboard.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "clipboard",
+    "model": "/tmp/keystroke-whisper-turbo-q5.bin",
+    "total_ms": 980,
+    "text": "Copy what I dictated to the clipboard.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "negation",
+    "model": "small",
+    "total_ms": 547,
+    "text": "Do not open a browser.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "negation",
+    "model": "/tmp/keystroke-whisper-turbo-q5.bin",
+    "total_ms": 999,
+    "text": "Do not open a browser.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "unsupported",
+    "model": "small",
+    "total_ms": 540,
+    "text": "Make my window corners more rounded.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "unsupported",
+    "model": "/tmp/keystroke-whisper-turbo-q5.bin",
+    "total_ms": 999,
+    "text": "Make my window corners more rounded.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "description",
+    "model": "small",
+    "total_ms": 539,
+    "text": "The browser is already open.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  },
+  {
+    "fixture": "description",
+    "model": "/tmp/keystroke-whisper-turbo-q5.bin",
+    "total_ms": 1024,
+    "text": "The browser is already open.",
+    "exit": 0,
+    "model_allocation": [],
+    "diagnostic": ""
+  }
+]

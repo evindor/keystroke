@@ -19,12 +19,12 @@ Item {
     name: "AI & Web Search",
     icon: "✳",
     color: "#e79c85",
-    description: "Continue any query in Claude, ChatGPT/Codex or Google",
+    description: "Continue any query in Claude, ChatGPT web or Google",
     settings: [
       { key: "provider", type: "enum", label: "Preferred assistant", "default": "chatgpt", options: ["chatgpt", "claude"],
         description: "Listed first among the fallbacks" },
       { key: "mode", type: "enum", label: "Open conversations in", "default": "desktop", options: ["desktop", "cli", "browser"],
-        description: "Desktop opens Claude or Codex with the prompt filled in; falls back to the browser when the app or CLI is not installed" },
+        description: "Controls Claude; ChatGPT opens in the browser. Codex has its own provider settings." },
       { key: "autoSend", type: "boolean", label: "Send immediately in the browser", "default": false,
         description: "ChatGPT only. Claude and the desktop apps always let you review the prompt first" }
     ],
@@ -59,7 +59,7 @@ Item {
                   action: { type: "url", url: AiTargets.googleUrl(q) } }]
     var order = ctx.settings.provider === "claude" ? ["claude", "chatgpt"] : ["chatgpt", "claude"]
     for (var i = 0; i < order.length; i++) {
-      var p = AiTargets.plan(order[i], ctx.settings.mode, ctx.settings.autoSend === true, root.available, q)
+      var p = AiTargets.plan(order[i], order[i] === "chatgpt" ? "browser" : ctx.settings.mode, ctx.settings.autoSend === true, root.available, q)
       rows.push({ id: p.id, title: p.title, subtitle: p.subtitle, icon: order[i] === "claude" ? "󰛄" : "󰭹", section: "Continue with",
                   verb: p.verb, tier: "fallback", score: i === 0 ? 3 : 2, action: p.effect,
                   preview: q, previewLabel: "PROMPT", previewDetail: "Opens with this prompt in the composer" })

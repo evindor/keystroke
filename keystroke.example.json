@@ -6,13 +6,9 @@
     "showPreview": true
   },
   "voice": {
-    "backend": "voxtype",
-    "audioEndpoint": "http://127.0.0.1:18782",
     "enabled": true,
     "secondTap": "voice",
-    "keys": "SUPER + SPACE",
-    "assist": true,
-    "assistEndpoint": "http://127.0.0.1:18781"
+    "keys": "SUPER + SPACE"
   },
   "providers": {
     "omarchy": {
@@ -60,6 +56,13 @@
     "example.keystroke-hello": {
       "enabled": false,
       "greeting": "Hello"
+    },
+    "codex": {
+      "enabled": true,
+      "model": "gpt-5.6-luna",
+      "fast": true,
+      "destination": "desktop",
+      "workspace": ""
     }
   }
 }

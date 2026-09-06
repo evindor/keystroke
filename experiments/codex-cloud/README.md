@@ -79,3 +79,12 @@ for a final answer. Reuse an agent thread for follow-up corrections, but do not
 accumulate unrelated commands indefinitely. A production bridge still needs
 action approval UI, cancellation, clear completion/failure states, capability
 discovery, and tests of the real desktop focus lifecycle.
+
+## Inline question benchmark
+
+`python3 experiments/codex-cloud/questions.py --output /tmp/questions.json` runs
+30 real requests (15 prompts in alternating Fast/Standard order) using the
+production `codex/Policy.js`. This consumes subscription allowance. The recorded
+`results/questions.json` contains startup, first-text, first-sentence, completion,
+token usage and app-server memory measurements. See the current integration
+verification for interpretation; these are small-sample observations, not SLAs.

@@ -58,7 +58,6 @@ Item {
         description: "Confirm shutdown, reboot, logout, removal and config resets" }
     ],
     query: function(ctx) { return root.query(ctx) },
-    catalog: function(ctx) { return root.catalog(ctx) },
     opened: function() { root.evaluateGuards() }
   })
 
@@ -315,22 +314,6 @@ Item {
       remember: true, action: action, previewDetail: root.searchInfo(entry.id).path,
       confirm: entry.kind === "action" && confirmDestructive && root.isDestructive(entry.id) ? "Run “" + entry.label + "”?" : ""
     }
-  }
-
-  // Every visible entry of the whole menu, for the voice assistant's
-  // catalog; `detail` is the breadcrumb above the entry ("System › Lock").
-  function catalog(ctx) {
-    if (!root.rowsLoaded) return []
-    var confirmDestructive = !ctx || !ctx.settings || ctx.settings.confirmDestructive !== false
-    var rows = []
-    for (var i = 0; i < root.itemOrder.length; i++) {
-      var entry = root.item(root.itemOrder[i])
-      if (!entry || entry.id === "root" || !root.isVisible(entry)) continue
-      var row = root.rowFor(entry, entry.description, 1, confirmDestructive)
-      row.detail = root.searchInfo(entry.id).labels.slice(0, -1).join(" › ") || entry.description || ""
-      rows.push(row)
-    }
-    return rows
   }
 
   function query(ctx) {

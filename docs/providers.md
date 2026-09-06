@@ -35,7 +35,7 @@ Bundled providers also carry `id`; community providers are keyed by their plugin
 
 ### ctx
 
-`query` (string), `scope` (`""` at root, or `<key>` / `<key>/<sub>`), `sub`, `generation`, `settings` (validated values for your schema), `pending()` (call when more rows will arrive later), `host` (`host.requery()` re-runs the current query; `host.appLibrary`, `host.omarchyPath`, `host.shell`), `shell`, `appLibrary`, `omarchyPath`.
+`query` (string), `rawQuery` (full original text before spoken-command normalization), `scope` (`""` at root, or `<key>` / `<key>/<sub>`), `sub`, `generation`, `settings` (validated values for your schema), `pending()` (call when more rows will arrive later), `host` (`host.requery()` re-runs the current query; `host.appLibrary`, `host.omarchyPath`, `host.shell`), `shell`, `appLibrary`, `omarchyPath`.
 
 Return quickly. `query` runs on the UI thread for every keystroke; anything that forks or reads large files must be cached or asynchronous (`Process`/`FileView` in your service, then `host.requery()`).
 
@@ -50,7 +50,7 @@ Return quickly. `query` runs on the UI thread for every keystroke; anything that
   action: effect, altAction: effect }
 ```
 
-`catalog(ctx)` is optional. When present it returns every row the provider could ever activate (no query), in the same shape as `query()` rows plus an optional `detail` string (a breadcrumb or a category, kept short). The host feeds these rows, numbered, to the voice assistant so a spoken command can be mapped to one of them; a provider without `catalog()` is simply not on the assistant's list. `ctx` carries `host`, `settings`, `shell`, `appLibrary` and `omarchyPath`, like `query()` without the query fields.
+Legacy `catalog(ctx)` fields are ignored; the local model command classifier has been removed.
 
 `altAction` is optional and runs on `Ctrl+↵` (a row without one runs `action` again). Say what it does in `hint` ("ctrl ↵ terminal"). A provider's `activate(row, ctx)` receives `ctx.alternate === true` for that key so it can compute the effect itself.
 
@@ -67,3 +67,9 @@ Navigating into a provider gives it scope `<key>`; deeper scopes are `<key>/<sub
 ## Stability
 
 API 1 is frozen once a second community provider ships against it. Changes that add optional fields keep the version; anything else bumps `apiVersion`, and Keystroke keeps loading the previous version for one Omarchy release.
+
+## Optional provider views (API 1)
+
+A provider may expose `view: Component { ... }` and return `{type: "provider-view", provider: "<registry key>"}` from activation. The host loads the component over the palette card, injects `host`, and calls optional `focusInput()`. A missing/disabled view produces a visible error. Ordinary row-only providers need no changes.
+
+The provider owns view data and asynchronous work; keep durable state outside the loaded component. The view may implement `dismiss()`, `beginVoice()` and `transcript(text, final)`. The host calls dismissal before unloading or navigating and supplies voice snapshots to these optional methods. Dismiss must cancel or detach work without blocking close. The provider must stop its owned resources when disabled. See `providers/Codex.qml` for the reference implementation.

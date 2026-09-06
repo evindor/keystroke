@@ -1,3 +1,5 @@
+> Historical checkpoints below include retired local-model implementations. Current build: [Codex integration verification](codex-integration-verification.md).
+
 ## v1-voice checkpoint: clipboard query fallback (2026-09-06)
 
 Normal spoken or typed queries now include **Copy to Clipboard** under **Continue with**. Enter copies the original text and closes; Ctrl+Enter additionally pastes after 100 ms. Command normalization does not strip wording, punctuation, or whitespace from the clipboard payload. AI handoffs also receive the original query. The dedicated dictation launcher remains optional.
@@ -13,7 +15,7 @@ The whole-request backend change is included as `helpers/voxtype-full-request.pa
 - Automated checks cover whole-transcript replacement, Unicode/deletions, audio beyond the former window, clipboard payload fidelity, failure/cancellation, copy-close-paste ordering, and actual palette key handling with fake audio/clipboard processes. An offscreen render checks the dictation preview.
 - Validation: 109 QML tests, 34 sliding-window tests, 13 streaming-output tests, recording lifecycle and clipboard/palette integration checks passed. Installed both the palette and rebuilt voxtype daemon; both voice services are active. Omarchy needed a shell restart to clear its old provider cache; IPC then confirmed the dictation provider. Live recognition accuracy and long-request latency still need user testing.
 
-# Verification
+# Historical verification
 
 Run on 2026-09-06 on Omarchy 4.0.2-1 (Quickshell 0.3.1-1, Qt 6.11.2, Python 3.14.7).
 

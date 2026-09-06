@@ -19,15 +19,11 @@ with tempfile.TemporaryDirectory(prefix='keystroke-palette-') as temp:
   property alias testVoice: root.voice
   property alias testSearch: search
   property alias testTransfer: clipboardTransfer
-  property alias testSpoken: spoken
-  property alias testAssist: assist
   property alias testCard: card
   property alias testPanel: panel
 ''',1).replace('  PanelWindow {','  Window {\n    transientParent: null\n    width: 1000; height: 800')
     s=s.replace('    anchors { top: true; bottom: true; left: true; right: true }\n','')
     s='\n'.join(line for line in s.splitlines() if 'exclusionMode:' not in line and 'WlrLayershell.' not in line)
-    s=s.replace('    id: assist','''    id: assist
-    createRequest: function() { return { open: function(){}, send: function(){}, abort: function(){}, setRequestHeader: function(){} } }''')
     p.write_text(s)
     (project/'voice/VoiceSession.qml').write_text('''import QtQuick
 Item {
@@ -51,12 +47,6 @@ Item {
   function cancel() { phase = "idle" }
 }
 ''')
-    if os.environ.get('KEYSTROKE_TEST_AUDIO'):
-        fake = (project/'voice/VoiceSession.qml').read_text().replace('Item {', 'Item {\n  property bool watching: false\n  property bool available: true\n  property string endpoint: ""\n  property var catalog: []\n  property int lastMs: 0\n  property string warmedPrompt: ""\n  signal recognized(int index, string text, int ms)\n  function warm(items) {}\n', 1)
-        (project/'voice/AudioSession.qml').write_text(fake)
-        config_dir = work/'.config/omarchy'
-        config_dir.mkdir(parents=True)
-        (config_dir/'keystroke.json').write_text('{"version":1,"voice":{"backend":"vllm"}}')
     helper=work/'copy.py'
     helper.write_text('import pathlib,sys\np=pathlib.Path(__file__).parent\n(p/sys.argv[1]).write_text(sys.stdin.read() if sys.argv[1]=="clipboard" else "pasted")\n')
     cfg=work/'shell.qml'
@@ -77,7 +67,6 @@ ShellRoot {
     palette.open('{}')
     palette.perform({type:"dictate"}, {title:"Dictate to Clipboard"})
     test.check(palette.dictationMode && palette.testVoice.phase === "listening", "extension starts recording")
-    test.check(!palette.testSpoken.active && !palette.testAssist.enabled, "dictation bypasses intent model")
     palette.testVoice.partial(test.text)
     test.check(palette.testSearch.text === test.text, "live prose preserved")
     palette.testPanel.requestActivate()

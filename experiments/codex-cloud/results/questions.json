@@ -1,0 +1,581 @@
+{
+  "startup_ms": 186,
+  "process_memory_kib": {
+    "Rss": 187284,
+    "Pss": 134106,
+    "Private_Clean": 2368,
+    "Private_Dirty": 78600
+  },
+  "rows": [
+    {
+      "prompt": "Why does Bluetooth sometimes interfere with Wi-Fi? Answer in two sentences.",
+      "tier": "fast",
+      "thread_ms": 276,
+      "ttft_ms": 2889,
+      "sentence_ms": 2943,
+      "complete_ms": 3803,
+      "status": "completed",
+      "output": "Bluetooth and Wi\u2011Fi often share the crowded 2.4 GHz radio band, so their signals can overlap and cause interference. Bluetooth reduces this by rapidly hopping between frequencies, but heavy Bluetooth use, distance, obstacles, or poorly shielded devices can still slow or destabilize Wi\u2011Fi.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5444,
+        "inputTokens": 5381,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 63,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Why does Bluetooth sometimes interfere with Wi-Fi? Answer in two sentences.",
+      "tier": "default",
+      "thread_ms": 31,
+      "ttft_ms": 2126,
+      "sentence_ms": 2385,
+      "complete_ms": 3411,
+      "status": "completed",
+      "output": "Bluetooth and Wi\u2011Fi can interfere because both commonly use the crowded 2.4 GHz radio band, causing overlapping signals and packet collisions. Adaptive frequency hopping and Wi\u2011Fi\u2019s channel selection usually reduce the problem, but interference is more noticeable with weak signals, heavy traffic, or nearby devices.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5444,
+        "inputTokens": 5381,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 63,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "What is the difference between RAM and disk storage? Two sentences.",
+      "tier": "default",
+      "thread_ms": 39,
+      "ttft_ms": 2557,
+      "sentence_ms": 3009,
+      "complete_ms": 3317,
+      "status": "completed",
+      "output": "RAM is fast, temporary memory used by running programs, and its contents disappear when power is lost. Disk storage is slower, persistent space for saving files, applications, and the operating system.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5422,
+        "inputTokens": 5380,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 42,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "What is the difference between RAM and disk storage? Two sentences.",
+      "tier": "fast",
+      "thread_ms": 29,
+      "ttft_ms": 2311,
+      "sentence_ms": 2628,
+      "complete_ms": 3190,
+      "status": "completed",
+      "output": "RAM is fast, temporary memory used by active programs and is cleared when the computer powers off. Disk storage (SSD or HDD) is slower, long-term memory that keeps files and applications saved even when the computer is off.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5429,
+        "inputTokens": 5380,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 49,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Translate into Italian: I will arrive ten minutes late.",
+      "tier": "fast",
+      "thread_ms": 29,
+      "ttft_ms": 2548,
+      "sentence_ms": 2702,
+      "complete_ms": 2846,
+      "status": "completed",
+      "output": "Arriver\u00f2 con dieci minuti di ritardo.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5393,
+        "inputTokens": 5378,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 15,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Translate into Italian: I will arrive ten minutes late.",
+      "tier": "default",
+      "thread_ms": 28,
+      "ttft_ms": 2950,
+      "sentence_ms": 3131,
+      "complete_ms": 3223,
+      "status": "completed",
+      "output": "Arriver\u00f2 con dieci minuti di ritardo.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5393,
+        "inputTokens": 5378,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 15,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Explain DNS in one short paragraph.",
+      "tier": "default",
+      "thread_ms": 29,
+      "ttft_ms": 2579,
+      "sentence_ms": 3439,
+      "complete_ms": 3490,
+      "status": "completed",
+      "output": "DNS (Domain Name System) is the internet\u2019s phone book: it translates human-friendly domain names like `example.com` into IP addresses that computers use to find and connect to websites and other services.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5418,
+        "inputTokens": 5374,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 44,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Explain DNS in one short paragraph.",
+      "tier": "fast",
+      "thread_ms": 27,
+      "ttft_ms": 2349,
+      "sentence_ms": 2825,
+      "complete_ms": 3310,
+      "status": "completed",
+      "output": "DNS (Domain Name System) translates human-friendly website names like `example.com` into IP addresses that computers use to locate servers. It works like the internet\u2019s phone book, allowing your browser to find the correct server when you enter a domain name.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5428,
+        "inputTokens": 5374,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 54,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "What is 17 percent of 240? Give only the result.",
+      "tier": "fast",
+      "thread_ms": 28,
+      "ttft_ms": 2828,
+      "sentence_ms": 2834,
+      "complete_ms": 2984,
+      "status": "completed",
+      "output": "40.8",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5388,
+        "inputTokens": 5381,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 7,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "What is 17 percent of 240? Give only the result.",
+      "tier": "default",
+      "thread_ms": 28,
+      "ttft_ms": 3709,
+      "sentence_ms": 3714,
+      "complete_ms": 3876,
+      "status": "completed",
+      "output": "40.8",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5388,
+        "inputTokens": 5381,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 7,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Give me a clearer version: This meeting could have been an email.",
+      "tier": "default",
+      "thread_ms": 29,
+      "ttft_ms": 2161,
+      "sentence_ms": 2288,
+      "complete_ms": 2375,
+      "status": "completed",
+      "output": "This meeting could have been handled via email.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5394,
+        "inputTokens": 5381,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 13,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Give me a clearer version: This meeting could have been an email.",
+      "tier": "fast",
+      "thread_ms": 309,
+      "ttft_ms": 2393,
+      "sentence_ms": 2538,
+      "complete_ms": 2640,
+      "status": "completed",
+      "output": "This meeting could have been handled via email.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5394,
+        "inputTokens": 5381,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 13,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "What does a Linux symlink do? Two sentences.",
+      "tier": "fast",
+      "thread_ms": 29,
+      "ttft_ms": 2591,
+      "sentence_ms": 2955,
+      "complete_ms": 3285,
+      "status": "completed",
+      "output": "A Linux symlink is a special file that points to another file or directory, acting like a shortcut. Accessing the symlink transparently redirects operations to its target.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5416,
+        "inputTokens": 5378,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 38,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "What does a Linux symlink do? Two sentences.",
+      "tier": "default",
+      "thread_ms": 27,
+      "ttft_ms": 2887,
+      "sentence_ms": 3260,
+      "complete_ms": 3818,
+      "status": "completed",
+      "output": "A Linux symlink is a special file that points to another file or directory, similar to a shortcut. Accessing the symlink transparently accesses its target, and it becomes broken if the target is moved or deleted.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5426,
+        "inputTokens": 5378,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 48,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Why is the sky blue? Two sentences.",
+      "tier": "default",
+      "thread_ms": 28,
+      "ttft_ms": 2196,
+      "sentence_ms": 2573,
+      "complete_ms": 2829,
+      "status": "completed",
+      "output": "The sky appears blue because air molecules scatter shorter blue wavelengths of sunlight more strongly than longer red wavelengths. This scattered blue light reaches our eyes from all directions.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5411,
+        "inputTokens": 5376,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 35,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Why is the sky blue? Two sentences.",
+      "tier": "fast",
+      "thread_ms": 28,
+      "ttft_ms": 2223,
+      "sentence_ms": 2831,
+      "complete_ms": 3009,
+      "status": "completed",
+      "output": "The sky appears blue because air molecules scatter shorter blue wavelengths of sunlight more strongly than longer red wavelengths. This scattered blue light reaches our eyes from all directions.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5411,
+        "inputTokens": 5376,
+        "cachedInputTokens": 3840,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 35,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Give three concise names for a keyboard launcher.",
+      "tier": "fast",
+      "thread_ms": 28,
+      "ttft_ms": 2653,
+      "sentence_ms": null,
+      "complete_ms": 3067,
+      "status": "completed",
+      "output": "- Keystack\n- Keyflow\n- Launchpad",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5392,
+        "inputTokens": 5376,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 16,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Give three concise names for a keyboard launcher.",
+      "tier": "default",
+      "thread_ms": 29,
+      "ttft_ms": 2452,
+      "sentence_ms": null,
+      "complete_ms": 2745,
+      "status": "completed",
+      "output": "- Keystroke\n- Launchpad\n- QuickKey",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5392,
+        "inputTokens": 5376,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 16,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Convert 3.5 kilometers to miles, approximately.",
+      "tier": "default",
+      "thread_ms": 28,
+      "ttft_ms": 2793,
+      "sentence_ms": 2793,
+      "complete_ms": 3938,
+      "status": "completed",
+      "output": "3.5 kilometers \u2248 **2.17 miles**.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5395,
+        "inputTokens": 5378,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 17,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Convert 3.5 kilometers to miles, approximately.",
+      "tier": "fast",
+      "thread_ms": 27,
+      "ttft_ms": 2442,
+      "sentence_ms": 2442,
+      "complete_ms": 2750,
+      "status": "completed",
+      "output": "3.5 kilometers \u2248 **2.17 miles**.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5395,
+        "inputTokens": 5378,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 17,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Explain latency versus throughput in two sentences.",
+      "tier": "fast",
+      "thread_ms": 265,
+      "ttft_ms": 2512,
+      "sentence_ms": 2907,
+      "complete_ms": 3208,
+      "status": "completed",
+      "output": "Latency is the time it takes to complete a single operation or deliver one item. Throughput is the amount of work or data processed per unit of time.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5410,
+        "inputTokens": 5375,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 35,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Explain latency versus throughput in two sentences.",
+      "tier": "default",
+      "thread_ms": 341,
+      "ttft_ms": 2324,
+      "sentence_ms": 2594,
+      "complete_ms": 2851,
+      "status": "completed",
+      "output": "Latency is the delay before a single operation produces a result. Throughput is the amount of work completed per unit of time.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5404,
+        "inputTokens": 5375,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 29,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Make this polite: Send me the report now.",
+      "tier": "default",
+      "thread_ms": 29,
+      "ttft_ms": 2213,
+      "sentence_ms": 2404,
+      "complete_ms": 2485,
+      "status": "completed",
+      "output": "Could you please send me the report when you have a moment?",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5394,
+        "inputTokens": 5377,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 17,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Make this polite: Send me the report now.",
+      "tier": "fast",
+      "thread_ms": 27,
+      "ttft_ms": 2473,
+      "sentence_ms": 2704,
+      "complete_ms": 2747,
+      "status": "completed",
+      "output": "Could you please send me the report when you have a moment?",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5394,
+        "inputTokens": 5377,
+        "cachedInputTokens": 0,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 17,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "What is a prime number? One sentence and an example.",
+      "tier": "fast",
+      "thread_ms": 28,
+      "ttft_ms": 2344,
+      "sentence_ms": 2922,
+      "complete_ms": 2980,
+      "status": "completed",
+      "output": "A prime number is a whole number greater than 1 with exactly two positive divisors: 1 and itself\u2014for example, **7**.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5412,
+        "inputTokens": 5379,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 33,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "What is a prime number? One sentence and an example.",
+      "tier": "default",
+      "thread_ms": 27,
+      "ttft_ms": 2660,
+      "sentence_ms": 3368,
+      "complete_ms": 3517,
+      "status": "completed",
+      "output": "A prime number is a whole number greater than 1 with exactly two positive divisors: 1 and itself\u2014for example, **7**.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5412,
+        "inputTokens": 5379,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 33,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Explain the difference between weather and climate briefly.",
+      "tier": "default",
+      "thread_ms": 30,
+      "ttft_ms": 3444,
+      "sentence_ms": 3867,
+      "complete_ms": 4289,
+      "status": "completed",
+      "output": "**Weather** is the short-term state of the atmosphere\u2014such as today\u2019s temperature, rain, or wind.\n\n**Climate** is the long-term pattern of weather in a place, typically measured over decades.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5422,
+        "inputTokens": 5376,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 46,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Explain the difference between weather and climate briefly.",
+      "tier": "fast",
+      "thread_ms": 28,
+      "ttft_ms": 6979,
+      "sentence_ms": 7270,
+      "complete_ms": 7921,
+      "status": "completed",
+      "output": "**Weather** is the short-term condition of the atmosphere\u2014such as today\u2019s temperature, rain, or wind.\n\n**Climate** is the long-term pattern of weather in a region, typically measured over decades.",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5422,
+        "inputTokens": 5376,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 46,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Write a two-line reminder to take a break and drink water.",
+      "tier": "fast",
+      "thread_ms": 27,
+      "ttft_ms": 2354,
+      "sentence_ms": 2492,
+      "complete_ms": 2853,
+      "status": "completed",
+      "output": "Take a short break and stretch your legs.  \nDrink some water\u2014you\u2019ve earned it!",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5402,
+        "inputTokens": 5380,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 22,
+        "reasoningOutputTokens": 0
+      }
+    },
+    {
+      "prompt": "Write a two-line reminder to take a break and drink water.",
+      "tier": "default",
+      "thread_ms": 28,
+      "ttft_ms": 2710,
+      "sentence_ms": 2840,
+      "complete_ms": 3089,
+      "status": "completed",
+      "output": "Take a short break and stretch your legs.  \nDrink some water\u2014you\u2019ve got this!",
+      "tools": [],
+      "usage": {
+        "totalTokens": 5402,
+        "inputTokens": 5380,
+        "cachedInputTokens": 4864,
+        "cacheWriteInputTokens": 0,
+        "outputTokens": 22,
+        "reasoningOutputTokens": 0
+      }
+    }
+  ]
+}

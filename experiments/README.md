@@ -1,51 +1,7 @@
-# Voice v2 experiments
+# Keystroke experiments
 
-The installed voice checkpoint is `main` / `v1-voice` at `800adb6`.
-This branch (`codex/gemma-audio-vllm`) keeps experimental runtimes separate
-from the installed palette, voxtype service, and llama-server on port 18781.
+The retained [Codex benchmark](codex-cloud/README.md) uses the supported app-server and managed subscription login. `python3 experiments/test_protocols.py` checks its event ordering offline.
 
-## Product direction
+Local Gemma audio and text runtimes were removed in the Codex integration checkpoint. Quantized Gemma 4 E2B W4A16 did run on Intel XPU with vLLM, but measured model allocation was 6.84 GiB and total service memory about 12.4 GiB; startup was roughly 90 seconds. Those resource costs did not fit the laptop experience. Earlier code and detailed results remain in git history (`0325fb6`). The v1 voice tag is unchanged.
 
-Dictate into the existing palette. Watch the complete request improve while
-speaking. Ordinary actions remain immediate; clipboard, ChatGPT, and Codex
-remain normal options for the same request. For an open-ended request such as
-“make my window corners more rounded”, offer an agent that can inspect the
-machine, load the applicable Omarchy skill, make the change, and verify it.
-
-The next integration should use two execution paths:
-
-1. Local transcription, full-request revision, and deterministic extension
-   actions for responsiveness. Suggest while recording; only execute after
-   the user selects an action. Never execute speculative partial speech.
-2. A resident Codex app-server for open-ended work. Show progress immediately,
-   stream actual action events, support interruption, and preserve the agent
-   session for corrections. Permissions and approval handling belong in the
-   execution bridge; model size alone does not establish safe execution.
-
-Use generation IDs and cancellation for superseded transcripts and results.
-Pre-create the agent session and catalog prefix where possible, but measure
-speech-end-to-useful-action latency, not just model token speed. Resolve skills
-from the installed environment instead of hard-coding desktop edits. Start
-with one explicit “Run with agent” option before considering automatic routing.
-
-## What was tested
-
-- [Codex subscription / GPT-5.6 Luna](codex-cloud/README.md): working managed
-  sign-in, streaming classification benchmark, and one real read-only terminal
-  action. No authentication tokens are extracted or stored by this code.
-- [Gemma 4 audio / Intel XPU](gemma-audio/README.md): isolated driver, Python,
-  vLLM runtime, pinned INT4 checkpoint, and successful native-audio inference.
-  Median new-command response was 0.72 s; model allocation was 6.84 GiB. The
-  default AutoRound library's unsupported CPU instruction was avoided using
-  vLLM's built-in oneDNN backend. Seven of eight synthetic utterances were
-  transcribed and routed correctly; explicit activation remains essential.
-
-Run the offline benchmark protocol checks with:
-
-```sh
-python -m unittest discover -s experiments -p 'test_*.py' -v
-```
-
-These are exploratory clients, not a shipped agent executor. Their example
-catalog is deliberately small and their timings do not measure microphone,
-ASR, UI, or end-to-end voice latency.
+Keystroke now retains Vulkan Whisper for speech and uses Codex for reasoning. See [current verification](../docs/codex-integration-verification.md).

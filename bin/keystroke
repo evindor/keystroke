@@ -20,10 +20,8 @@ Usage: bin/keystroke <command>
   open <q>    Open the palette with a query
   validate    omarchy plugin validate on this checkout
   test        Run QML, voice lifecycle, time-zone checks, and qmllint
-  voice-setup Build/install Keystroke's voxtype (streaming + live transcript), llama-server and Gemma 4 E2B;
-              write the user services and switch voxtype to streaming. Re-runnable. See helpers/voice-setup.sh
-  voice-backend vllm|voxtype  Switch the live backend (vLLM runtime must be prepared first)
-  voice-status  Show what voice-setup installed and whether both daemons answer
+  voice-setup Build/install streaming voxtype with Vulkan speech recognition
+  voice-status Show speech daemon and GPU status
 USAGE
 }
 
@@ -68,16 +66,13 @@ case "${1:-help}" in
   test)
     (cd "$ROOT/tests" && /usr/lib/qt6/bin/qmltestrunner -silent -input .)
     python3 "$ROOT/tests/voice_session_check.py"
-    python3 "$ROOT/tests/audio_session_check.py"
-    python3 "$ROOT/tests/audio_record_check.py"
     python3 "$ROOT/tests/clipboard_transfer_check.py"
+    python3 "$ROOT/tests/codex_session_check.py"
     python3 "$ROOT/tests/palette_dictation_check.py"
-    KEYSTROKE_TEST_AUDIO=1 python3 "$ROOT/tests/palette_dictation_check.py"
     python3 "$ROOT/tests/tz_helper_check.py"
     "$ROOT/tests/lint.sh"
     ;;
   voice-setup) shift; exec "$ROOT/helpers/voice-setup.sh" "$@" ;;
-  voice-backend) shift; exec "$ROOT/helpers/voice-backend.sh" "$@" ;;
   voice-status) exec "$ROOT/helpers/voice-setup.sh" --status ;;
   help|-h|--help) usage ;;
   *) usage >&2; exit 2 ;;

@@ -22,9 +22,10 @@ Item {
   Clipboard { id: clipboard; host: root.host }
   Files { id: files; host: root.host }
   AiWeb { id: aiWeb; host: root.host }
+  Codex { id: codex; host: root.host }
   SettingsProvider { id: settingsProvider; host: root.host }
 
-  readonly property var bundled: [omarchyMenu, applications, calculator, converter, colors, emoji, clipboard, dictation, files, aiWeb, settingsProvider]
+  readonly property var bundled: [omarchyMenu, applications, calculator, converter, colors, emoji, clipboard, dictation, files, codex, aiWeb, settingsProvider]
 
   function rebuild() {
     var out = [], issues = []

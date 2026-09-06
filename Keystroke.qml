@@ -67,6 +67,21 @@ Item {
     return "stopping"
   }
 
+  // Optional provider views share the palette window, focus and voice lifecycle.
+  property string activeProviderKey: ""
+  readonly property bool providerViewActive: activeProviderKey.length > 0
+  function closeProviderView() {
+    if (providerView.item && typeof providerView.item.dismiss === "function") providerView.item.dismiss()
+    root.activeProviderKey = ""
+    providerView.sourceComponent = null
+  }
+  function showProviderView(key) {
+    var entry = root.registryEntry(key)
+    if (!entry || !root.providerEnabled(entry) || !entry.provider.view) { root.errorMessage = "Provider view is unavailable"; return }
+    root.activeProviderKey = key
+    providerView.sourceComponent = entry.provider.view
+  }
+
   // -------------------------------------------------------------- settings
   property var config: Settings.empty()
   property string configError: ""
@@ -117,51 +132,17 @@ Item {
     host: root
     onPartial: function(text) { root.voiceLive(text) }
     onTranscribed: function(text) { root.voiceTranscribed(text) }
-    onNothingHeard: { root.dictationPending = ""; spoken.cancel(); if (root.opened) root.statusMessage = "Nothing heard" }
-    onFailed: function(message) { root.dictationPending = ""; spoken.cancel(); if (root.opened) root.errorMessage = message }
+    onNothingHeard: { root.dictationPending = ""; if (root.opened) root.statusMessage = "Nothing heard" }
+    onFailed: function(message) { root.dictationPending = ""; if (root.opened) root.errorMessage = message }
   }
-  readonly property bool nativeAudio: root.voiceSettings.backend === "vllm"
-  readonly property var voice: root.nativeAudio ? audioVoice : voxtypeVoice
-  AudioSession {
-    id: audioVoice
-    host: root
-    enabled: root.nativeAudio
-    watching: root.opened
-    endpoint: String(root.voiceSettings.audioEndpoint || "http://127.0.0.1:18782")
-    onAvailableChanged: { if (available && root.opened && !voice.active) root.voiceWarm() }
-    onPartial: function(text) { root.voiceLive(text) }
-    onTranscribed: function(text) { root.voiceTranscribed(text) }
-    onRecognized: function(index, text, ms) {
-      if (root.opened && !root.voiceDiscard && !root.dictationMode) spoken.acceptAudio(index, text, ms)
-    }
-    onNothingHeard: { root.dictationPending = ""; spoken.cancel(); if (root.opened) root.statusMessage = "Nothing heard" }
-    onFailed: function(message) { root.dictationPending = ""; spoken.cancel(); if (root.opened) root.errorMessage = message }
-  }
-  // A local llama-server (Gemma 4 E2B in the reference setup) that maps the
-  // transcript to one catalog row. The fuzzy results stay on screen; the
-  // assistant's pick is pinned above them when it lands.
-  Assist {
-    id: assist
-    watching: root.opened
-    enabled: !root.nativeAudio && root.voiceEnabled && !root.dictationMode && root.voiceSettings.assist === true
-    endpoint: String(root.voiceSettings.assistEndpoint || "")
-    onAvailableChanged: { if (available && root.opened && !spoken.active) root.voiceWarm() }
-  }
+  readonly property var voice: voxtypeVoice
   readonly property var voiceSchema: [
-    { key: "backend", type: "enum", label: "Voice backend", "default": "voxtype", options: ["voxtype", "vllm"],
-      description: "Voxtype uses Whisper; vLLM uses resident Gemma native audio (requires voice-backend setup)" },
-    { key: "audioEndpoint", type: "string", label: "vLLM audio endpoint", "default": "http://127.0.0.1:18782",
-      description: "Local native-audio server installed by bin/keystroke voice-backend vllm" },
     { key: "enabled", type: "boolean", label: "Voice command integration", "default": true,
       description: "Hold the palette hotkey, or tap it again while the palette is open, to dictate the query" },
     { key: "secondTap", type: "enum", label: "Second tap of the hotkey", "default": "voice", options: ["voice", "close"],
       description: "Voice starts dictation and a third tap stops it (Esc closes); Close is the stock toggle" },
     { key: "keys", type: "string", label: "Hotkeys to hold", "default": "SUPER + SPACE",
-      description: "Hyprland combos for the long-press bindings, comma-separated, e.g. SUPER + SPACE, SUPER + SHIFT + code:201" },
-    { key: "assist", type: "boolean", label: "Assistant picks the command", "default": true,
-      description: "Asks the local llama-server (Gemma) which app, action or setting a spoken command means and pins it above the matches" },
-    { key: "assistEndpoint", type: "string", label: "llama-server endpoint", "default": "http://127.0.0.1:18781",
-      description: "Where the assistant listens; bin/keystroke voice-setup installs it as the keystroke-llm user service" }
+      description: "Hyprland combos for the long-press bindings, comma-separated, e.g. SUPER + SPACE, SUPER + SHIFT + code:201" }
   ]
   property var voiceSettings: Settings.values(root.config, ["voice"], root.voiceSchema)
   readonly property bool voiceEnabled: voice.detected && voiceSettings.enabled === true
@@ -181,19 +162,10 @@ Item {
     onFileChanged: reload()
   }
   readonly property string voiceBindingsStatus: root.bindingsKnown ? VoiceBindings.status(root.bindingsText, root.voiceSettings.keys) : "missing"
-  readonly property string voiceStamp: [voice.detected, voice.version, voice.daemonState, root.voiceBindingsStatus, root.bindingsKnown,
-                                         assist.enabled, assist.available, assist.modelName, assist.lastMs, assist.endpoint, root.nativeAudio, audioVoice.available, audioVoice.lastMs].join("|")
+  readonly property string voiceStamp: [voice.detected, voice.version, voice.daemonState, root.voiceBindingsStatus, root.bindingsKnown].join("|")
   function voiceModel() {
-    return { backend: root.nativeAudio ? "vllm" : "voxtype", schemas: root.voiceSchema, values: root.voiceSettings, detected: voice.detected, version: voice.version, daemonState: voice.daemonState,
-             bindings: root.voiceBindingsStatus, bindingsPath: "~/.config/hypr/bindings.lua",
-             assist: root.nativeAudio ? { enabled: root.voiceSettings.assist === true, available: audioVoice.available, endpoint: audioVoice.endpoint, model: audioVoice.version, lastMs: audioVoice.lastMs }
-                                      : { enabled: assist.enabled, available: assist.available, endpoint: assist.endpoint, model: assist.modelName, lastMs: assist.lastMs } }
-  }
-  IntentSession {
-    id: spoken
-    assistant: root.nativeAudio ? null : assist
-    onPickChanged: root.requery()
-    onStatusChanged: { if (root.opened && status) root.statusMessage = status }
+    return { schemas: root.voiceSchema, values: root.voiceSettings, detected: voice.detected, version: voice.version, daemonState: voice.daemonState,
+             bindings: root.voiceBindingsStatus, bindingsPath: "~/.config/hypr/bindings.lua" }
   }
   readonly property bool dictationMode: !root.dmenuActive && root.scope === "dictation"
   property string dictationPending: ""   // explicit Enter intent: copy | paste
@@ -213,43 +185,16 @@ Item {
     } else clipboardTransfer.submit(search.text, alternate)
   }
   property string voiceRawText: ""
-  property var voiceCatalog: null
   readonly property bool liveText: voice.active && search.text.length > 0
   function voiceLive(text) {
-    if (!root.opened || (voice.phase !== "listening" && !(root.nativeAudio && voice.phase === "transcribing")) || root.voiceDiscard) return
+    if (!root.opened || voice.phase !== "listening" || root.voiceDiscard) return
+    if (root.providerViewActive && providerView.item) { if (typeof providerView.item.transcript === "function") providerView.item.transcript(text, false); return }
     root.voiceRawText = String(text || "")
     var t = root.dictationMode ? String(text || "") : String(text || "").replace(/\s+/g, " ").trim()
-    if (!root.dictationMode) spoken.update(t, false)
     if (t === search.text) return
     search.text = t
     search.cursorPosition = t.length
     root.edited()
-  }
-  // Every row a spoken command could mean: providers that expose catalog()
-  // list everything they own, normalized like query results so the pick can
-  // be activated through the usual path.
-  function catalogForVoice() {
-    var items = [], rows = []
-    for (var i = 0; i < providerRegistry.entries.length && rows.length < 2000; i++) {
-      var entry = providerRegistry.entries[i]
-      if (!root.providerEnabled(entry) || typeof entry.provider.catalog !== "function") continue
-      var out = []
-      try {
-        out = entry.provider.catalog({ host: root, settings: root.settingsFor(entry), shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }) || []
-      } catch (e) { console.warn("keystroke: provider", entry.key, "catalog failed:", e); continue }
-      for (var r = 0; r < out.length && rows.length < 2000; r++) {
-        var row = root.normalize(out[r], entry, "")
-        if (!row || row.disabled) continue
-        rows.push(row)
-        items.push({ title: row.title, detail: String(out[r].detail !== undefined ? out[r].detail : row.subtitle || "") })
-      }
-    }
-    root.voiceCatalog = { items: items, rows: rows, stamp: Intent.stamp(items) }
-    return root.voiceCatalog
-  }
-  function voiceWarm() {
-    if (root.nativeAudio) audioVoice.warm(root.dictationMode || root.voiceSettings.assist !== true ? [] : root.catalogForVoice().items)
-    else if (assist.ready) assist.warm(root.catalogForVoice().items)
   }
   function installVoiceBindings() {
     if (!root.bindingsKnown) { root.errorMessage = "Could not read " + root.bindingsPath; return }
@@ -266,29 +211,24 @@ Item {
     root.voiceDiscard = false
     root.voiceRawText = ""
     root.dictationPending = ""
-    if (!root.dictationMode) spoken.begin(root.catalogForVoice())
-    search.text = ""
-    root.edited()
-    if (!root.dictationMode && assist.ready) assist.warm(spoken.catalog.items)
+    if (root.providerViewActive && providerView.item && typeof providerView.item.beginVoice === "function") providerView.item.beginVoice()
+    else { search.text = ""; root.edited() }
     root.errorMessage = ""
     root.statusMessage = ""
-    if (root.nativeAudio) audioVoice.catalog = root.dictationMode || root.voiceSettings.assist !== true ? [] : spoken.catalog.items
     var started = voice.start()
-    if (!started) spoken.cancel()
     return started
   }
   function voiceStop() { if (voice.phase === "starting" || voice.phase === "listening") voice.stop() }
   function voiceCancel() {
     root.voiceRawText = ""
     root.dictationPending = ""
-    spoken.cancel()
     root.voiceDiscard = true
     if (voice.active) voice.cancel()
   }
   function voiceTranscribed(raw) {
     if (!root.opened || root.voiceDiscard) return
+    if (root.providerViewActive && providerView.item) { if (typeof providerView.item.transcript === "function") providerView.item.transcript(raw, true); return }
     root.voiceRawText = String(raw || "")
-    if (!root.dictationMode) spoken.update(raw, true)
     var text = root.dictationMode ? String(raw) : Intent.normalize(raw)
     search.text = text
     search.cursorPosition = text.length
@@ -298,7 +238,7 @@ Item {
       root.dictationPending = ""
       root.statusMessage = "Enter copies · Ctrl+Enter pastes"
       if (pendingCopy) clipboardTransfer.submit(text, pendingCopy === "paste")
-    } else root.statusMessage = spoken.status || "Transcribed · press ↵ to run"
+    } else root.statusMessage = "Transcribed · press ↵ to run"
   }
   function isSuperKey(key) { return key === Qt.Key_Super_L || key === Qt.Key_Super_R || key === Qt.Key_Meta || key === Qt.Key_Hyper_L || key === Qt.Key_Hyper_R }
   function isModifierKey(key) {
@@ -383,6 +323,7 @@ Item {
   }
 
   function openRoute(input, payload) {
+    root.closeProviderView()
     clipboardTransfer.cancel()
     if (root.dmenuActive && root.requestActive) root.finishRequest(null)
     var route = providerRegistry.bundled[0].routeFor(input)
@@ -426,11 +367,10 @@ Item {
       if (typeof p.opened === "function") { try { p.opened() } catch (e) { console.warn("keystroke: provider opened() threw", e) } }
     }
     voice.refresh()
-    assist.check()
-    if (root.nativeAudio || assist.ready) Qt.callLater(root.voiceWarm)
   }
 
   function openDmenu(payload) {
+    root.closeProviderView()
     clipboardTransfer.cancel()
     if (root.dmenuActive && root.requestActive) root.finishRequest(null)   // a new caller cancels the previous one
     root.voiceCancel()
@@ -465,6 +405,7 @@ Item {
   }
 
   function cancel(preserveTransfer) {
+    root.closeProviderView()
     if (preserveTransfer !== true) clipboardTransfer.cancel()
     if (root.dmenuActive) root.finishRequest(null)
     root.voiceCancel()
@@ -490,10 +431,10 @@ Item {
   }
 
   function runQuery() {
-    if (!root.opened) return
+    if (!root.opened || root.providerViewActive) return
     if (root.dmenuActive) { root.applyRows(root.dmenuRows()); root.pending = false; root.afterRows(); return }
     root.generation++
-    var q = spoken.active ? spoken.query : search.text, sc = root.scope
+    var q = root.voiceRawText && !root.dictationMode ? Intent.normalize(root.voiceRawText) : search.text, sc = root.scope
     var owner = sc.split("/")[0]
     var sub = sc.indexOf("/") >= 0 ? sc.slice(owner.length + 1) : ""
     var collected = [], errors = [], pend = false
@@ -502,7 +443,7 @@ Item {
       var entry = providerRegistry.entries[i]
       if (!root.providerEnabled(entry)) continue
       if (sc && owner !== entry.key) continue
-      var ctx = { query: q, rawQuery: spoken.active ? root.voiceRawText : search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
+      var ctx = { query: q, rawQuery: root.voiceRawText || search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
                   pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
       try {
         var out = entry.provider.query(ctx) || []
@@ -517,17 +458,6 @@ Item {
     }
     if (root.configError) errors.push(root.configError)
     var ranked = Match.rank(collected, root.bonusFor)
-    // The assistant's pick sits above the fuzzy results for the transcript it
-    // answered; any edit to the query lets the ordinary ranking through.
-    if (spoken.active && spoken.pick && q && q === spoken.query) {
-      var pick = spoken.pick, rest = []
-      for (var k = 0; k < ranked.length; k++) if (ranked[k].uid !== pick.uid) rest.push(ranked[k])
-      var pinned = {}
-      for (var f in pick) pinned[f] = pick[f]
-      pinned.tier = "answer"; pinned.section = "Spoken command"; pinned.badge = "assistant"; pinned.score = 1000
-      rest.unshift(pinned)
-      ranked = rest
-    }
     root.applyRows(ranked.slice(0, 120))
     root.pending = pend
     root.errorMessage = errors.join(" · ")
@@ -717,6 +647,7 @@ Item {
   function perform(effect, row) {
     var type = effect.type
     if (type === "noop") return
+    if (type === "provider-view") { root.showProviderView(effect.provider); return }
     if (type === "dictate") {
       root.navigate("dictation", "Dictate to Clipboard")
       if (!root.voiceBegin("tap")) root.errorMessage = "Voice is unavailable; check Settings › Voice"
@@ -752,17 +683,18 @@ Item {
     }
   }
 
-  function inspectVoiceCatalog() { return JSON.stringify(root.catalogForVoice().items) }
 
+  function inspectConversation() {
+    var c = providerRegistry.bundled.find(x => x.provider.id === "codex").session
+    return JSON.stringify({ threadId: c.threadId, phase: c.phase, ready: c.server.ready, error: c.error, activity: c.activity, messages: c.messages, draft: c.draft, firstTextMs: c.firstTextMs, lastMs: c.lastMs })
+  }
   function inspect() {
-    return JSON.stringify({ opened: root.opened, mode: root.mode, scope: root.scope, query: search.text, count: root.rows.length,
+    return JSON.stringify({ opened: root.opened, mode: root.mode, view: root.activeProviderKey, scope: root.scope, query: search.text, count: root.rows.length,
       titles: root.rows.map(function(r) { return r.title }), selected: root.selected, pending: root.pending,
       modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems,
       error: root.errorMessage, configError: root.configError, status: root.statusMessage,
-      voice: { warmed: root.nativeAudio && audioVoice.warmedPrompt.length > 0, backend: root.nativeAudio ? "vllm" : "voxtype", available: root.nativeAudio ? audioVoice.available : voice.daemonRunning, lastMs: root.nativeAudio ? audioVoice.lastMs : assist.lastMs, state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
-               command: voice.command, daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length, live: voice.liveText },
-      assist: { enabled: assist.enabled, available: assist.available, model: assist.modelName, lastMs: assist.lastMs, warmed: assist.warmedStamp,
-                pick: spoken.pick ? spoken.pick.title : "", catalog: root.voiceCatalog ? root.voiceCatalog.rows.length : 0 } })
+      voice: { backend: "voxtype", state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
+               command: voice.command, daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length, live: voice.liveText } })
   }
 
   // ------------------------------------------------------------------ view
@@ -805,9 +737,17 @@ Item {
       Accessible.name: "Keystroke command palette"
       MouseArea { anchors.fill: parent; onClicked: {} }
 
+      Loader {
+        id: providerView
+        anchors.fill: parent
+        z: 5
+        onLoaded: { item.host = root; if (typeof item.focusInput === "function") Qt.callLater(item.focusInput) }
+      }
+
       // Header: search field
       Item {
         id: header
+        visible: !root.providerViewActive
         x: Style.space(root.compact ? 20 : 24); y: 0
         width: parent.width - x * 2
         height: root.headerHeight

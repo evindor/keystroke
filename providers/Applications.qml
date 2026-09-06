@@ -19,7 +19,6 @@ Item {
     description: "Launch installed desktop apps",
     settings: [],
     query: function(ctx) { return root.query(ctx) },
-    catalog: function() { return root.catalog() },
     opened: function() { if (root.library) root.library.refreshIcons() }
   })
 
@@ -50,20 +49,6 @@ Item {
       section: "Applications", verb: "Launch", tier: "item", score: score, order: order, remember: true,
       appId: String(entry.id), action: { type: "app", id: String(entry.id), name: name }, hint: "Del uninstall"
     }
-  }
-
-  // Every installed app, for the voice assistant's catalog; `detail` is the
-  // generic name ("Web Browser") so a spoken category still lands.
-  function catalog() {
-    if (!root.library) return []
-    var all = root.library.sortedEntries(""), rows = []
-    for (var i = 0; i < all.length; i++) {
-      var entry = all[i].entry
-      var row = root.rowFor(entry, 1, i)
-      row.detail = String(entry.genericName || entry.comment || "")
-      rows.push(row)
-    }
-    return rows
   }
 
   function query(ctx) {

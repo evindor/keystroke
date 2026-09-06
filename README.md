@@ -1,6 +1,6 @@
 # Keystroke
 
-A Raycast-inspired command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin, written in QML/JavaScript, running inside the existing `omarchy-shell` process. The palette uses the existing shell runtime. Optional voice backends keep their speech/model services resident.
+A Raycast-inspired command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin, written in QML/JavaScript, running inside the existing `omarchy-shell` process. The palette uses the existing shell runtime. Speech runs locally on Vulkan; optional Codex reasoning uses the managed subscription through app-server.
 
 Every capability is a provider: applications, the complete Omarchy menu, calculator, unit and time-zone conversion, colors, emoji, clipboard history, files and folders under your home, AI/web continuation, and the settings screens themselves. Community providers are ordinary Omarchy plugins.
 
@@ -24,7 +24,7 @@ The plugin id is `evindor.keystroke` for now; the permanent publishing id may ch
 - Search is fuzzy everywhere and reaches into submenus. From the root, `prefp`, `keysepro` and `setaiprv` all land on Keystroke Settings › AI & Web Search › Preferred assistant, `prefcla` on its Claude choice, `sysshut` on System › Shutdown. Letters may skip whole words of the breadcrumb, the words of a query can come in any order (`ai prov`), and descriptions match by word. Inside a submenu the same search covers everything below it.
 - Computed answers appear first as answer rows with a preview; matches next; Google and the assistants last.
 - Files and folders under `~` join the results from two characters on, found by `fd` (Omarchy ships it; hidden and gitignored entries are skipped unless you turn hidden entries on). The words of the query are literal substrings: the last one has to be in the name, earlier ones anywhere in the path, so `docs readme` finds README files under a docs folder and `bindings lua` the Lua files in a bindings folder. `↵` opens a file with its default app and a folder in your file manager; `Ctrl+↵` opens a terminal in the folder (or in a file's folder). They rank below apps and Omarchy entries on purpose and at most ten of them mix into the root (Settings → Files: files, folders, hidden entries, limit); the Files screen shows up to sixty.
-- Assistant hand-offs open the target with your prompt already in its composer, nothing goes through the clipboard: Claude desktop via `claude://claude.ai/new?q=…` (the same link Anthropic's own GNOME search provider uses), the Codex desktop app (which is what the Linux "ChatGPT" package installs) via `codex://threads/new?prompt=…`, or in the browser `claude.ai/new?q=` and `chatgpt.com/?prompt=` (`?q=` sends immediately when **Send immediately in the browser** is on). CLI mode opens a terminal with `claude` or `codex` and the prompt as a literal argument. A missing app or CLI falls back to the browser and the row says so.
+- Assistant hand-offs open the target with your prompt already in its composer, nothing goes through the clipboard: Claude desktop via `claude://claude.ai/new?q=…` (the same link Anthropic's own GNOME search provider uses), the Codex desktop app (which is what the Linux "ChatGPT" package installs) via `codex://threads/new?prompt=…`, or in the browser `claude.ai/new?q=` and `chatgpt.com/?prompt=` (`?q=` sends immediately when **Send immediately in the browser** is on). CLI mode opens a terminal with `claude` or `codex` and the prompt as a literal argument. Claude falls back to its browser route; Codex falls back from desktop to CLI and preserves the request if neither is available.
 - `↑`/`↓` or `Ctrl+P`/`Ctrl+N` move, `PageUp`/`PageDown` jump six rows, `↵` or `→` activates, `Ctrl+↵` runs a row's alternate action (terminal for files and folders), `Esc` closes immediately, `Ctrl+U` clears the query, `←`/`Backspace` on an empty query goes back, `Del` on an application offers to uninstall it, `Ctrl+,` opens Settings, `Ctrl+K` opens the selected provider's settings.
 - Destructive Omarchy actions (shutdown, reboot, logout, hibernate, removals, config resets) ask for confirmation; turn this off in Settings → Omarchy.
 - Selections of apps and Omarchy commands earn a bounded frecency bonus (14-day half-life). State lives in `~/.local/state/keystroke/usage.json` as hashed ids only.
@@ -34,7 +34,7 @@ Every `omarchy menu` route works as before: submenus open scoped (`omarchy menu 
 
 ## Voice
 
-Keystroke dictates through [voxtype](https://voxtype.io), the dictation daemon Omarchy installs from Install › AI › Dictation. Nothing else is needed: Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the PATH, and the screen offers Omarchy's installer when it is not. Two optional pieces make it fast and forgiving, both installed by `bin/keystroke voice-setup` (no root): a voxtype build that streams words while you speak, and a local Gemma model that turns "luck the screen" into Lock Screen. See [Speaking commands](#speaking-commands) below.
+Keystroke dictates through [voxtype](https://voxtype.io), the dictation daemon Omarchy installs from Install › AI › Dictation. Nothing else is needed: Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the PATH, and the screen offers Omarchy's installer when it is not. `bin/keystroke voice-setup` (no root) installs a voxtype build with live words and whole-request revision. See [Speaking commands](#speaking-commands) below.
 
 Two ways in, both while the palette is open:
 
@@ -48,7 +48,7 @@ Two ways in, both while the palette is open:
   -- <<< keystroke voice
   ```
 
-While listening, live words keep most of the query field and a small waveform sits to the right. Matches and assistant suggestions update while you speak. Releasing the hotkey, tapping it again, or pressing `↵` finishes the recording. **A fresh `↵` after transcription runs the visible selection.** Stopping, a model reply, and a timeout never run a command. Typing or navigating cancels the voice suggestion and recording; held Enter repeats are ignored. Voxtype's overlay stays hidden (`--no-osd`), the transcript never goes through the clipboard or virtual keyboard, and temporary transcript files are removed after recording or cancellation.
+While listening, live words keep most of the query field and a small waveform sits to the right. Matches update while you speak. Releasing the hotkey, tapping it again, or pressing `↵` finishes the recording. **A fresh `↵` after transcription runs the visible selection.** Stopping, a model reply, and a timeout never run a command. Typing or navigating cancels the recording; held Enter repeats are ignored. Voxtype's overlay stays hidden (`--no-osd`), the transcript never goes through the clipboard or virtual keyboard, and temporary transcript files are removed after recording or cancellation.
 
 Model, language, VAD and everything else are voxtype's settings (`voxtype configure`). Whisper transcribes silence as "Thank you." now and then; voxtype's VAD filters that when enabled. With the daemon stopped the palette says so instead of listening.
 
@@ -71,40 +71,23 @@ Speech and search work together:
 
 1. **Words appear as you speak.** With a streaming engine the daemon mirrors the text so far to `$XDG_RUNTIME_DIR/voxtype/transcript`; the palette shows it in the query field and matches follow each revision. The Keystroke fork now uses complete transcript snapshots for file-output sessions: every word remains revisable, punctuation and deletions are preserved, and a final pass processes the complete recording. Audio is retained through the configured recording-duration limit (60 seconds here). Ordinary live typing retains its rolling-window behavior. Longer requests require more inference work per update. This needs voxtype 1.1's sliding-window streaming plus a small patch that exposes the partials, proposed upstream and meanwhile built from [evindor/voxtype](https://github.com/evindor/voxtype) (branch `feature/live-transcript-file`) by `bin/keystroke voice-setup`. The build lands in `~/.local/share/keystroke/voxtype`, a systemd drop-in makes it the daemon, and the palette prefers it over the packaged binary; delete `~/.config/systemd/user/voxtype.service.d/keystroke.conf` to go back. Whisper on the GPU is what makes streaming keep up: `voxtype setup gpu --enable` (Vulkan) turns a 2.6 s transcription into 0.2 s on an Intel Arc iGPU, and the CPU cannot re-transcribe the rolling window every half second.
 2. **The transcript becomes a query.** Trailing punctuation goes, so do a leading launcher verb ("open", "go to") and filler ("the", "please"): "Launch Chrome." is searched as `Chrome`. The fuzzy matcher then ranks as if you had typed it.
-3. **The assistant suggests while you speak.** Settings › Voice › **Assistant picks the command** sends your latest words and a numbered catalog to local [llama-server](https://github.com/ggml-org/llama.cpp), running Gemma 4 E2B Q4_0 at `127.0.0.1:18781`. A suggestion is pinned as *Spoken command*. Partial requests are throttled to 300 ms; one inference runs at a time and only the newest pending transcript is kept. Stale replies cannot change a newer query. A final punctuation/case correction reuses the live answer. The catalog is warmed when the palette opens; duplicate warm-ups share the same work, and real requests wait for that work instead of competing with it. If the server is still starting, health checks continue while the palette is open. A cold model or uncached catalog still takes time; the fuzzy matches stay usable throughout.
+3. **Choose what to do.** Local matches stay immediate. Ask Codex here answers inside the palette; Copy to Clipboard preserves the full prose. Only explicit activation sends a cloud request.
 
-The assistant is text-only: the service does not load a vision/audio projector. It retains diagnostic logs, limits ordinary process memory to 6 GiB with no swap, and bounds restart attempts (GPU allocations may fall outside that memory limit). Requests time out after 4 s of inference; warm-up has a separate 30 s deadline. These are fallback deadlines, not latency promises. The model can return only a catalog number or NONE; it has no command-execution tools. `core/Intent.js` defines the prompt and `voice/IntentSession.qml` owns suggestion state.
+To stop speech across reboots: `systemctl --user disable --now voxtype`. Restore it with `systemctl --user enable --now voxtype`. `bin/keystroke voice-setup` builds only Vulkan speech recognition and whole-request revision. No local language model is installed.
 
-To stop voice services **and keep them off after reboot**: `systemctl --user disable --now keystroke-llm voxtype`. `stop` alone does not disable startup. To enable them again: `systemctl --user enable --now keystroke-llm voxtype`. Run `bin/keystroke voice-setup` explicitly to install/update the text-only service and restart it.
+### Codex inside Keystroke
 
-### Experimental native audio with vLLM
+Type or speak, then select **Ask Codex here**, or type `? ` before your question to put it first. Answers stream inside the palette. **Enter** sends a follow-up; **Shift+Enter** adds a line; your voice hotkey fills the composer. **Update request** steers a running answer. **Stop** interrupts; **Escape** closes and interrupts. Reopen **Codex → Recent questions** to continue.
 
-On the prepared Intel XPU reference machine, `bin/keystroke voice-backend vllm`
-installs/enables `keystroke-vllm.service`, disables the previous llama service,
-and sets `voice.backend` to `vllm`. Run `bin/keystroke install` after checking out
-this branch, then `omarchy restart shell` if the shell retains the previous QML.
-The isolated runtime and quantized model must already be prepared as described
-in [experiments/gemma-audio](experiments/gemma-audio/README.md).
+**Continue in Codex** (Ctrl+Enter in the conversation) saves and hands the same conversation to your configured desktop app or CLI. A running answer stops first. The **Open task in Codex** result opens a new request in that destination; desktop prefills the composer for you to send. Clipboard's Ctrl+Enter still means paste.
 
-Gemma 4 E2B W4A16 AutoRound receives microphone audio directly: whole-recording
-revisions produce both the transcript and an optional catalog suggestion.
-The first words stream; subsequent completed revisions replace the text without
-clearing it. Recording is limited to 60 seconds, kept in memory, and ends on
-stop/cancel. Model output never executes an action. Clipboard shortcuts are the
-same as the default backend. The voice assistant switch disables catalog routing
-while retaining native transcription.
+Settings → Codex selects the model, Fast/Standard processing, destination and optional working folder. The default is **GPT-5.6 Luna, low effort, Fast** using your existing `codex login`. Fast uses more subscription allowance. Keystroke never reads or copies credentials. This integration pins **Codex CLI 0.153.2**; other versions display a compatibility error.
 
-The resident service listens only on `127.0.0.1:18782`, uses the verified oneDNN
-INT4 XPU kernel, a 16,384-token context, and 512 MiB KV cache. Model allocation is
-6.84 GiB; total service memory measured about 12.4 GiB, including runtime and file
-cache. Startup takes roughly 90 seconds, then the model stays loaded. In a live
-349-row catalog test, a short browser request took 1.06 seconds for the final
-inference. This is one synthetic utterance, not a general latency guarantee.
+Quick questions can search the web but cannot execute local commands, edit files or invoke connected apps. Within the Codex scope, **Do this here · desktop settings** starts an explicit agent task scoped to `~/.config`; a configured working folder adds a project task option. Required approvals and questions appear in the panel. Continue in the full app for unsupported capabilities.
 
-Switch back with `bin/keystroke voice-backend voxtype`; both backend choices
-persist across login. To stop this experimental server and keep it off, use
-`systemctl --user disable --now keystroke-vllm`. The helper creates a timestamped
-config backup before switching. It does not change the system Intel drivers.
+Keystroke owns one local `codex app-server` transport process, shuts it down after ten idle minutes, and exits it before handing a conversation to another client. Conversation records remain managed by Codex; Keystroke stores only its recent-question index and drafts. No request is silently replayed after a connection failure.
+
+Local Gemma/vLLM runtimes were retired. See [the integration verification](docs/codex-integration-verification.md) for measured behavior and compatibility limits.
 
 ## Settings
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Keystroke is one Omarchy `menu` plugin. Everything runs in `omarchy-shell`'s QML engine; there is no second process while hidden and no IPC on the query path.
+Keystroke is one Omarchy `menu` plugin. Everything runs in `omarchy-shell`'s QML engine; local queries stay synchronous and never wait for Codex. Speech has its own daemon; the optional Codex transport stays warm for ten idle minutes.
 
 ```text
 omarchy-shell
@@ -8,13 +8,13 @@ omarchy-shell
        ├─ window, keys, navigation stack, dmenu protocol, effects, config, frecency
        ├─ providers/Registry.qml
        │    ├─ bundled: OmarchyMenu, Applications, Calculator, Converter, Colors,
-       │    │           Emoji, Clipboard, Files, AiWeb, SettingsProvider
+       │    │           Emoji, Clipboard, Files, Codex, AiWeb, SettingsProvider
        │    └─ community: shell.serviceFor(<plugin id>) for every enabled plugin
        │                  whose manifest carries "x-keystroke"
        ├─ core/*.js   Match (fuzzy matcher + tiers), SettingsTree, Frecency, Settings, VoiceBindings, Intent, Calculator, Units, Colors, Emoji, AiTargets, Files
        ├─ omarchy/MenuModel.js   vendored stock menu model (parse, merge, routes, guards)
        ├─ voice/VoiceSession.qml   voxtype recording lifecycle, live transcript and audio levels
-       ├─ voice/Assist.qml         llama-server client: spoken command → catalog row
+       ├─ codex/      AppServer, CodexSession, ConversationView, Policy
        └─ ui/         ResultRow, PreviewPane, Keycap, VoiceWave
 ```
 
@@ -35,15 +35,19 @@ Two triggers, both host-owned in `Keystroke.qml`:
 
 **Query.** `core/Intent.normalize()` turns the transcript into a query: trailing punctuation, a leading launcher verb and filler words are dropped ("Launch Chrome." → `Chrome`), because the matcher treats punctuation as literal characters and AND-s the words.
 
-**Assistant.** `voice/Assist.qml` owns the HTTP transport; `voice/IntentSession.qml` owns a recording's catalog snapshot, latest transcript and suggested row. Partial transcripts use a 300 ms throttle (not a restarting debounce), so continuous speech gets suggestions too. The transport serializes work for llama-server's single slot and replaces its pending request with the latest one without aborting active inference. Warm-ups are deduplicated, have a 30 s deadline and complete before queued command inference. Inference has a 4 s deadline; health and model probes have 2 s deadlines. Health is retried every 750 ms while an open palette waits for startup. No polling occurs while the palette is closed.
-
-Each reply carries the rows captured for its request. Only a reply matching the current transcript key can become a suggestion; casing and trailing punctuation do not change that key. Typing, navigation, closing and a new recording retire old suggestions. Endpoint changes and disabling abort all requests, including probes, and callbacks check request ownership before touching state. The grammar constrains replies and the parser rejects anything except a complete valid number or NONE.
-
-**Activation.** The suggestion controller has no execution path. Enter during recording only stops it; Enter during transcription is consumed; a fresh Enter afterwards activates the visible row through normal provider confirmations. Auto-repeat Enter cannot bridge these phases. Timeouts and responses never call `activate()`.
+**Activation.** Enter while recording only stops it; Enter while transcribing is consumed. A fresh Enter activates the selected local result or explicit Codex/clipboard choice. The complete original transcript is passed separately as `ctx.rawQuery`; normalization applies to local matching only.
 
 **Recording cancellation.** Cancellation retires the CLI transcript reader before sending `record cancel`, then removes temporary output after the cancellation acknowledges. New recordings are rejected during that brief cleanup window, preventing an old `--wait` or cleanup from interfering with the next session. A daemon finishing streaming directly into idle also triggers final transcript collection.
 
-**Service.** Gemma loads text weights only (`--no-mmproj`). The service keeps info/error logs, limits process memory to 6 GiB, disables process swap and limits restart attempts. These limits are not a guarantee against GPU driver allocation failures. `voice-setup` restarts the unit after installing an updated definition; disabling the services explicitly prevents restart on login.
+## Codex
+
+`providers/Codex.qml` owns the durable session and an optional provider view. `codex/AppServer.qml` speaks asynchronous JSONL RPC to one version-checked `codex app-server --stdio`. It initializes, reads configured capabilities/model/account readiness, correlates responses, bounds logs and enforces startup/request deadlines. It never attaches to the desktop's private server. Ten idle minutes shut down the child; resuming rehydrates the saved conversation.
+
+`CodexSession.qml` tracks connection, thread, turn and item identities; reconciles early notifications and final items; coalesces deltas every 32 ms; handles interruption, drafts, scoped approvals and questions. Escape requests interruption offscreen. A ten-second unacknowledged interruption closes the connection without retrying the request. Codex owns history; `~/.local/state/keystroke/codex.json` is an atomic forty-entry index with drafts.
+
+Quick mode explicitly disables shell, code execution, local environments, inherited MCP, connected apps, plugins and hooks, while retaining web search. Agent mode is deliberately selected with a visible working directory and Codex workspace-write/on-request permissions. No answer text is interpreted as an effect. Handoff stops an active turn and exits the owned server: unsubscribe alone retains Codex's writer lease and prevents another client from resuming.
+
+`ConversationView.qml` provides selectable Markdown, source links, follow-up dictation, steering and a scrollable approval view. The root hosts it through the generic provider-view effect and resumes normal launcher behavior on the next summon.
 
 ## Query flow
 
@@ -63,7 +67,7 @@ All from Omarchy 4.0.2 source: property injection of `shell`, `manifest`, `plugi
 
 ## Helpers
 
-`helpers/timezone.py` and `fd` are the only out-of-process helpers. `helpers/timezone.py` QML's JavaScript has no IANA zone data; the converter spawns the helper once per distinct time query after a regex gate matches, with a 1 s timeout, and caches the answer.
+The optional Codex and speech transports are described above. File search uses `fd`. `helpers/timezone.py` QML's JavaScript has no IANA zone data; the converter spawns the helper once per distinct time query after a regex gate matches, with a 1 s timeout, and caches the answer.
 
 ## Settings and state
 
@@ -77,4 +81,4 @@ Every provider that owns a tree searches all of it when a query is present: the 
 
 ## Deferred
 
-Match highlighting in rows, arbitrary provider views and a permanent publishing id.
+Match highlighting in rows and a permanent publishing id.

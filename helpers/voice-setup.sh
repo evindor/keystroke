@@ -10,8 +10,6 @@
 #      restores it.
 #   2. voxtype's config switched to streaming (`[whisper] streaming = true`
 #      and a `[streaming]` section tuned for short commands).
-#   3. llama-server (llama.cpp, Vulkan build) with Gemma 4 E2B Q4_0 as the
-#      keystroke-llm user service on 127.0.0.1:18781.
 #
 # Nothing here needs root. Rust (rustup) and a cmake are found on the PATH or
 # under ~/.local/share/keystroke/toolchain/env.sh, which is where a root-free
@@ -23,15 +21,10 @@ KS="$HOME/.local/share/keystroke"
 SRC="${KEYSTROKE_VOXTYPE_SRC:-$HOME/Documents/ChatGPT/voxtype}"
 FORK_URL="https://github.com/evindor/voxtype.git"
 FORK_BRANCH="feature/live-transcript-file"
-LLAMA_TAG="${KEYSTROKE_LLAMA_TAG:-b10821}"
-LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_TAG/llama-$LLAMA_TAG-bin-ubuntu-vulkan-x64.tar.gz"
-MODEL_REPO="https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main"
-MODEL="gemma-4-E2B-it-Q4_0.gguf"
-UNIT_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/keystroke-llm.service"
+HELPERS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UNIT_DIR="$HOME/.config/systemd/user"
 DROPIN="$UNIT_DIR/voxtype.service.d/keystroke.conf"
 VOXTYPE="$KS/voxtype/voxtype"
-ENDPOINT="http://127.0.0.1:18781"
 
 say() { printf '\033[1m» %s\033[0m\n' "$*"; }
 note() { printf '  %s\n' "$*"; }
@@ -45,15 +38,12 @@ status() {
     note "streaming: $(awk '/^\[whisper\]/{w=1;next} /^\[/{w=0} w && /^streaming *=/{print "whisper." $0}' "$cfg" | tr -d ' ' | head -1) $(awk '/^\[streaming\]/{s=1;next} /^\[/{s=0} s && /=/{printf "%s ", $0}' "$cfg" | tr -d ' ')"
   fi
   if [[ -x $VOXTYPE ]]; then note "accel: $("$VOXTYPE" info accel 2>/dev/null | sed -n 's/^ *Backend: *//p' | head -1)"; fi
-  if [[ -x $KS/llama/current/llama-server ]]; then note "llama-server: $KS/llama/current ($(readlink "$KS/llama/current" 2>/dev/null))"; else note "llama-server: not installed"; fi
-  for f in "$MODEL"; do if [[ -f $KS/models/$f ]]; then note "model: $f ($(du -h "$KS/models/$f" | cut -f1))"; else note "model: $f missing"; fi; done
-  note "keystroke-llm.service: $(systemctl --user is-active keystroke-llm 2>/dev/null || true) · health: $(curl -s -m 2 "$ENDPOINT/health" 2>/dev/null || echo unreachable)"
   ls "$XDG_RUNTIME_DIR/voxtype/" 2>/dev/null | tr '\n' ' ' | sed 's/^/  runtime: /'; echo
 }
 
 if [[ ${1:-} == --status ]]; then status; exit 0; fi
 
-mkdir -p "$KS/voxtype" "$KS/llama" "$KS/models" "$UNIT_DIR/voxtype.service.d"
+mkdir -p "$KS/voxtype" "$UNIT_DIR/voxtype.service.d"
 
 # ------------------------------------------------------------- 1. voxtype
 say "voxtype (Keystroke build)"
@@ -67,7 +57,7 @@ else
     note "cloning $FORK_URL ($FORK_BRANCH) into $SRC"
     git clone -q --branch "$FORK_BRANCH" "$FORK_URL" "$SRC"
   fi
-  revision_patch="$(dirname "$UNIT_SRC")/voxtype-full-request.patch"
+  revision_patch="$HELPERS/voxtype-full-request.patch"
   if git -C "$SRC" apply --reverse --check "$revision_patch" 2>/dev/null; then
     note "whole-request revision patch already applied"
   elif git -C "$SRC" apply --check "$revision_patch"; then
@@ -146,47 +136,5 @@ PY
   note "voxtype.service now runs $VOXTYPE with whisper streaming on"
 fi
 
-# --------------------------------------------------------- 2. llama-server
-say "llama-server ($LLAMA_TAG, Vulkan)"
-if [[ ! -x $KS/llama/$LLAMA_TAG/llama-server ]]; then
-  note "downloading $LLAMA_URL"
-  tmp="$(mktemp -d "$KS/llama/.dl.XXXXXX")"
-  curl -fL --progress-bar -o "$tmp/llama.tgz" "$LLAMA_URL"
-  tar -xzf "$tmp/llama.tgz" -C "$tmp"
-  inner="$(find "$tmp" -maxdepth 2 -name llama-server -printf '%h\n' | head -1)"
-  rm -rf "$KS/llama/$LLAMA_TAG"
-  mv "$inner" "$KS/llama/$LLAMA_TAG"
-  rm -rf "$tmp"
-fi
-ln -sfn "$LLAMA_TAG" "$KS/llama/current"
-note "$("$KS/llama/current/llama-server" --version 2>&1 | head -1)"
 
-say "Gemma 4 E2B (Q4_0, text-only command assistant)"
-for f in "$MODEL"; do
-  if [[ ! -f $KS/models/$f ]]; then
-    note "downloading $f"
-    curl -fL --progress-bar -C - -o "$KS/models/$f.part" "$MODEL_REPO/$f"
-    mv -f "$KS/models/$f.part" "$KS/models/$f"
-  fi
-done
-
-install -m 644 "$UNIT_SRC" "$UNIT_DIR/keystroke-llm.service"
-systemctl --user daemon-reload
-systemctl --user enable keystroke-llm >/dev/null
-systemctl --user restart keystroke-llm
-assistant_ready=false
-for _ in $(seq 1 120); do
-  if curl -fsS -m 1 "$ENDPOINT/health" 2>/dev/null | grep -q '"ok"'; then assistant_ready=true; break; fi
-  sleep 1
-done
-if [[ $assistant_ready != true ]]; then
-  note "Assistant did not become healthy; inspect journalctl --user -u keystroke-llm"
-  exit 1
-fi
-note "keystroke-llm.service: active · health: ok"
-
-echo
-status
-echo
-echo "Keystroke picks the build under $KS/voxtype up on its next open (Settings › Voice shows the version and the assistant)."
-echo "If the palette was already loaded, run: omarchy-restart-shell"
+note "Vulkan speech setup complete; no local language model is installed."
