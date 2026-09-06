@@ -610,7 +610,7 @@ Item {
         x: Style.space(root.compact ? 22 : 26); y: root.headerHeight + Style.space(8)
         height: root.crumbHeight
         spacing: Style.space(10)
-        Text { id: brand; anchors.verticalCenter: parent.verticalCenter; text: "KEYSTROKE"; textFormat: Text.PlainText; color: root.accent; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 2; font.weight: Font.Bold }
+        Text { id: brand; anchors.verticalCenter: parent.verticalCenter; text: "OMARCHY"; textFormat: Text.PlainText; color: root.accent; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 2; font.weight: Font.Bold }
         Text { anchors.baseline: brand.baseline; text: root.scope ? "›" : "/"; textFormat: Text.PlainText; color: Util.alpha(root.foreground, 0.35); font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
         Text {
           anchors.baseline: brand.baseline
