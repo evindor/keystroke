@@ -1,5 +1,5 @@
 # Keystroke's local assistant: llama-server with Gemma 4 E2B on the GPU
-# (Vulkan). Installed by `bin/keystroke voice-setup`; edit the copy in
+# (Vulkan), text only. Installed by `bin/keystroke voice-setup`; edit the copy in
 # ~/.config/systemd/user/ to change the model or the flags.
 #
 # --reasoning-budget 0 turns Gemma's thinking off (the answer is one number,
@@ -10,18 +10,25 @@
 Description=Keystroke assistant (llama-server, Gemma 4 E2B)
 PartOf=graphical-session.target
 After=graphical-session.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
 
 [Service]
 Type=simple
 ExecStart=%h/.local/share/keystroke/llama/current/llama-server \
   --model %h/.local/share/keystroke/models/gemma-4-E2B-it-Q4_0.gguf \
-  --mmproj %h/.local/share/keystroke/models/mmproj-gemma-4-E2B-it-Q8_0.gguf \
+  --no-mmproj \
   --host 127.0.0.1 --port 18781 --alias keystroke \
   -ngl 99 -c 16384 -np 1 --cache-reuse 256 --reasoning-budget 0 \
-  --log-disable
+  --log-verbosity 3
 Restart=on-failure
 RestartSec=5
 Nice=5
+# Bound ordinary process memory and prevent the assistant from thrashing swap.
+# GPU driver allocations are not necessarily covered by this cgroup limit.
+MemoryMax=6G
+MemorySwapMax=0
+OOMPolicy=stop
 
 [Install]
 WantedBy=graphical-session.target

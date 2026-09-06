@@ -27,7 +27,6 @@ LLAMA_TAG="${KEYSTROKE_LLAMA_TAG:-b10821}"
 LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_TAG/llama-$LLAMA_TAG-bin-ubuntu-vulkan-x64.tar.gz"
 MODEL_REPO="https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main"
 MODEL="gemma-4-E2B-it-Q4_0.gguf"
-MMPROJ="mmproj-gemma-4-E2B-it-Q8_0.gguf"
 UNIT_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/keystroke-llm.service"
 UNIT_DIR="$HOME/.config/systemd/user"
 DROPIN="$UNIT_DIR/voxtype.service.d/keystroke.conf"
@@ -47,7 +46,7 @@ status() {
   fi
   if [[ -x $VOXTYPE ]]; then note "accel: $("$VOXTYPE" info accel 2>/dev/null | sed -n 's/^ *Backend: *//p' | head -1)"; fi
   if [[ -x $KS/llama/current/llama-server ]]; then note "llama-server: $KS/llama/current ($(readlink "$KS/llama/current" 2>/dev/null))"; else note "llama-server: not installed"; fi
-  for f in "$MODEL" "$MMPROJ"; do if [[ -f $KS/models/$f ]]; then note "model: $f ($(du -h "$KS/models/$f" | cut -f1))"; else note "model: $f missing"; fi; done
+  for f in "$MODEL"; do if [[ -f $KS/models/$f ]]; then note "model: $f ($(du -h "$KS/models/$f" | cut -f1))"; else note "model: $f missing"; fi; done
   note "keystroke-llm.service: $(systemctl --user is-active keystroke-llm 2>/dev/null || true) · health: $(curl -s -m 2 "$ENDPOINT/health" 2>/dev/null || echo unreachable)"
   ls "$XDG_RUNTIME_DIR/voxtype/" 2>/dev/null | tr '\n' ' ' | sed 's/^/  runtime: /'; echo
 }
@@ -67,6 +66,15 @@ else
   if [[ ! -d $SRC/.git ]]; then
     note "cloning $FORK_URL ($FORK_BRANCH) into $SRC"
     git clone -q --branch "$FORK_BRANCH" "$FORK_URL" "$SRC"
+  fi
+  revision_patch="$(dirname "$UNIT_SRC")/voxtype-full-request.patch"
+  if git -C "$SRC" apply --reverse --check "$revision_patch" 2>/dev/null; then
+    note "whole-request revision patch already applied"
+  elif git -C "$SRC" apply --check "$revision_patch"; then
+    git -C "$SRC" apply "$revision_patch"
+  else
+    note "Whole-request patch does not match this voxtype checkout; resolve it before building."
+    exit 1
   fi
   note "building in $SRC (whisper.cpp + Vulkan; several minutes the first time)"
   (cd "$SRC" && cargo build --release --features gpu-vulkan --bin voxtype --bin voxtype-audio-bridge)
@@ -119,16 +127,15 @@ text = "\n".join(out)
 if not re.search(r"^\s*\[streaming\]", text, re.M):
     text = text.rstrip("\n") + """
 
-# Sliding-window streaming, tuned by Keystroke for short spoken commands on a
-# GPU (voxtype setup gpu --enable): a re-transcription every half second, the
-# first one after half a second of audio, every stable word committed, and a
-# 12 s window so a tick never grows past the interval (a saturated 29 s
-# window makes the stop drain for a minute).
+# Begin with a full second of context; revise every 0.8 s. Keystroke file
+# sessions use whole-request snapshots through the recording duration cap.
+# Ordinary live typing keeps a 12 s rolling window and four revisable words.
 [streaming]
-interval_secs = 0.5
-min_audio_secs = 0.5
+interval_secs = 0.8
+min_audio_secs = 1.0
 partial_min_words = 1
 max_buffer_secs = 12
+revision_mode = true
 """
 tmp = path + ".keystroke.tmp"
 open(tmp, "w").write(text)
@@ -154,8 +161,8 @@ fi
 ln -sfn "$LLAMA_TAG" "$KS/llama/current"
 note "$("$KS/llama/current/llama-server" --version 2>&1 | head -1)"
 
-say "Gemma 4 E2B (Q4_0 weights + Q8_0 projector, ~3.3 GB)"
-for f in "$MODEL" "$MMPROJ"; do
+say "Gemma 4 E2B (Q4_0, text-only command assistant)"
+for f in "$MODEL"; do
   if [[ ! -f $KS/models/$f ]]; then
     note "downloading $f"
     curl -fL --progress-bar -C - -o "$KS/models/$f.part" "$MODEL_REPO/$f"
@@ -165,9 +172,18 @@ done
 
 install -m 644 "$UNIT_SRC" "$UNIT_DIR/keystroke-llm.service"
 systemctl --user daemon-reload
-systemctl --user enable --now keystroke-llm >/dev/null
-for _ in $(seq 1 120); do curl -s -m 1 "$ENDPOINT/health" 2>/dev/null | grep -q '"ok"' && break; sleep 1; done
-note "keystroke-llm.service: $(systemctl --user is-active keystroke-llm) · $(curl -s -m 2 "$ENDPOINT/health" 2>/dev/null || echo 'not answering yet')"
+systemctl --user enable keystroke-llm >/dev/null
+systemctl --user restart keystroke-llm
+assistant_ready=false
+for _ in $(seq 1 120); do
+  if curl -fsS -m 1 "$ENDPOINT/health" 2>/dev/null | grep -q '"ok"'; then assistant_ready=true; break; fi
+  sleep 1
+done
+if [[ $assistant_ready != true ]]; then
+  note "Assistant did not become healthy; inspect journalctl --user -u keystroke-llm"
+  exit 1
+fi
+note "keystroke-llm.service: active · health: ok"
 
 echo
 status

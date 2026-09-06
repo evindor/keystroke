@@ -68,17 +68,27 @@ Item {
     path: root.statePath
     watchChanges: true
     printErrors: false
-    onLoaded: root.daemonState = String(text() || "idle").trim() || "idle"
+    // voxtype truncates then writes this file; an empty intermediate read is
+    // not an idle transition and must not stop an ongoing recording.
+    onLoaded: { var state = String(text() || "").trim(); if (state) root.daemonState = state }
     onLoadFailed: root.daemonState = ""
     onFileChanged: reload()
   }
   // The daemon stops on its own at its max duration; follow it instead of
   // listening to a recording that no longer exists.
-  onDaemonStateChanged: { if (root.phase === "listening" && root.daemonState === "transcribing") root.stop() }
+  onDaemonStateChanged: {
+    if (root.phase !== "listening") return
+    if (root.daemonState === "transcribing" || root.daemonState === "idle") root.stop()
+    else if (!root.daemonState) { root.cancel(); root.failed("Voxtype daemon stopped") }
+  }
 
   // -------------------------------------------------------------- session
   function start() {
     if (root.phase !== "idle") return false
+    if (startProc.running || stopProc.running || fallbackRead.running || cancelProc.running || cleanupProc.running) {
+      root.failed("Voice is finishing the previous recording; try again")
+      return false
+    }
     root.stopWhenStarted = false
     root.cancelWhenStarted = false
     root.history = []
@@ -162,7 +172,12 @@ Item {
   function cancel() {
     if (root.phase === "starting") { root.cancelWhenStarted = true; return }
     if (root.phase === "idle") return
-    Quickshell.execDetached([root.command, "record", "cancel"])
+    // Retire the old CLI readers before allowing another recording. Otherwise
+    // a cancelled --wait can deliver its result into the next session.
+    root.phase = "idle"
+    stopProc.running = false
+    fallbackRead.running = false
+    cancelProc.running = true
     root.finish()
   }
 
@@ -172,8 +187,15 @@ Item {
     root.peak = 0
     root.vad = false
     root.liveText = ""
-    Quickshell.execDetached(["rm", "-f", root.transcriptPath])
+    if (!cancelProc.running) cleanupProc.running = true
   }
+
+  Process {
+    id: cancelProc
+    command: [root.command, "record", "cancel"]
+    onExited: cleanupProc.running = true
+  }
+  Process { id: cleanupProc; command: ["rm", "-f", root.transcriptPath] }
 
   // ------------------------------------------------------------ live words
   // With a streaming engine the daemon mirrors the session's text so far to
@@ -197,7 +219,7 @@ Item {
     var t = String(raw || "").replace(/\s+/g, " ").trim()
     if (t === root.liveText) return
     root.liveText = t
-    if (t) root.partial(t)
+    root.partial(t)
   }
 
   // ---------------------------------------------------------------- levels

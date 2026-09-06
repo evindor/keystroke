@@ -15,10 +15,11 @@ Usage: bin/keystroke <command>
   uninstall   Disable, remove the copy, restore the stock Omarchy menu
   enable      omarchy plugin enable $ID
   disable     omarchy plugin disable $ID (restores omarchy.menu)
+  dictate     Open Dictate to Clipboard and start recording
   toggle      Toggle the palette (routes through omarchy.menu)
   open <q>    Open the palette with a query
   validate    omarchy plugin validate on this checkout
-  test        Run the QML unit tests, the time-zone helper checks, and qmllint
+  test        Run QML, voice lifecycle, time-zone checks, and qmllint
   voice-setup Build/install Keystroke's voxtype (streaming + live transcript), llama-server and Gemma 4 E2B;
               write the user services and switch voxtype to streaming. Re-runnable. See helpers/voice-setup.sh
   voice-status  Show what voice-setup installed and whether both daemons answer
@@ -30,7 +31,7 @@ sync_copy() {
   local stage
   stage="$(mktemp -d "$(dirname "$TARGET")/.keystroke.XXXXXX")"
   # -L dereferences any symlink so the installed tree never contains one.
-  rsync -aL --delete --exclude .git --exclude tests --exclude docs --exclude assets --exclude examples \
+  rsync -aL --delete --exclude .git --exclude .claude --exclude .agents --exclude .codex --exclude tests --exclude docs --exclude assets --exclude examples \
     --exclude '__pycache__' --exclude '*.pyc' "$ROOT/" "$stage/"
   if [[ -e $TARGET ]]; then rm -rf "$TARGET"; fi
   mv "$stage" "$TARGET"
@@ -56,6 +57,7 @@ case "${1:-help}" in
     ;;
   enable) omarchy plugin enable "$ID" ;;
   disable) omarchy plugin disable "$ID" ;;
+  dictate) exec omarchy-shell shell summon omarchy.menu '{"scope":"dictation","title":"Dictate to Clipboard","dictate":true}' ;;
   toggle) exec omarchy-shell shell toggle omarchy.menu '{"menu":"root"}' ;;
   open)
     shift
@@ -64,6 +66,9 @@ case "${1:-help}" in
   validate) exec omarchy plugin validate "$ROOT" ;;
   test)
     (cd "$ROOT/tests" && /usr/lib/qt6/bin/qmltestrunner -silent -input .)
+    python3 "$ROOT/tests/voice_session_check.py"
+    python3 "$ROOT/tests/clipboard_transfer_check.py"
+    python3 "$ROOT/tests/palette_dictation_check.py"
     python3 "$ROOT/tests/tz_helper_check.py"
     "$ROOT/tests/lint.sh"
     ;;

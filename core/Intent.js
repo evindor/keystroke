@@ -30,6 +30,12 @@ function normalize(transcript) {
   return out || t
 }
 
+// A final punctuation/case correction should reuse a live answer. Preserve
+// the spoken words here (including negation), independently of fuzzy search.
+function transcriptKey(text) {
+  return String(text || "").replace(/\s+/g, " ").trim().replace(TRAIL, "").toLowerCase()
+}
+
 // One line per row, short enough to keep the prompt small and stable:
 // "12. Google Chrome — Web Browser". Details are cut at DETAIL_MAX so an
 // app with a paragraph for a comment does not blow up the prompt.
@@ -100,8 +106,8 @@ function parseAnswer(responseText, count) {
     content = choice && choice.message ? String(choice.message.content || "") : ""
   } catch (e) { return { index: 0, none: false } }
   var t = content.trim()
-  if (/^NONE\b/i.test(t)) return { index: 0, none: true }
-  var m = /^(\d{1,4})\b/.exec(t)
+  if (/^NONE$/i.test(t)) return { index: 0, none: true }
+  var m = /^([1-9]\d{0,3})$/.exec(t)
   var n = m ? Number(m[1]) : 0
   if (!(n >= 1 && n <= count)) return { index: 0, none: false }
   return { index: n, none: false }

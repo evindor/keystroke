@@ -110,27 +110,25 @@ Item {
   // Dictation through the voxtype daemon Omarchy ships. Two ways in: hold the
   // palette hotkey (Hyprland long-press bind → voiceHold; its release bind or
   // the modifier's own release → stop), or tap the hotkey again while the
-  // palette is open (a further tap stops). Enter while listening stops and
-  // then accepts the result. The transcript replaces the query; nothing is
-  // activated on its own.
+  // palette is open (a further tap stops). Enter finishes recording; a fresh
+  // Enter after transcription runs the visible selection. Replies never execute.
   VoiceSession {
     id: voice
     host: root
     onPartial: function(text) { root.voiceLive(text) }
     onTranscribed: function(text) { root.voiceTranscribed(text) }
-    onNothingHeard: { root.voiceActivateAfter = false; root.voiceAcceptWaiting = false; if (root.opened) root.statusMessage = "Nothing heard" }
-    onFailed: function(message) { root.voiceActivateAfter = false; root.voiceAcceptWaiting = false; if (root.opened) root.errorMessage = message }
+    onNothingHeard: { root.dictationPending = ""; spoken.cancel(); if (root.opened) root.statusMessage = "Nothing heard" }
+    onFailed: function(message) { root.dictationPending = ""; spoken.cancel(); if (root.opened) root.errorMessage = message }
   }
   // A local llama-server (Gemma 4 E2B in the reference setup) that maps the
   // transcript to one catalog row. The fuzzy results stay on screen; the
   // assistant's pick is pinned above them when it lands.
   Assist {
     id: assist
-    enabled: root.voiceEnabled && root.voiceSettings.assist === true
+    watching: root.opened
+    enabled: root.voiceEnabled && !root.dictationMode && root.voiceSettings.assist === true
     endpoint: String(root.voiceSettings.assistEndpoint || "")
-    onAnswered: function(index, none, transcript, ms) { root.voiceAnswered(index, none, transcript, ms) }
-    onFailed: function(message, transcript) { root.voiceAssistFailed(message, transcript) }
-    onAvailableChanged: { if (available && root.opened) root.voiceWarm() }
+    onAvailableChanged: { if (available && root.opened && !spoken.active) root.voiceWarm() }
   }
   readonly property var voiceSchema: [
     { key: "enabled", type: "boolean", label: "Voxtype voice command integration", "default": voice.detected,
@@ -147,7 +145,6 @@ Item {
   property var voiceSettings: Settings.values(root.config, ["voice"], root.voiceSchema)
   readonly property bool voiceEnabled: voice.detected && voiceSettings.enabled === true
   property string voiceTrigger: "tap"      // hold | tap
-  property bool voiceActivateAfter: false  // Enter arrived while listening: accept the transcript's top result
   property bool voiceDiscard: false        // the user typed while transcribing: the transcript loses
   readonly property string bindingsPath: home + "/.config/hypr/bindings.lua"
   property string bindingsText: ""
@@ -170,48 +167,41 @@ Item {
              bindings: root.voiceBindingsStatus, bindingsPath: "~/.config/hypr/bindings.lua",
              assist: { enabled: assist.enabled, available: assist.available, endpoint: assist.endpoint, model: assist.modelName, lastMs: assist.lastMs } }
   }
-  // The spoken command's journey: live words while listening, the normalized
-  // transcript as the query, then the assistant's pick pinned on top.
-  property var voicePick: null            // catalog row the assistant chose
-  property string voicePickQuery: ""      // the query it was chosen for; typing past it drops the pin
-  property string voiceAsked: ""          // transcript of the request in flight
-  property var voiceCatalog: null         // { items, rows, stamp }, rebuilt per request
-  property bool voiceAcceptWaiting: false // ↵ arrived while listening and the assistant is still thinking
+  IntentSession {
+    id: spoken
+    assistant: assist
+    onPickChanged: root.requery()
+    onStatusChanged: { if (root.opened && status) root.statusMessage = status }
+  }
+  readonly property bool dictationMode: !root.dmenuActive && root.scope === "dictation"
+  property string dictationPending: ""   // explicit Enter intent: copy | paste
+  ClipboardTransfer {
+    id: clipboardTransfer
+    onCopied: root.cancel(true)
+    onFailed: function(message) {
+      if (root.opened) root.errorMessage = message
+      else Quickshell.execDetached(["notify-send", "Keystroke dictation", message])
+    }
+  }
+  function dictationAccept(alternate) {
+    if (clipboardTransfer.busy) return
+    if (voice.active) {
+      if (!root.dictationPending) root.dictationPending = alternate ? "paste" : "copy"
+      root.voiceStop()
+    } else clipboardTransfer.submit(search.text, alternate)
+  }
+  property string voiceRawText: ""
+  property var voiceCatalog: null
   readonly property bool liveText: voice.active && search.text.length > 0
-  Timer { id: acceptWait; interval: 1500; onTriggered: root.voiceAcceptNow() }
   function voiceLive(text) {
-    if (!root.opened || voice.phase !== "listening") return
-    var t = String(text || "").replace(/\s+/g, " ").trim()
+    if (!root.opened || voice.phase !== "listening" || root.voiceDiscard) return
+    root.voiceRawText = String(text || "")
+    var t = root.dictationMode ? String(text || "") : String(text || "").replace(/\s+/g, " ").trim()
+    if (!root.dictationMode) spoken.update(t, false)
     if (t === search.text) return
     search.text = t
     search.cursorPosition = t.length
     root.edited()
-  }
-  function voiceAnswered(index, none, transcript, ms) {
-    if (!root.opened || transcript !== root.voiceAsked) return
-    var cat = root.voiceCatalog
-    if (index >= 1 && cat && index <= cat.rows.length) {
-      root.voicePick = cat.rows[index - 1]
-      root.voicePickQuery = search.text
-      root.statusMessage = (assist.modelName || "Assistant") + " picked " + root.voicePick.title + " · " + ms + " ms"
-    } else {
-      root.voicePick = null
-      root.statusMessage = none ? "No match from " + (assist.modelName || "the assistant") + " · " + ms + " ms" : "The assistant answered nothing usable"
-    }
-    root.requery()
-    if (root.voiceAcceptWaiting) root.voiceAcceptNow()
-  }
-  function voiceAssistFailed(message, transcript) {
-    if (transcript !== root.voiceAsked) return
-    if (root.opened) root.statusMessage = message
-    if (root.voiceAcceptWaiting) root.voiceAcceptNow()
-  }
-  function voiceAcceptNow() {
-    if (!root.voiceAcceptWaiting) return
-    root.voiceAcceptWaiting = false
-    acceptWait.stop()
-    if (!root.opened) return
-    debounce.stop(); root.runQuery(); root.activate()
   }
   // Every row a spoken command could mean: providers that expose catalog()
   // list everything they own, normalized like query results so the pick can
@@ -248,41 +238,39 @@ Item {
   function voiceBegin(trigger) {
     if (!root.voiceEnabled || !root.opened || root.dmenuActive || root.confirmPending || voice.active) return false
     root.voiceTrigger = trigger
-    root.voiceActivateAfter = false
     root.voiceDiscard = false
+    root.voiceRawText = ""
+    root.dictationPending = ""
+    if (!root.dictationMode) spoken.begin(root.catalogForVoice())
+    search.text = ""
+    root.edited()
+    if (!root.dictationMode && assist.ready) assist.warm(spoken.catalog.items)
     root.errorMessage = ""
     root.statusMessage = ""
     return voice.start()
   }
   function voiceStop() { if (voice.phase === "starting" || voice.phase === "listening") voice.stop() }
   function voiceCancel() {
-    root.voiceActivateAfter = false
-    root.voiceAcceptWaiting = false
-    acceptWait.stop()
-    assist.cancel()
-    root.voiceAsked = ""
+    root.voiceRawText = ""
+    root.dictationPending = ""
+    spoken.cancel()
+    root.voiceDiscard = true
     if (voice.active) voice.cancel()
   }
   function voiceTranscribed(raw) {
-    var accept = root.voiceActivateAfter
-    root.voiceActivateAfter = false
     if (!root.opened || root.voiceDiscard) return
-    var text = Intent.normalize(raw)
+    root.voiceRawText = String(raw || "")
+    if (!root.dictationMode) spoken.update(raw, true)
+    var text = root.dictationMode ? String(raw) : Intent.normalize(raw)
     search.text = text
     search.cursorPosition = text.length
-    root.voicePick = null
-    root.voicePickQuery = ""
     root.edited()
-    root.statusMessage = "Transcribed"
-    var asked = false
-    if (assist.ready && text) {
-      root.voiceAsked = raw
-      asked = assist.ask(root.catalogForVoice().items, raw)
-      if (asked) root.statusMessage = "Transcribed · asking " + (assist.modelName || "the assistant") + "…"
-    }
-    if (!accept) return
-    if (asked) { root.voiceAcceptWaiting = true; acceptWait.restart() }
-    else { debounce.stop(); root.runQuery(); root.activate() }
+    if (root.dictationMode) {
+      var pendingCopy = root.dictationPending
+      root.dictationPending = ""
+      root.statusMessage = "Enter copies · Ctrl+Enter pastes"
+      if (pendingCopy) clipboardTransfer.submit(text, pendingCopy === "paste")
+    } else root.statusMessage = spoken.status || "Transcribed · press ↵ to run"
   }
   function isSuperKey(key) { return key === Qt.Key_Super_L || key === Qt.Key_Super_R || key === Qt.Key_Meta || key === Qt.Key_Hyper_L || key === Qt.Key_Hyper_R }
   function isModifierKey(key) {
@@ -336,6 +324,7 @@ Item {
   readonly property var current: rows.length && selected >= 0 && selected < rows.length ? rows[selected] : ({})
   readonly property bool compact: paletteSettings.density !== "comfortable"
   readonly property color accent: paletteSettings.accent === "ember" ? "#ee987e" : paletteSettings.accent === "violet" ? "#b5a0ef" : paletteSettings.accent === "mint" ? "#8bceb4" : Color.accent
+  readonly property bool clipboardChoice: root.dictationMode || !!(root.current.action && root.current.action.type === "dictation-copy")
   readonly property bool previewVisible: !dmenuActive && paletteSettings.showPreview !== false && !!(current.preview || current.previewImage || current.swatch)
 
   // Theme surfaces, same tokens as the stock menu.
@@ -366,6 +355,7 @@ Item {
   }
 
   function openRoute(input, payload) {
+    clipboardTransfer.cancel()
     if (root.dmenuActive && root.requestActive) root.finishRequest(null)
     var route = providerRegistry.bundled[0].routeFor(input)
     if (route.kind === "action") {
@@ -396,7 +386,10 @@ Item {
     root.opened = true
     root.notifyOpened()
     root.runQuery()
-    Qt.callLater(function() { search.forceActiveFocus() })
+    Qt.callLater(function() {
+      search.forceActiveFocus()
+      if (root.opened && root.dictationMode && payload && payload.dictate === true) root.voiceBegin("tap")
+    })
   }
 
   function notifyOpened() {
@@ -410,6 +403,7 @@ Item {
   }
 
   function openDmenu(payload) {
+    clipboardTransfer.cancel()
     if (root.dmenuActive && root.requestActive) root.finishRequest(null)   // a new caller cancels the previous one
     root.voiceCancel()
     root.mode = payload.mode === "input" ? "input" : "select"
@@ -442,7 +436,8 @@ Item {
       Quickshell.execDetached(["bash", "-c", "printf '%s\\n' " + Util.shellQuote(selection) + " > " + Util.shellQuote(selectionPath) + "; : > " + Util.shellQuote(donePath)])
   }
 
-  function cancel() {
+  function cancel(preserveTransfer) {
+    if (preserveTransfer !== true) clipboardTransfer.cancel()
     if (root.dmenuActive) root.finishRequest(null)
     root.voiceCancel()
     root.opened = false
@@ -457,7 +452,7 @@ Item {
     root.resetSelection()
     debounce.restart()
   }
-  function setQuery(text) { search.text = String(text || ""); root.edited(); return "ok" }
+  function setQuery(text) { clipboardTransfer.cancel(); root.voiceCancel(); search.text = String(text || ""); root.edited(); return "ok" }
 
   // Providers call this when asynchronous results land; the selection is kept.
   function requery() {
@@ -470,7 +465,7 @@ Item {
     if (!root.opened) return
     if (root.dmenuActive) { root.applyRows(root.dmenuRows()); root.pending = false; root.afterRows(); return }
     root.generation++
-    var q = search.text, sc = root.scope
+    var q = spoken.active ? spoken.query : search.text, sc = root.scope
     var owner = sc.split("/")[0]
     var sub = sc.indexOf("/") >= 0 ? sc.slice(owner.length + 1) : ""
     var collected = [], errors = [], pend = false
@@ -479,7 +474,7 @@ Item {
       var entry = providerRegistry.entries[i]
       if (!root.providerEnabled(entry)) continue
       if (sc && owner !== entry.key) continue
-      var ctx = { query: q, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
+      var ctx = { query: q, rawQuery: spoken.active ? root.voiceRawText : search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
                   pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
       try {
         var out = entry.provider.query(ctx) || []
@@ -496,8 +491,8 @@ Item {
     var ranked = Match.rank(collected, root.bonusFor)
     // The assistant's pick sits above the fuzzy results for the transcript it
     // answered; any edit to the query lets the ordinary ranking through.
-    if (root.voicePick && q && q === root.voicePickQuery) {
-      var pick = root.voicePick, rest = []
+    if (spoken.active && spoken.pick && q && q === spoken.query) {
+      var pick = spoken.pick, rest = []
       for (var k = 0; k < ranked.length; k++) if (ranked[k].uid !== pick.uid) rest.push(ranked[k])
       var pinned = {}
       for (var f in pick) pinned[f] = pick[f]
@@ -599,6 +594,8 @@ Item {
 
   // ------------------------------------------------------------- navigation
   function navigate(nextScope, title) {
+    clipboardTransfer.cancel()
+    root.voiceCancel()
     root.history = root.history.concat([{ scope: root.scope, title: root.scopeTitle, query: search.text }])
     root.scope = nextScope
     root.scopeTitle = title || ""
@@ -610,8 +607,10 @@ Item {
   }
 
   function goBack() {
+    clipboardTransfer.cancel()
     if (root.confirmPending) { root.confirmPending = null; return true }
     if (root.dmenuActive) return false
+    root.voiceCancel()
     if (root.history.length) {
       var prior = root.history[root.history.length - 1]
       root.history = root.history.slice(0, -1)
@@ -653,6 +652,7 @@ Item {
   // otherwise its action; the provider's activate() sees ctx.alternate.
   function activate(alternate) {
     if (root.confirmPending) return
+    if (root.dictationMode) { root.dictationAccept(alternate); return }
     if (debounce.running) { debounce.stop(); root.runQuery() }
     if (root.dmenuActive) {
       if (root.mode === "input") { root.applyDmenuSelection(search.text); return }
@@ -689,6 +689,12 @@ Item {
   function perform(effect, row) {
     var type = effect.type
     if (type === "noop") return
+    if (type === "dictate") {
+      root.navigate("dictation", "Dictate to Clipboard")
+      if (!root.voiceBegin("tap")) root.errorMessage = "Voice is unavailable; check Settings › Voice"
+      return
+    }
+    if (type === "dictation-copy") { clipboardTransfer.submit(effect.text, effect.paste); return }
     if (type === "navigate") { root.navigate(effect.scope, effect.title || row.title); return }
     if (type === "setting") {
       try {
@@ -726,7 +732,7 @@ Item {
       voice: { state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
                command: voice.command, daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length, live: voice.liveText },
       assist: { enabled: assist.enabled, available: assist.available, model: assist.modelName, lastMs: assist.lastMs, warmed: assist.warmedStamp,
-                pick: root.voicePick ? root.voicePick.title : "", catalog: root.voiceCatalog ? root.voiceCatalog.rows.length : 0 } })
+                pick: spoken.pick ? spoken.pick.title : "", catalog: root.voiceCatalog ? root.voiceCatalog.rows.length : 0 } })
   }
 
   // ------------------------------------------------------------------ view
@@ -795,12 +801,13 @@ Item {
         VoiceWave {
           id: wave
           visible: voice.active
-          anchors.left: root.liveText ? undefined : glyph.right
-          anchors.leftMargin: Style.space(14)
           anchors.right: escCap.left
           anchors.rightMargin: Style.space(12)
           anchors.verticalCenter: parent.verticalCenter
-          width: Style.space(96)               // only while the live words take the field
+          // Switching away from two horizontal anchors does not restore a
+          // constant width. Keep one anchor and bind both widths explicitly.
+          width: root.liveText ? Math.min(Style.space(96), fieldWidth * 0.22) : fieldWidth
+          readonly property real fieldWidth: Math.max(0, escCap.x - Style.space(12) - glyph.x - glyph.width - Style.space(14))
           height: Style.space(40)
           mode: voice.phase
           level: voice.level
@@ -830,13 +837,13 @@ Item {
           Text {
             anchors.fill: parent
             verticalAlignment: Text.AlignVCenter
-            text: root.dmenuActive ? root.dmenuPrompt + "…" : root.scope ? "Search " + root.scopeTitle.toLowerCase() + "…" : "What would you like to do?"
+            text: root.dictationMode ? "Speak or edit your dictation…" : root.dmenuActive ? root.dmenuPrompt + "…" : root.scope ? "Search " + root.scopeTitle.toLowerCase() + "…" : "What would you like to do?"
             color: Util.alpha(root.foreground, 0.42)
             font: parent.font
             visible: !parent.text && !parent.preeditText && !voice.active
             elide: Text.ElideRight
           }
-          onTextEdited: root.edited()
+          onTextEdited: { clipboardTransfer.cancel(); root.voiceCancel(); root.edited() }
           Keys.priority: Keys.BeforeItem
           Keys.onReleased: function(event) {
             // Hold mode ends when the modifier comes up (Hyprland swallows the
@@ -845,13 +852,17 @@ Item {
             if (voice.active && root.voiceTrigger === "hold" && root.isSuperKey(event.key)) { root.voiceStop(); event.accepted = true }
           }
           Keys.onPressed: function(event) {
+            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && event.isAutoRepeat) { event.accepted = true; return }
             if (root.confirmPending) { confirmDialog.handleKey(event); event.accepted = true; return }
             if (voice.active) {
               if (event.key === Qt.Key_Escape) { root.cancel(); event.accepted = true; return }
-              if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { root.voiceActivateAfter = true; root.voiceStop(); event.accepted = true; return }
+              if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                if (root.dictationMode) root.dictationAccept(!!(event.modifiers & Qt.ControlModifier))
+                else root.voiceStop()
+                event.accepted = true; return
+              }
               if (root.isModifierKey(event.key)) { event.accepted = true; return }
-              if (voice.phase === "transcribing") root.voiceDiscard = true    // typing wins over a transcript still on its way
-              else root.voiceCancel()                                          // and over a recording; the key then behaves as usual
+              root.voiceCancel() // typing and navigation supersede speech immediately
             }
             var ctrl = event.modifiers & Qt.ControlModifier
             var atEnd = cursorPosition === text.length
@@ -1001,7 +1012,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
           Text {
             text: voice.phase === "listening" ? (root.voiceTrigger === "hold" ? "Listening… release to finish" : "Listening… tap the hotkey again or press ↵ to finish")
-                : voice.phase === "transcribing" ? (root.voiceAcceptWaiting ? "Transcribing… ↵ runs the best match" : "Transcribing…") : voice.phase === "starting" ? "Starting voxtype…"
+                : voice.phase === "transcribing" ? "Finishing transcript…" : voice.phase === "starting" ? "Starting voxtype…"
                 : root.pending && root.showLoading ? "Searching…" : root.errorMessage ? "Needs attention: " + root.errorMessage : root.statusMessage || (root.current.providerName ? root.current.providerName : "Keystroke")
             textFormat: Text.PlainText; elide: Text.ElideRight; width: Math.min(implicitWidth, card.width * 0.5)
             color: root.errorMessage ? Color.urgent : root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
@@ -1010,11 +1021,11 @@ Item {
         }
         Row {
           anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
-          Text { text: root.current.verb || "Select"; textFormat: Text.PlainText; color: Util.alpha(root.foreground, 0.8); font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter }
+          Text { text: root.dictationMode ? "Copy" : voice.active ? "Finish" : root.current.verb || "Select"; textFormat: Text.PlainText; color: Util.alpha(root.foreground, 0.8); font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter }
           Keycap { label: "↵"; bright: true; foreground: root.foreground }
           Item { width: Style.space(8); height: 1 }
-          Text { text: root.compact ? "Settings" : "Provider settings"; textFormat: Text.PlainText; color: root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter }
-          Keycap { label: "ctrl K"; foreground: root.foreground }
+          Text { text: root.clipboardChoice ? "Paste" : root.compact ? "Settings" : "Provider settings"; textFormat: Text.PlainText; color: root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter }
+          Keycap { label: root.clipboardChoice ? "ctrl ↵" : "ctrl K"; foreground: root.foreground }
         }
       }
 

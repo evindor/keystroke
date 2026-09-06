@@ -8,7 +8,7 @@ Item {
   property bool compact: true
   property color accent: Color.accent
   property color foreground: Color.menu.text
-  readonly property bool clipboard: (row.previewLabel || "") === "CLIPBOARD"
+  readonly property bool clipboard: (row.previewLabel || "") === "CLIPBOARD" || (row.previewLabel || "") === "DICTATION"
   readonly property bool emoji: row.emoji === true
 
   Text {

@@ -8,5 +8,5 @@ ln -s "${OMARCHY_PATH:-/usr/share/omarchy}/shell" "$SHIM/qs"
 status=0
 while IFS= read -r file; do
   if ! /usr/lib/qt6/bin/qmllint -I /usr/lib/qt6/qml -I "$SHIM" "$file"; then status=1; fi
-done < <(find "$ROOT" -name '*.qml' -not -path '*/.git/*' -not -path '*/tests/*' | sort)
+done < <(rg --files "$ROOT" -g '*.qml' -g '!**/tests/**' | sort)
 exit $status

@@ -57,6 +57,9 @@ TestCase {
         compare(Intent.parseAnswer(reply("3"), 4), { index: 3, none: false })
         compare(Intent.parseAnswer(reply(" 1\n"), 4), { index: 1, none: false })
         compare(Intent.parseAnswer(reply("NONE"), 4), { index: 0, none: true })
+        compare(Intent.parseAnswer(reply("1 then 2"), 4), { index: 0, none: false })
+        compare(Intent.parseAnswer(reply("NONE but 2"), 4), { index: 0, none: false })
+        compare(Intent.parseAnswer(reply("01"), 4), { index: 0, none: false })
         compare(Intent.parseAnswer(reply("9"), 4), { index: 0, none: false })     // out of range
         compare(Intent.parseAnswer(reply("Google Chrome"), 4), { index: 0, none: false })
         compare(Intent.parseAnswer("not json", 4), { index: 0, none: false })

@@ -54,7 +54,7 @@ Item {
 
   function query(ctx) {
     if (ctx.scope || !ctx.query.trim()) return []
-    var q = ctx.query.trim()
+    var q = String(ctx.rawQuery === undefined ? ctx.query : ctx.rawQuery).trim()
     var rows = [{ id: "google", title: "Search Google", subtitle: q, icon: "󰊭", section: "Continue with", verb: "Search", tier: "fallback", score: 2,
                   action: { type: "url", url: AiTargets.googleUrl(q) } }]
     var order = ctx.settings.provider === "claude" ? ["claude", "chatgpt"] : ["chatgpt", "claude"]

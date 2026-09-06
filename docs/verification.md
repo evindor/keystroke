@@ -1,3 +1,18 @@
+## v1-voice checkpoint: clipboard query fallback (2026-09-06)
+
+Normal spoken or typed queries now include **Copy to Clipboard** under **Continue with**. Enter copies the original text and closes; Ctrl+Enter additionally pastes after 100 ms. Command normalization does not strip wording, punctuation, or whitespace from the clipboard payload. AI handoffs also receive the original query. The dedicated dictation launcher remains optional.
+
+Validation: 110 QML tests plus clipboard, palette, and recording lifecycle checks passed. The palette integration test covers a normal spoken query, selection and activation of the clipboard fallback, and replacement by a fresh typed query.
+
+The whole-request backend change is included as `helpers/voxtype-full-request.patch`, based on voxtype commit `60082b10e61af51b63b97ce86254686aadb8af88`. `voice-setup` applies it or recognizes an already-patched checkout, and refuses incompatible source. This keeps the checkpoint reproducible without depending on uncommitted changes in the sibling checkout.
+
+## Whole-request revision and Dictate to Clipboard (2026-09-06)
+
+- File-output streaming in the local voxtype fork (`../voxtype`) now retains audio through the recording-duration cap and emits complete transcript snapshots. These replace accumulated text in memory, including earlier words and final punctuation; they never become virtual keyboard backspaces. Regular cursor dictation keeps its existing behavior.
+- The Dictate to Clipboard provider preserves raw prose, bypasses Gemma, and starts recording on entry. Enter queues copying of the final transcript; Ctrl+Enter also pastes 100 ms after successful copy closes the palette. Escape, new navigation, and reopening cancel pending work.
+- Automated checks cover whole-transcript replacement, Unicode/deletions, audio beyond the former window, clipboard payload fidelity, failure/cancellation, copy-close-paste ordering, and actual palette key handling with fake audio/clipboard processes. An offscreen render checks the dictation preview.
+- Validation: 109 QML tests, 34 sliding-window tests, 13 streaming-output tests, recording lifecycle and clipboard/palette integration checks passed. Installed both the palette and rebuilt voxtype daemon; both voice services are active. Omarchy needed a shell restart to clear its old provider cache; IPC then confirmed the dictation provider. Live recognition accuracy and long-request latency still need user testing.
+
 # Verification
 
 Run on 2026-09-06 on Omarchy 4.0.2-1 (Quickshell 0.3.1-1, Qt 6.11.2, Python 3.14.7).
@@ -10,6 +25,15 @@ Run on 2026-09-06 on Omarchy 4.0.2-1 (Quickshell 0.3.1-1, Qt 6.11.2, Python 3.14
 - `tests/lint.sh` (qmllint with `qs` mapped to `/usr/share/omarchy/shell`): no findings except the known Quickshell metadata noise (`PanelWindow is not creatable`, `QProcess::ExitStatus` in `onExited`) and "member not found on QObject" for Omarchy's nested `Style.font.*`/`Color.menu.*` tokens, which qmllint cannot see through and which the stock plugins trigger identically.
 
 `bin/keystroke test` runs all three.
+
+### Voice review and live suggestions (2026-09-06, afternoon)
+
+This supersedes the earlier Enter-to-finish-and-run behavior below.
+
+- `bin/keystroke test` with the offscreen Qt platform and software rendering: **105 QML tests passed**, voice subprocess lifecycle check passed, 6 time-zone checks passed. The new assistant tests use an injected XMLHttpRequest substitute: warm-up deduplication, one-slot serialization, newest-partial coalescing, request and warm-up deadlines, stale callbacks, endpoint changes, live suggestions, final-answer reuse, startup recovery, catalog snapshots and edit/cancellation behavior. The separate Quickshell test drives the real `VoiceSession` Process callbacks with a fake CLI, verifies cancelled readers cannot leak into a new recording, and collects a daemon auto-stop.
+- Reproduced the actual query-field anchor bindings in an isolated software-rendered window: original waveform **522 px**, text **-12 px**; corrected waveform **96 px**, text **414 px**, within the same 640 px card. Inspected a rendered image with the live phrase "Open the display settings". For this harness only, PanelWindow was replaced by an ordinary offscreen Window, and voice transport/detection was disabled. No microphone, model or desktop input was used.
+- `omarchy plugin validate`, shell syntax checks, `git diff --check`, and `systemd-analyze --user verify helpers/keystroke-llm.service`: pass. qmllint has the existing Omarchy/Quickshell metadata warnings; no new assistant/session-controller warnings. Lint now excludes hidden worktrees, matching the installer exclusions.
+- The model's real end-to-end latency, simultaneous Whisper/Gemma GPU inference, physical hold-to-talk bindings and the updated code in the running desktop have **not** been exercised in this pass. Keystroke and the two voice services remain disabled during investigation of the laptop's lid-sensor behavior. The text-only service definition and resource limits are verified but not installed or started. No claim of measured instant inference is made.
 
 ### Live words, normalization and the assistant (2026-09-06, evening)
 

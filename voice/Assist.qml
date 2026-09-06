@@ -1,130 +1,189 @@
 import QtQuick
 import "../core/Intent.js" as Intent
 
-// Client for a local llama-server (OpenAI-compatible HTTP) that maps a
-// spoken command to one catalog row. Nothing runs while idle: a health
-// probe when the palette opens, one warm-up request when the catalog
-// changed, one request per transcript. Requests are XMLHttpRequest from the
-// QML engine, so no helper process is involved.
+// One server slot, one request at a time. Partials replace the queued request
+// instead of repeatedly aborting inference. Every callback checks ownership.
 Item {
   id: root
   property string endpoint: "http://127.0.0.1:18781"
-  property bool enabled: false
-  property bool available: false      // /health answered ok since the last probe
+  enabled: false
+  property bool watching: false
+  property bool available: false
   property string modelName: ""
-  property int lastMs: 0               // duration of the last answered request
+  property int lastMs: 0
   property string warmedStamp: ""
+  property string warmingStamp: ""
   property double checkedAt: 0
   property var inflight: null
   property var warming: null
+  property var probe: null
+  property var modelProbe: null
+  property var queued: null
+  property int requestTimeout: 4000
+  property int warmTimeout: 30000
+  property int healthTimeout: 2000
+  property var createRequest: function() { return new XMLHttpRequest() }
   readonly property bool ready: enabled && available
+  readonly property bool busy: !!(inflight || warming || queued)
 
-  signal answered(int index, bool none, string transcript, int ms)
+  signal answered(int index, bool none, string transcript, int ms, var context)
   signal failed(string message, string transcript)
 
   function base() { return String(endpoint || "").replace(/\/+$/, "") }
-
-  // At most one probe every 10 s: opening the palette must stay cheap.
-  function check(force) {
-    if (!root.enabled) { root.available = false; return }
-    var now = Date.now()
-    if (!force && root.checkedAt && now - root.checkedAt < 10000) return
-    root.checkedAt = now
-    var xhr = new XMLHttpRequest()
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState !== XMLHttpRequest.DONE) return
-      var ok = xhr.status === 200 && /"ok"/.test(String(xhr.responseText || ""))
-      if (ok !== root.available) root.available = ok
-      if (!ok) { root.warmedStamp = ""; root.modelName = "" }
-      else if (!root.modelName) root.readModel()
-    }
-    try { xhr.open("GET", root.base() + "/health"); xhr.send() } catch (e) { root.available = false }
+  function abortRequest(key) {
+    var xhr = root[key]
+    root[key] = null
+    if (xhr) { try { xhr.abort() } catch (e) { } }
   }
-
-  function readModel() {
-    var xhr = new XMLHttpRequest()
+  function check(force) {
+    if (!root.enabled) return
+    var now = Date.now()
+    if (root.probe || (!force && root.checkedAt && now - root.checkedAt < 10000)) return
+    root.checkedAt = now
+    var xhr = root.createRequest()
+    root.probe = xhr
     xhr.onreadystatechange = function() {
-      if (xhr.readyState !== XMLHttpRequest.DONE || xhr.status !== 200) return
+      if (xhr.readyState !== 4 || root.probe !== xhr) return
+      root.probe = null
+      healthTimer.stop()
+      var ok = false
+      try { ok = xhr.status === 200 && JSON.parse(xhr.responseText).status === "ok" } catch (e) { }
+      if (!ok) { root.warmedStamp = ""; root.modelName = "" }
+      root.available = ok
+      if (ok && !root.modelName) root.readModel()
+    }
+    healthTimer.restart()
+    try { xhr.open("GET", root.base() + "/health"); xhr.send() }
+    catch (e) { root.abortRequest("probe"); healthTimer.stop(); root.available = false }
+  }
+  function readModel() {
+    if (root.modelProbe) return
+    var xhr = root.createRequest()
+    root.modelProbe = xhr
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4 || root.modelProbe !== xhr) return
+      root.modelProbe = null
+      modelTimer.stop()
+      if (xhr.status !== 200) return
       try {
         var data = JSON.parse(xhr.responseText)
         var path = String(data.model_path || (data.default_generation_settings && data.default_generation_settings.model) || "")
         root.modelName = path.split("/").pop().replace(/\.gguf$/, "")
       } catch (e) { }
     }
-    try { xhr.open("GET", root.base() + "/props"); xhr.send() } catch (e) { }
+    modelTimer.restart()
+    try { xhr.open("GET", root.base() + "/props"); xhr.send() }
+    catch (e) { root.abortRequest("modelProbe"); modelTimer.stop() }
   }
-
-  // Put the catalog in the server's prefix cache. Fire-and-forget; a warm-up
-  // still in flight is dropped when the catalog changes again.
-  function warm(items) {
-    if (!root.ready || !items || !items.length) return
-    var s = Intent.stamp(items)
-    if (s === root.warmedStamp) return
-    if (root.warming) { try { root.warming.abort() } catch (e) { } root.warming = null }
-    var xhr = new XMLHttpRequest()
-    root.warming = xhr
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState !== XMLHttpRequest.DONE) return
-      if (root.warming === xhr) root.warming = null
-      if (xhr.status === 200) root.warmedStamp = s
-      else if (xhr.status === 0) root.check(true)
-    }
-    root.post(xhr, Intent.warmBody(items))
-  }
-
-  function ask(items, transcript) {
-    root.cancel()
-    if (!root.ready) { root.failed("Assistant is not available", transcript); return false }
-    if (!items || !items.length) { root.failed("Nothing to match against", transcript); return false }
-    var started = Date.now()
-    var xhr = new XMLHttpRequest()
-    root.inflight = xhr
-    xhr.onreadystatechange = function() {
-      if (xhr.readyState !== XMLHttpRequest.DONE) return
-      if (root.inflight !== xhr) return           // superseded or cancelled
-      root.inflight = null
-      timeout.stop()
-      var ms = Date.now() - started
-      if (xhr.status !== 200) {
-        if (xhr.status === 0) root.check(true)
-        root.failed("llama-server answered " + (xhr.status || "nothing") + (xhr.responseText ? ": " + String(xhr.responseText).slice(0, 120) : ""), transcript)
-        return
-      }
-      root.lastMs = ms
-      var a = Intent.parseAnswer(xhr.responseText, items.length)
-      root.answered(a.index, a.none, transcript, ms)
-    }
-    timeout.transcript = transcript
-    timeout.restart()
-    root.post(xhr, Intent.requestBody(items, transcript))
-    return true
-  }
-
   function post(xhr, body) {
     try {
       xhr.open("POST", root.base() + "/v1/chat/completions")
       xhr.setRequestHeader("Content-Type", "application/json")
       xhr.send(JSON.stringify(body))
-    } catch (e) {
-      root.available = false
-      if (root.inflight === xhr) { root.inflight = null; root.failed(String(e), timeout.transcript) }
+      return true
+    } catch (e) { return false }
+  }
+  function warm(items) {
+    if (!root.ready || !items || !items.length || root.inflight || root.queued) return
+    var stamp = Intent.stamp(items)
+    if (stamp === root.warmedStamp || root.warming) return
+    var xhr = root.createRequest()
+    root.warming = xhr
+    root.warmingStamp = stamp
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4 || root.warming !== xhr) return
+      root.warming = null
+      root.warmingStamp = ""
+      warmTimer.stop()
+      if (xhr.status === 200) root.warmedStamp = stamp
+      root.drain()
+    }
+    warmTimer.restart()
+    if (!root.post(xhr, Intent.warmBody(items))) {
+      root.abortRequest("warming"); root.warmingStamp = ""; warmTimer.stop()
     }
   }
-
-  function cancel() {
-    timeout.stop()
-    if (root.inflight) { var x = root.inflight; root.inflight = null; try { x.abort() } catch (e) { } }
+  function ask(items, transcript, context) {
+    if (!root.ready || !items || !items.length) return false
+    root.queued = { items: items.slice(), transcript: transcript, context: context,
+                    stamp: Intent.stamp(items), started: Date.now() }
+    root.drain()
+    return true
   }
-
-  // A stalled server must not hold a keypress hostage: the fuzzy results
-  // are already on screen, the assistant only reorders them.
+  function drain() {
+    if (root.inflight || root.warming || !root.queued) return
+    var request = root.queued
+    root.queued = null
+    if (!root.ready) { root.failed("Assistant is not available", request.transcript); return }
+    var xhr = root.createRequest()
+    root.inflight = xhr
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== 4 || root.inflight !== xhr) return
+      root.inflight = null
+      requestTimer.stop()
+      if (xhr.status === 200) {
+        root.warmedStamp = request.stamp
+        root.lastMs = Date.now() - request.started
+        var a = Intent.parseAnswer(xhr.responseText, request.items.length)
+        root.answered(a.index, a.none, request.transcript, root.lastMs, request.context)
+      } else {
+        root.failed("Assistant request failed (" + (xhr.status || "connection") + ")", request.transcript)
+        if (xhr.status === 0) root.check(true)
+      }
+      root.drain()
+    }
+    requestTimer.transcript = request.transcript
+    requestTimer.restart()
+    if (!root.post(xhr, Intent.requestBody(request.items, request.transcript))) {
+      root.abortRequest("inflight"); requestTimer.stop()
+      root.failed("Could not contact the assistant", request.transcript)
+      root.drain()
+    }
+  }
+  function cancel(keepWarm) {
+    root.queued = null
+    requestTimer.stop()
+    root.abortRequest("inflight")
+    if (!keepWarm) {
+      warmTimer.stop(); root.abortRequest("warming"); root.warmingStamp = ""
+    }
+  }
+  function resetConnection() {
+    root.cancel()
+    healthTimer.stop(); modelTimer.stop()
+    root.abortRequest("probe"); root.abortRequest("modelProbe")
+    root.available = false; root.modelName = ""; root.warmedStamp = ""; root.checkedAt = 0
+    if (root.enabled) root.check(true)
+  }
   Timer {
-    id: timeout
-    interval: 4000
+    id: requestTimer
+    interval: root.requestTimeout
     property string transcript: ""
-    onTriggered: { if (root.inflight) { var x = root.inflight; root.inflight = null; try { x.abort() } catch (e) { } root.failed("llama-server took longer than 4 s", transcript) } }
+    onTriggered: {
+      root.abortRequest("inflight")
+      root.failed("Assistant timed out; search results are ready", transcript)
+      root.drain()
+    }
   }
-
-  onEnabledChanged: { if (enabled) root.check(true); else { root.cancel(); root.available = false } }
-  onEndpointChanged: { root.warmedStamp = ""; root.checkedAt = 0; root.check(true) }
+  Timer {
+    id: warmTimer
+    interval: root.warmTimeout
+    onTriggered: { root.abortRequest("warming"); root.warmingStamp = ""; root.drain() }
+  }
+  Timer {
+    id: healthTimer
+    interval: root.healthTimeout
+    onTriggered: { root.abortRequest("probe"); root.available = false; root.warmedStamp = "" }
+  }
+  Timer { id: modelTimer; interval: root.healthTimeout; onTriggered: root.abortRequest("modelProbe") }
+  Timer {
+    interval: 750
+    repeat: true
+    running: root.enabled && root.watching && !root.available
+    onTriggered: root.check(true)
+  }
+  onWatchingChanged: { if (root.watching) root.check(true) }
+  onEnabledChanged: root.resetConnection()
+  onEndpointChanged: root.resetConnection()
+  Component.onDestruction: root.cancel()
 }

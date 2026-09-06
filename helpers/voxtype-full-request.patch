@@ -1,0 +1,408 @@
+diff --git i/src/daemon.rs w/src/daemon.rs
+index 4c6f2de..4044eae 100644
+--- i/src/daemon.rs
++++ w/src/daemon.rs
+@@ -1310,8 +1310,19 @@ impl Daemon {
+             Err(()) => return false,
+         };
+ 
++        let output_override = read_output_mode_override();
++        let file_output_path = self.resolve_file_output_path(&output_override, None);
+         let streaming = transcriber.as_streaming().expect("checked above");
+-        let handle = match streaming.start_stream(samples_rx) {
++        let started = if file_output_path.is_some() {
++            tracing::info!(
++                "Starting revisable file-output stream (whole request, max {} s)",
++                self.config.audio.max_duration_secs
++            );
++            streaming.start_revisable_stream(samples_rx, self.config.audio.max_duration_secs)
++        } else {
++            streaming.start_stream(samples_rx)
++        };
++        let handle = match started {
+             Ok(h) => h,
+             Err(e) => {
+                 tracing::error!("Failed to start streaming session: {}", e);
+@@ -1328,9 +1339,6 @@ impl Daemon {
+         // see the Partial/Final/Replace arms in the event pump, gated on
+         // `file_output_path`. The chain is still built normally; it's
+         // simply unused for a file-output session.
+-        let output_override = read_output_mode_override();
+-        let file_output_path = self.resolve_file_output_path(&output_override, None);
+-
+         *audio_capture = Some(capture);
+         *streaming_handle = Some(handle);
+         *streaming_session = Some(StreamingSession::new());
+@@ -4271,6 +4279,19 @@ impl Daemon {
+                         State::Streaming { file_output_path: Some(_), .. }
+                     );
+                     match event {
++                        Some(StreamingEvent::Snapshot { text }) => {
++                            if file_output {
++                                if let Some(s) = streaming_session.as_mut() {
++                                    s.replace_snapshot_silent(&text);
++                                    if let State::Streaming { finalized_text, .. } = &mut state {
++                                        finalized_text.clone_from(&text);
++                                    }
++                                    write_live_transcript(&live_transcript_path(), &text);
++                                }
++                            } else {
++                                tracing::error!("Ignoring whole-transcript snapshot outside file output");
++                            }
++                        }
+                         Some(StreamingEvent::Partial { text, .. }) => {
+                             if let Some(s) = streaming_session.as_mut() {
+                                 if file_output {
+diff --git i/src/output/streaming.rs w/src/output/streaming.rs
+index 19073cc..d0b5152 100644
+--- i/src/output/streaming.rs
++++ w/src/output/streaming.rs
+@@ -307,6 +307,14 @@ impl StreamingSession {
+         Ok(())
+     }
+ 
++    /// Replace the complete transcript for a file-only snapshot. This never
++    /// emits keystrokes, and clears any partial from the previous snapshot.
++    pub fn replace_snapshot_silent(&mut self, text: &str) {
++        self.clear_partial();
++        self.finalized_text.clear();
++        self.finalized_text.push_str(text);
++    }
++
+     /// File-output counterpart to `replace_and_commit`: no real cursor to
+     /// send backspace keystrokes to, but `backspace` still means the same
+     /// thing — trim that many trailing chars off the accumulated
+@@ -575,6 +583,23 @@ mod tests {
+         assert_eq!(session.partial(), "");
+     }
+ 
++    #[test]
++    fn file_snapshots_replace_every_prior_snapshot_and_partial() {
++        let mut session = StreamingSession::new();
++        session.observe_partial_delta("wrong first guess");
++        session.replace_snapshot_silent("Open the first document please.");
++        session.replace_snapshot_silent("Copy the second document, please!");
++        assert_eq!(session.live_text(), "Copy the second document, please!");
++        session.finalize_pending_partial();
++        assert_eq!(
++            session.finalized_text(),
++            "Copy the second document, please!"
++        );
++        session.replace_snapshot_silent("");
++        assert_eq!(session.live_text(), "");
++        assert_eq!(session.typed_chars(), 0);
++    }
++
+     #[test]
+     fn live_text_is_committed_plus_pending() {
+         let mut session = StreamingSession::new();
+diff --git i/src/transcribe/sliding_window.rs w/src/transcribe/sliding_window.rs
+index 162e306..16f48d2 100644
+--- i/src/transcribe/sliding_window.rs
++++ w/src/transcribe/sliding_window.rs
+@@ -136,13 +136,17 @@ const REVISION_LAG_WORDS: usize = 4;
+ /// `final_flush`.
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ enum Delta {
++    Snapshot(String),
+     /// Append `text` after whatever's already been typed. Maps to a plain
+     /// `Partial`/`Final` event depending on `type_partials` — the only
+     /// kind of delta the non-revision-mode gate ever produces.
+     Append(String),
+     /// Revision mode only: backspace `backspace` (Unicode scalar) chars,
+     /// then type `text`. Maps to `StreamingEvent::Replace`.
+-    Replace { backspace: usize, text: String },
++    Replace {
++        backspace: usize,
++        text: String,
++    },
+ }
+ 
+ /// Map a [`Delta`] to the [`StreamingEvent`] the daemon expects. `Append`
+@@ -153,6 +157,7 @@ enum Delta {
+ /// progressive-typing choice, so there's no "non-partial" equivalent.
+ fn delta_to_event(delta: Delta, type_partials: bool) -> StreamingEvent {
+     match delta {
++        Delta::Snapshot(text) => StreamingEvent::Snapshot { text },
+         Delta::Append(text) => {
+             if type_partials {
+                 StreamingEvent::Partial {
+@@ -253,8 +258,26 @@ impl Transcriber for SlidingWindowStreamingTranscriber {
+ 
+ impl StreamingTranscriber for SlidingWindowStreamingTranscriber {
+     fn start_stream(
++        &self,
++        samples_rx: mpsc::Receiver<Vec<f32>>,
++    ) -> Result<StreamHandle, TranscribeError> {
++        self.start_session(samples_rx, None)
++    }
++
++    fn start_revisable_stream(
++        &self,
++        samples_rx: mpsc::Receiver<Vec<f32>>,
++        max_duration_secs: u32,
++    ) -> Result<StreamHandle, TranscribeError> {
++        self.start_session(samples_rx, Some(max_duration_secs))
++    }
++}
++
++impl SlidingWindowStreamingTranscriber {
++    fn start_session(
+         &self,
+         mut samples_rx: mpsc::Receiver<Vec<f32>>,
++        full_request_duration: Option<u32>,
+     ) -> Result<StreamHandle, TranscribeError> {
+         let (events_tx, events_rx) = mpsc::channel::<StreamingEvent>(64);
+         let (cancel_tx, mut cancel_rx) = oneshot::channel::<()>();
+@@ -265,6 +288,12 @@ impl StreamingTranscriber for SlidingWindowStreamingTranscriber {
+         let task = tokio::task::spawn_blocking(move || -> Result<(), TranscribeError> {
+             let runtime = tokio::runtime::Handle::current();
+             let mut session = Session::new(base, config);
++            if let Some(seconds) = full_request_duration {
++                // The daemon caps the recording. Keep every sample through its
++                // final capture chunk instead of sliding away earlier context.
++                session.config.max_buffer_s = seconds.max(1) as f32 + 1.0;
++                session.full_request_text = Some(String::new());
++            }
+ 
+             // Skip the interval's immediate first tick so we don't
+             // re-transcribe an empty buffer.
+@@ -307,19 +336,45 @@ impl StreamingTranscriber for SlidingWindowStreamingTranscriber {
+                         let _ = runtime.block_on(events_tx.send(StreamingEvent::Ended));
+                         return Ok(());
+                     }
+-                    Outcome::Tick => match session.on_tick() {
+-                        Ok(deltas) => {
+-                            for delta in deltas {
+-                                let event = delta_to_event(delta, config.type_partials);
+-                                let _ = runtime.block_on(events_tx.send(event));
++                    Outcome::Tick => {
++                        // Inference can outlast the interval. Consume queued
++                        // audio before the next pass, including EOF, so stop
++                        // never drains a backlog via repeated stale inference.
++                        loop {
++                            if cancel_rx.try_recv().is_ok() {
++                                let _ = runtime.block_on(events_tx.send(StreamingEvent::Ended));
++                                return Ok(());
++                            }
++                            match samples_rx.try_recv() {
++                                Ok(chunk) => session.feed(&chunk),
++                                Err(mpsc::error::TryRecvError::Empty) => break,
++                                Err(mpsc::error::TryRecvError::Disconnected) => {
++                                    if let Some(tail) = session.final_flush() {
++                                        let _ = runtime.block_on(
++                                            events_tx
++                                                .send(delta_to_event(tail, config.type_partials)),
++                                        );
++                                    }
++                                    let _ = runtime.block_on(events_tx.send(StreamingEvent::Ended));
++                                    return Ok(());
++                                }
+                             }
+                         }
+-                        Err(err) => {
+-                            let _ = runtime.block_on(events_tx.send(StreamingEvent::Error(err)));
+-                            let _ = runtime.block_on(events_tx.send(StreamingEvent::Ended));
+-                            return Ok(());
++                        match session.on_tick() {
++                            Ok(deltas) => {
++                                for delta in deltas {
++                                    let event = delta_to_event(delta, config.type_partials);
++                                    let _ = runtime.block_on(events_tx.send(event));
++                                }
++                            }
++                            Err(err) => {
++                                let _ =
++                                    runtime.block_on(events_tx.send(StreamingEvent::Error(err)));
++                                let _ = runtime.block_on(events_tx.send(StreamingEvent::Ended));
++                                return Ok(());
++                            }
+                         }
+-                    },
++                    }
+                 }
+             }
+         });
+@@ -348,6 +403,9 @@ struct Session {
+     base: Arc<dyn Transcriber>,
+     config: SlidingWindowConfig,
+ 
++    // Some only for file-output sessions: all displayed text stays revisable.
++    full_request_text: Option<String>,
++
+     // Audio accumulator.
+     buffer: Vec<f32>,
+     /// True once the buffer wrapped (audio was dropped). Switches diffing
+@@ -379,6 +437,7 @@ impl Session {
+         Self {
+             base,
+             config,
++            full_request_text: None,
+             buffer: Vec::new(),
+             sliding: false,
+             full_text_parts: Vec::new(),
+@@ -454,6 +513,9 @@ impl Session {
+         let Some(curr) = self.transcribe_buffer()? else {
+             return Ok(Vec::new());
+         };
++        if self.full_request_text.is_some() {
++            return Ok(self.reconcile_full_request(curr).into_iter().collect());
++        }
+         let curr_words: Vec<String> = curr.split_whitespace().map(str::to_owned).collect();
+         if curr_words.is_empty() {
+             return Ok(Vec::new());
+@@ -674,6 +736,18 @@ impl Session {
+         delta
+     }
+ 
++    /// File outputs replace text in memory, never backspace another app.
++    /// Compare literally so punctuation, case, deletions, and earlier words
++    /// can all be corrected, even when no old words anchor the new result.
++    fn reconcile_full_request(&mut self, text: String) -> Option<Delta> {
++        let previous = self.full_request_text.as_mut()?;
++        if *previous == text {
++            return None;
++        }
++        *previous = text.clone();
++        Some(Delta::Snapshot(text))
++    }
++
+     /// One last transcription at end-of-recording. Returns the remaining tail
+     /// delta (never cumulative text — the daemon already typed the partials).
+     fn final_flush(&mut self) -> Option<Delta> {
+@@ -682,6 +756,9 @@ impl Session {
+             _ => return None,
+         };
+ 
++        if self.full_request_text.is_some() {
++            return self.reconcile_full_request(final_text);
++        }
+         if self.config.revision_mode {
+             // Unlike `on_tick`, there is no next tick to wait for: this is
+             // the true end of the session. Found live on a 60s recording
+@@ -1110,6 +1187,81 @@ mod tests {
+         s.split_whitespace().map(str::to_owned).collect()
+     }
+ 
++    #[test]
++    fn full_request_revises_first_words_and_final_punctuation() {
++        let mut session = Session::new(
++            Arc::new(RevisingTranscriber::new(vec![
++                "Send the wrong document to Alex tomorrow morning",
++                "Send the revised document to Alex tomorrow morning",
++                "Send the revised document to Alex tomorrow morning.",
++            ])),
++            streaming_config(),
++        );
++        session.full_request_text = Some(String::new());
++        session.feed(&loud_samples(1.5));
++        assert_eq!(
++            session.on_tick().unwrap(),
++            vec![Delta::Snapshot(
++                "Send the wrong document to Alex tomorrow morning".into()
++            )]
++        );
++        assert_eq!(
++            session.on_tick().unwrap(),
++            vec![Delta::Snapshot(
++                "Send the revised document to Alex tomorrow morning".into()
++            )]
++        );
++        assert_eq!(
++            session.final_flush(),
++            Some(Delta::Snapshot(
++                "Send the revised document to Alex tomorrow morning.".into()
++            ))
++        );
++    }
++
++    #[test]
++    fn full_request_replacement_handles_unicode_deletion_and_unchanged_text() {
++        let mut session = revision_session();
++        session.full_request_text = Some("Héllo 🌍 extra words".into());
++        assert_eq!(
++            session.reconcile_full_request("Hello!".into()),
++            Some(Delta::Snapshot("Hello!".into()))
++        );
++        assert_eq!(session.reconcile_full_request("Hello!".into()), None);
++        assert_eq!(
++            session.reconcile_full_request("".into()),
++            Some(Delta::Snapshot(String::new()))
++        );
++    }
++
++    #[tokio::test]
++    async fn full_request_keeps_audio_beyond_the_rolling_window() {
++        struct LengthTranscriber;
++        impl Transcriber for LengthTranscriber {
++            fn transcribe(&self, samples: &[f32]) -> Result<String, TranscribeError> {
++                Ok(format!("{} samples", samples.len()))
++            }
++        }
++        let mut config = streaming_config();
++        config.max_buffer_s = 2.0;
++        let engine = SlidingWindowStreamingTranscriber::new(Arc::new(LengthTranscriber), config);
++        let (tx, rx) = mpsc::channel(32);
++        let mut handle = engine.start_revisable_stream(rx, 60).unwrap();
++        tx.send(loud_samples(15.0)).await.unwrap();
++        drop(tx);
++        let mut session = crate::output::streaming::StreamingSession::new();
++        while let Some(event) = handle.events.recv().await {
++            match event {
++                StreamingEvent::Snapshot { text } => session.replace_snapshot_silent(&text),
++                StreamingEvent::Ended => break,
++                other => panic!("unexpected event: {other:?}"),
++            }
++        }
++        handle.task.await.unwrap().unwrap();
++        assert_eq!(session.live_text(), "240000 samples");
++        assert_eq!(session.finalized_text(), "240000 samples");
++    }
++
+     fn revision_session() -> Session {
+         let mut cfg = streaming_config();
+         cfg.revision_mode = true;
+diff --git i/src/transcribe/soniox.rs w/src/transcribe/soniox.rs
+index b9f7018..35d34dc 100644
+--- i/src/transcribe/soniox.rs
++++ w/src/transcribe/soniox.rs
+@@ -1436,6 +1436,7 @@ mod tests {
+                 } => ("Replace", format!("-{}+{}", backspace, text)),
+                 StreamingEvent::Ended => ("Ended", String::new()),
+                 StreamingEvent::Error(e) => ("Error", e.to_string()),
++                StreamingEvent::Snapshot { text } => ("Snapshot", text.clone()),
+             })
+             .collect()
+     }
+diff --git i/src/transcribe/streaming.rs w/src/transcribe/streaming.rs
+index 2207145..caccd62 100644
+--- i/src/transcribe/streaming.rs
++++ w/src/transcribe/streaming.rs
+@@ -64,6 +64,10 @@ pub type SegmentId = u64;
+ /// is not needed in normal use.
+ #[derive(Debug)]
+ pub enum StreamingEvent {
++    /// Complete current transcript, only for a revisable file-output session.
++    /// Replaces all prior text; never interpreted as virtual keyboard input.
++    Snapshot { text: String },
++
+     /// In-progress text for a segment. May be revised by later partials
+     /// or superseded by a `Final` event with the same `segment_id`.
+     Partial { text: String, segment_id: SegmentId },
+@@ -129,6 +133,16 @@ pub struct StreamHandle {
+ /// from `start_stream` directly. Errors during the session should arrive
+ /// as `StreamingEvent::Error` followed by `Ended`.
+ pub trait StreamingTranscriber: Send + Sync {
++    /// File-output clients can replace their entire visible transcript safely.
++    /// Backends without this capability keep their usual streaming behavior.
++    fn start_revisable_stream(
++        &self,
++        samples_rx: mpsc::Receiver<Vec<f32>>,
++        _max_duration_secs: u32,
++    ) -> Result<StreamHandle, TranscribeError> {
++        self.start_stream(samples_rx)
++    }
++
+     /// Open a streaming session.
+     ///
+     /// `samples_rx` is the channel from which the backend will pull
