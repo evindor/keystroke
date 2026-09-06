@@ -92,6 +92,15 @@ function voiceNodes(nodes, screens, rootParts, voice) {
     action: { type: "voice-bindings" } }))
   nodes.push(node(scope, parts.concat(["Voxtype " + (voice.version || "")]), { id: "voice/status", icon: "󰍬", verb: "", order: 60, disabled: true, listOnly: true,
     subtitle: daemonLabel(voice) + " · tap the hotkey again or hold it while the palette is open", action: { type: "noop" } }))
+  var a = voice.assist
+  if (a) {
+    var where = String(a.endpoint || "")
+    nodes.push(node(scope, parts.concat(["Assistant"]), { id: "voice/assist-status", icon: "✳", verb: "", order: 61, disabled: true, listOnly: true,
+      subtitle: !a.enabled ? "Off · spoken commands go through the fuzzy matcher only"
+              : a.available ? "llama-server ready at " + where + (a.model ? " · " + a.model : "") + (a.lastMs ? " · last answer " + a.lastMs + " ms" : "")
+              : "llama-server is not answering at " + where + " · bin/keystroke voice-setup, then systemctl --user start keystroke-llm",
+      accessory: !a.enabled ? "Off" : a.available ? "Ready" : "Down", action: { type: "noop" } }))
+  }
 }
 
 // model: { configPath, paletteSchema, paletteValues, voice,

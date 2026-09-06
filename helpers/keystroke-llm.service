@@ -1,0 +1,27 @@
+# Keystroke's local assistant: llama-server with Gemma 4 E2B on the GPU
+# (Vulkan). Installed by `bin/keystroke voice-setup`; edit the copy in
+# ~/.config/systemd/user/ to change the model or the flags.
+#
+# --reasoning-budget 0 turns Gemma's thinking off (the answer is one number,
+# thinking would only eat the token budget), --cache-reuse keeps the catalog
+# prefix cached across requests, -np 1 leaves one slot so the cache is never
+# split, and the context is sized for a few hundred catalog lines.
+[Unit]
+Description=Keystroke assistant (llama-server, Gemma 4 E2B)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/keystroke/llama/current/llama-server \
+  --model %h/.local/share/keystroke/models/gemma-4-E2B-it-Q4_0.gguf \
+  --mmproj %h/.local/share/keystroke/models/mmproj-gemma-4-E2B-it-Q8_0.gguf \
+  --host 127.0.0.1 --port 18781 --alias keystroke \
+  -ngl 99 -c 16384 -np 1 --cache-reuse 256 --reasoning-budget 0 \
+  --log-disable
+Restart=on-failure
+RestartSec=5
+Nice=5
+
+[Install]
+WantedBy=graphical-session.target

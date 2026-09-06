@@ -20,7 +20,8 @@ Item {
     color: "#a5a4ad",
     description: "Providers, appearance and the config file",
     settings: [],
-    query: function(ctx) { return root.query(ctx) }
+    query: function(ctx) { return root.query(ctx) },
+    catalog: function() { return root.catalog() }
   })
 
   function model() {
@@ -58,6 +59,22 @@ Item {
                   icon: "󰒓", section: schema.label, verb: "", tier: "item", score: 1, order: 0, disabled: true, action: { type: "noop" } }]
     if (ok) rows.push({ id: "save", title: "Save “" + String(typed) + "”", subtitle: schema.description || "", icon: "✓", section: schema.label,
                         verb: "Save", tier: "item", score: 100, order: 1, action: SettingsTree.settingAction(screen.path, schema.key, typed, schema) })
+    return rows
+  }
+
+  // Screens and settings (not the choices of every enum), for the voice
+  // assistant's catalog; `detail` is the breadcrumb above the row.
+  function catalog() {
+    if (!root.host) return []
+    var t = root.current(), rows = []
+    for (var i = 0; i < t.nodes.length; i++) {
+      var n = t.nodes[i]
+      if (n.listOnly || n.disabled || n.parts.length > 3) continue
+      var above = n.parts.slice(0, -1).join(" › ")
+      var row = SettingsTree.row(n, 1, above, "Settings")
+      row.detail = above
+      rows.push(row)
+    }
     return rows
   }
 

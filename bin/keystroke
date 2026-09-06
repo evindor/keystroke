@@ -19,6 +19,9 @@ Usage: bin/keystroke <command>
   open <q>    Open the palette with a query
   validate    omarchy plugin validate on this checkout
   test        Run the QML unit tests, the time-zone helper checks, and qmllint
+  voice-setup Build/install Keystroke's voxtype (streaming + live transcript), llama-server and Gemma 4 E2B;
+              write the user services and switch voxtype to streaming. Re-runnable. See helpers/voice-setup.sh
+  voice-status  Show what voice-setup installed and whether both daemons answer
 USAGE
 }
 
@@ -64,6 +67,8 @@ case "${1:-help}" in
     python3 "$ROOT/tests/tz_helper_check.py"
     "$ROOT/tests/lint.sh"
     ;;
+  voice-setup) shift; exec "$ROOT/helpers/voice-setup.sh" "$@" ;;
+  voice-status) exec "$ROOT/helpers/voice-setup.sh" --status ;;
   help|-h|--help) usage ;;
   *) usage >&2; exit 2 ;;
 esac

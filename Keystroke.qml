@@ -12,6 +12,7 @@ import "core/Match.js" as Match
 import "core/Frecency.js" as Frecency
 import "core/Settings.js" as Settings
 import "core/VoiceBindings.js" as VoiceBindings
+import "core/Intent.js" as Intent
 
 // Keystroke: an extension-first command palette that replaces the Omarchy
 // menu. Hosted by omarchy-shell as a `menu` plugin (see manifest.json).
@@ -115,9 +116,21 @@ Item {
   VoiceSession {
     id: voice
     host: root
+    onPartial: function(text) { root.voiceLive(text) }
     onTranscribed: function(text) { root.voiceTranscribed(text) }
-    onNothingHeard: { root.voiceActivateAfter = false; if (root.opened) root.statusMessage = "Nothing heard" }
-    onFailed: function(message) { root.voiceActivateAfter = false; if (root.opened) root.errorMessage = message }
+    onNothingHeard: { root.voiceActivateAfter = false; root.voiceAcceptWaiting = false; if (root.opened) root.statusMessage = "Nothing heard" }
+    onFailed: function(message) { root.voiceActivateAfter = false; root.voiceAcceptWaiting = false; if (root.opened) root.errorMessage = message }
+  }
+  // A local llama-server (Gemma 4 E2B in the reference setup) that maps the
+  // transcript to one catalog row. The fuzzy results stay on screen; the
+  // assistant's pick is pinned above them when it lands.
+  Assist {
+    id: assist
+    enabled: root.voiceEnabled && root.voiceSettings.assist === true
+    endpoint: String(root.voiceSettings.assistEndpoint || "")
+    onAnswered: function(index, none, transcript, ms) { root.voiceAnswered(index, none, transcript, ms) }
+    onFailed: function(message, transcript) { root.voiceAssistFailed(message, transcript) }
+    onAvailableChanged: { if (available && root.opened) root.voiceWarm() }
   }
   readonly property var voiceSchema: [
     { key: "enabled", type: "boolean", label: "Voxtype voice command integration", "default": voice.detected,
@@ -125,7 +138,11 @@ Item {
     { key: "secondTap", type: "enum", label: "Second tap of the hotkey", "default": "voice", options: ["voice", "close"],
       description: "Voice starts dictation and a third tap stops it (Esc closes); Close is the stock toggle" },
     { key: "keys", type: "string", label: "Hotkeys to hold", "default": "SUPER + SPACE",
-      description: "Hyprland combos for the long-press bindings, comma-separated, e.g. SUPER + SPACE, SUPER + SHIFT + code:201" }
+      description: "Hyprland combos for the long-press bindings, comma-separated, e.g. SUPER + SPACE, SUPER + SHIFT + code:201" },
+    { key: "assist", type: "boolean", label: "Assistant picks the command", "default": true,
+      description: "Asks the local llama-server (Gemma) which app, action or setting a spoken command means and pins it above the matches" },
+    { key: "assistEndpoint", type: "string", label: "llama-server endpoint", "default": "http://127.0.0.1:18781",
+      description: "Where the assistant listens; bin/keystroke voice-setup installs it as the keystroke-llm user service" }
   ]
   property var voiceSettings: Settings.values(root.config, ["voice"], root.voiceSchema)
   readonly property bool voiceEnabled: voice.detected && voiceSettings.enabled === true
@@ -146,11 +163,79 @@ Item {
     onFileChanged: reload()
   }
   readonly property string voiceBindingsStatus: root.bindingsKnown ? VoiceBindings.status(root.bindingsText, root.voiceSettings.keys) : "missing"
-  readonly property string voiceStamp: [voice.detected, voice.version, voice.daemonState, root.voiceBindingsStatus, root.bindingsKnown].join("|")
+  readonly property string voiceStamp: [voice.detected, voice.version, voice.daemonState, root.voiceBindingsStatus, root.bindingsKnown,
+                                         assist.enabled, assist.available, assist.modelName, assist.lastMs, assist.endpoint].join("|")
   function voiceModel() {
     return { schemas: root.voiceSchema, values: root.voiceSettings, detected: voice.detected, version: voice.version, daemonState: voice.daemonState,
-             bindings: root.voiceBindingsStatus, bindingsPath: "~/.config/hypr/bindings.lua" }
+             bindings: root.voiceBindingsStatus, bindingsPath: "~/.config/hypr/bindings.lua",
+             assist: { enabled: assist.enabled, available: assist.available, endpoint: assist.endpoint, model: assist.modelName, lastMs: assist.lastMs } }
   }
+  // The spoken command's journey: live words while listening, the normalized
+  // transcript as the query, then the assistant's pick pinned on top.
+  property var voicePick: null            // catalog row the assistant chose
+  property string voicePickQuery: ""      // the query it was chosen for; typing past it drops the pin
+  property string voiceAsked: ""          // transcript of the request in flight
+  property var voiceCatalog: null         // { items, rows, stamp }, rebuilt per request
+  property bool voiceAcceptWaiting: false // ↵ arrived while listening and the assistant is still thinking
+  readonly property bool liveText: voice.active && search.text.length > 0
+  Timer { id: acceptWait; interval: 1500; onTriggered: root.voiceAcceptNow() }
+  function voiceLive(text) {
+    if (!root.opened || voice.phase !== "listening") return
+    var t = String(text || "").replace(/\s+/g, " ").trim()
+    if (t === search.text) return
+    search.text = t
+    search.cursorPosition = t.length
+    root.edited()
+  }
+  function voiceAnswered(index, none, transcript, ms) {
+    if (!root.opened || transcript !== root.voiceAsked) return
+    var cat = root.voiceCatalog
+    if (index >= 1 && cat && index <= cat.rows.length) {
+      root.voicePick = cat.rows[index - 1]
+      root.voicePickQuery = search.text
+      root.statusMessage = (assist.modelName || "Assistant") + " picked " + root.voicePick.title + " · " + ms + " ms"
+    } else {
+      root.voicePick = null
+      root.statusMessage = none ? "No match from " + (assist.modelName || "the assistant") + " · " + ms + " ms" : "The assistant answered nothing usable"
+    }
+    root.requery()
+    if (root.voiceAcceptWaiting) root.voiceAcceptNow()
+  }
+  function voiceAssistFailed(message, transcript) {
+    if (transcript !== root.voiceAsked) return
+    if (root.opened) root.statusMessage = message
+    if (root.voiceAcceptWaiting) root.voiceAcceptNow()
+  }
+  function voiceAcceptNow() {
+    if (!root.voiceAcceptWaiting) return
+    root.voiceAcceptWaiting = false
+    acceptWait.stop()
+    if (!root.opened) return
+    debounce.stop(); root.runQuery(); root.activate()
+  }
+  // Every row a spoken command could mean: providers that expose catalog()
+  // list everything they own, normalized like query results so the pick can
+  // be activated through the usual path.
+  function catalogForVoice() {
+    var items = [], rows = []
+    for (var i = 0; i < providerRegistry.entries.length && rows.length < 2000; i++) {
+      var entry = providerRegistry.entries[i]
+      if (!root.providerEnabled(entry) || typeof entry.provider.catalog !== "function") continue
+      var out = []
+      try {
+        out = entry.provider.catalog({ host: root, settings: root.settingsFor(entry), shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }) || []
+      } catch (e) { console.warn("keystroke: provider", entry.key, "catalog failed:", e); continue }
+      for (var r = 0; r < out.length && rows.length < 2000; r++) {
+        var row = root.normalize(out[r], entry, "")
+        if (!row || row.disabled) continue
+        rows.push(row)
+        items.push({ title: row.title, detail: String(out[r].detail !== undefined ? out[r].detail : row.subtitle || "") })
+      }
+    }
+    root.voiceCatalog = { items: items, rows: rows, stamp: Intent.stamp(items) }
+    return root.voiceCatalog
+  }
+  function voiceWarm() { if (assist.ready) assist.warm(root.catalogForVoice().items) }
   function installVoiceBindings() {
     if (!root.bindingsKnown) { root.errorMessage = "Could not read " + root.bindingsPath; return }
     var next = VoiceBindings.apply(root.bindingsText, root.voiceSettings.keys)
@@ -170,16 +255,34 @@ Item {
     return voice.start()
   }
   function voiceStop() { if (voice.phase === "starting" || voice.phase === "listening") voice.stop() }
-  function voiceCancel() { root.voiceActivateAfter = false; if (voice.active) voice.cancel() }
-  function voiceTranscribed(text) {
+  function voiceCancel() {
+    root.voiceActivateAfter = false
+    root.voiceAcceptWaiting = false
+    acceptWait.stop()
+    assist.cancel()
+    root.voiceAsked = ""
+    if (voice.active) voice.cancel()
+  }
+  function voiceTranscribed(raw) {
     var accept = root.voiceActivateAfter
     root.voiceActivateAfter = false
     if (!root.opened || root.voiceDiscard) return
+    var text = Intent.normalize(raw)
     search.text = text
     search.cursorPosition = text.length
+    root.voicePick = null
+    root.voicePickQuery = ""
     root.edited()
     root.statusMessage = "Transcribed"
-    if (accept) { debounce.stop(); root.runQuery(); root.activate() }
+    var asked = false
+    if (assist.ready && text) {
+      root.voiceAsked = raw
+      asked = assist.ask(root.catalogForVoice().items, raw)
+      if (asked) root.statusMessage = "Transcribed · asking " + (assist.modelName || "the assistant") + "…"
+    }
+    if (!accept) return
+    if (asked) { root.voiceAcceptWaiting = true; acceptWait.restart() }
+    else { debounce.stop(); root.runQuery(); root.activate() }
   }
   function isSuperKey(key) { return key === Qt.Key_Super_L || key === Qt.Key_Super_R || key === Qt.Key_Meta || key === Qt.Key_Hyper_L || key === Qt.Key_Hyper_R }
   function isModifierKey(key) {
@@ -302,6 +405,8 @@ Item {
       if (typeof p.opened === "function") { try { p.opened() } catch (e) { console.warn("keystroke: provider opened() threw", e) } }
     }
     voice.refresh()
+    assist.check()
+    if (assist.ready) Qt.callLater(root.voiceWarm)
   }
 
   function openDmenu(payload) {
@@ -389,6 +494,17 @@ Item {
     }
     if (root.configError) errors.push(root.configError)
     var ranked = Match.rank(collected, root.bonusFor)
+    // The assistant's pick sits above the fuzzy results for the transcript it
+    // answered; any edit to the query lets the ordinary ranking through.
+    if (root.voicePick && q && q === root.voicePickQuery) {
+      var pick = root.voicePick, rest = []
+      for (var k = 0; k < ranked.length; k++) if (ranked[k].uid !== pick.uid) rest.push(ranked[k])
+      var pinned = {}
+      for (var f in pick) pinned[f] = pick[f]
+      pinned.tier = "answer"; pinned.section = "Spoken command"; pinned.badge = "assistant"; pinned.score = 1000
+      rest.unshift(pinned)
+      ranked = rest
+    }
     root.applyRows(ranked.slice(0, 120))
     root.pending = pend
     root.errorMessage = errors.join(" · ")
@@ -608,7 +724,9 @@ Item {
       modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems,
       error: root.errorMessage, configError: root.configError, status: root.statusMessage,
       voice: { state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
-               daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length } })
+               command: voice.command, daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length, live: voice.liveText },
+      assist: { enabled: assist.enabled, available: assist.available, model: assist.modelName, lastMs: assist.lastMs, warmed: assist.warmedStamp,
+                pick: root.voicePick ? root.voicePick.title : "", catalog: root.voiceCatalog ? root.voiceCatalog.rows.length : 0 } })
   }
 
   // ------------------------------------------------------------------ view
@@ -675,12 +793,14 @@ Item {
           }
         }
         VoiceWave {
+          id: wave
           visible: voice.active
-          anchors.left: glyph.right
+          anchors.left: root.liveText ? undefined : glyph.right
           anchors.leftMargin: Style.space(14)
           anchors.right: escCap.left
           anchors.rightMargin: Style.space(12)
           anchors.verticalCenter: parent.verticalCenter
+          width: Style.space(96)               // only while the live words take the field
           height: Style.space(40)
           mode: voice.phase
           level: voice.level
@@ -692,7 +812,7 @@ Item {
           id: search
           anchors.left: glyph.right
           anchors.leftMargin: Style.space(14)
-          anchors.right: escCap.left
+          anchors.right: root.liveText ? wave.left : escCap.left
           anchors.rightMargin: Style.space(12)
           anchors.verticalCenter: parent.verticalCenter
           height: Style.space(40)
@@ -705,7 +825,7 @@ Item {
           selectByMouse: true
           clip: true
           focus: true
-          opacity: voice.active ? 0 : 1        // the string takes the field; focus and keys stay here
+          opacity: voice.active && !root.liveText ? 0 : 1   // the string takes the field until words arrive; focus and keys stay here
           Accessible.name: root.dmenuActive ? root.dmenuPrompt : "Search commands, apps and extensions"
           Text {
             anchors.fill: parent
@@ -881,7 +1001,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
           Text {
             text: voice.phase === "listening" ? (root.voiceTrigger === "hold" ? "Listening… release to finish" : "Listening… tap the hotkey again or press ↵ to finish")
-                : voice.phase === "transcribing" ? "Transcribing…" : voice.phase === "starting" ? "Starting voxtype…"
+                : voice.phase === "transcribing" ? (root.voiceAcceptWaiting ? "Transcribing… ↵ runs the best match" : "Transcribing…") : voice.phase === "starting" ? "Starting voxtype…"
                 : root.pending && root.showLoading ? "Searching…" : root.errorMessage ? "Needs attention: " + root.errorMessage : root.statusMessage || (root.current.providerName ? root.current.providerName : "Keystroke")
             textFormat: Text.PlainText; elide: Text.ElideRight; width: Math.min(implicitWidth, card.width * 0.5)
             color: root.errorMessage ? Color.urgent : root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall

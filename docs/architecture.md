@@ -11,9 +11,10 @@ omarchy-shell
        │    │           Emoji, Clipboard, Files, AiWeb, SettingsProvider
        │    └─ community: shell.serviceFor(<plugin id>) for every enabled plugin
        │                  whose manifest carries "x-keystroke"
-       ├─ core/*.js   Match (fuzzy matcher + tiers), SettingsTree, Frecency, Settings, VoiceBindings, Calculator, Units, Colors, Emoji, AiTargets, Files
+       ├─ core/*.js   Match (fuzzy matcher + tiers), SettingsTree, Frecency, Settings, VoiceBindings, Intent, Calculator, Units, Colors, Emoji, AiTargets, Files
        ├─ omarchy/MenuModel.js   vendored stock menu model (parse, merge, routes, guards)
-       ├─ voice/VoiceSession.qml   voxtype recording lifecycle and audio levels
+       ├─ voice/VoiceSession.qml   voxtype recording lifecycle, live transcript and audio levels
+       ├─ voice/Assist.qml         llama-server client: spoken command → catalog row
        └─ ui/         ResultRow, PreviewPane, Keycap, VoiceWave
 ```
 
@@ -27,6 +28,14 @@ Two triggers, both host-owned in `Keystroke.qml`:
 - **Hold.** Hyprland is the only party that knows the key is still down, so two user-side bindings feed IPC methods: a long-press bind (`bindo`, fires after the keyboard repeat delay whichever order the keys are released in later) calls `voiceHold`, and a release bind (`bindr`) calls `voiceRelease`. Hyprland's release bind only fires while the modifier is still held (`handleKeybinds` compares the current modmask), and it swallows the hotkey's own release, so the palette also ends a hold when the modifier's release (`Key_Super_L`/`Key_Meta`) reaches the search field, which Hyprland does deliver. A tap's release must not end anything, so the modifier release only counts when the recording was started by a hold. `core/VoiceBindings.js` generates the block for `~/.config/hypr/bindings.lua`, recognises it by its markers and rewrites it in place; the Settings row confirms, writes atomically and runs `hyprctl reload`.
 
 `↵` while listening stops the recording and activates the top match once the transcript is in; any other non-modifier key cancels a recording (the key then behaves as usual) or, during transcription, marks the transcript as superseded. The transcript replaces the query through the normal `edited()` path, so ranking, previews and frecency are untouched.
+
+**Binary.** `VoiceSession` prefers `~/.local/share/keystroke/voxtype/voxtype` (the build `bin/keystroke voice-setup` installs: voxtype 1.1 with the live transcript mirror, whisper on Vulkan) and falls back to `voxtype` on the PATH; the audio bridge is taken from the same directory. Every CLI call uses that binary, so the client and the daemon (a systemd drop-in points `voxtype.service` at the same file) never disagree on the `--wait` protocol.
+
+**Live words.** Streaming engines (`[whisper] streaming = true`) make the daemon rewrite `$XDG_RUNTIME_DIR/voxtype/transcript` after every partial, final and revision event with the session's text so far, atomically by rename, empty at session start and removed at idle (the patch in `feature/live-transcript-file`, proposed upstream). While listening the session loads that file through a `FileView` behind a `Loader` plus an 80 ms poll (a watcher can lose the inode across renames) and emits `partial(text)` on change; the host puts the text in the query field and runs the normal debounced query, so the results follow the speech. The final transcript still comes from `record stop --wait --json` (the same patch publishes the completion sidecar for streaming file sessions), with the transcript file as fallback.
+
+**Query.** `core/Intent.normalize()` turns the transcript into a query: trailing punctuation, a leading launcher verb and filler words are dropped ("Launch Chrome." → `Chrome`), because the matcher treats punctuation as literal characters and AND-s the words.
+
+**Assistant.** `voice/Assist.qml` is an XMLHttpRequest client for a local llama-server (OpenAI-compatible; `keystroke-llm.service` runs Gemma 4 E2B Q4_0 on Vulkan). `Keystroke.catalogForVoice()` asks every enabled provider with a `catalog()` hook for all of its rows (Omarchy menu entries with their breadcrumb, applications with their generic name, settings screens and settings), normalizes them like query results and numbers them; `core/Intent.js` renders that list into a fixed system prompt, so llama-server's prefix cache holds it across requests (`cache_prompt`, one slot, `--cache-reuse`). The palette warms the cache when it opens (`Intent.stamp` skips a catalog already warmed) and sends the raw transcript as the user turn with a grammar that only admits a number or NONE and thinking disabled; the answer maps back to a row that `runQuery()` pins as an `answer`-tier row titled *Spoken command* for as long as the query is the one it was asked for. ↵ during transcription waits up to 1.5 s for the answer. Requests time out at 4 s, a dead server flips `available` and the Settings › Voice status row says how to start it; the fuzzy results never depend on the assistant.
 
 ## Query flow
 

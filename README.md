@@ -34,7 +34,7 @@ Every `omarchy menu` route works as before: submenus open scoped (`omarchy menu 
 
 ## Voice
 
-Keystroke dictates through [voxtype](https://voxtype.io), the dictation daemon Omarchy installs from Install › AI › Dictation. Nothing else is needed: Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the PATH, and the screen offers Omarchy's installer when it is not.
+Keystroke dictates through [voxtype](https://voxtype.io), the dictation daemon Omarchy installs from Install › AI › Dictation. Nothing else is needed: Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the PATH, and the screen offers Omarchy's installer when it is not. Two optional pieces make it fast and forgiving, both installed by `bin/keystroke voice-setup` (no root): a voxtype build that streams words while you speak, and a local Gemma model that turns "luck the screen" into Lock Screen. See [Speaking commands](#speaking-commands) below.
 
 Two ways in, both while the palette is open:
 
@@ -51,6 +51,14 @@ Two ways in, both while the palette is open:
 While listening, the query field shows a string plucked by the microphone (levels come from voxtype's own audio bridge) and the footer says how to finish. Releasing or tapping stops the recording and shows *Transcribing…*; the transcript then **replaces the query** and the matches update. Nothing is activated on its own: `↵` runs the selected row as usual. Pressing `↵` while still listening stops the recording first and runs the top match once the text is in. Typing while listening cancels the recording; typing while transcribing keeps what you type. voxtype's own overlay stays hidden for these recordings (`--no-osd`), the transcript never goes through the clipboard or the virtual keyboard, and the temporary transcript file in `$XDG_RUNTIME_DIR` is removed after every recording.
 
 Model, language, VAD and everything else are voxtype's settings (`voxtype configure`). Whisper transcribes silence as "Thank you." now and then; voxtype's VAD filters that when enabled. With the daemon stopped the palette says so instead of listening.
+
+### Speaking commands
+
+Three things happen to what you say, in order:
+
+1. **Words appear as you speak.** With a streaming engine the daemon mirrors the text so far to `$XDG_RUNTIME_DIR/voxtype/transcript`; the palette shows it in the query field (the string shrinks to the right) and the matches follow every partial. This needs voxtype 1.1's sliding-window streaming plus a small patch that exposes the partials, proposed upstream and meanwhile built from [evindor/voxtype](https://github.com/evindor/voxtype) (branch `feature/live-transcript-file`) by `bin/keystroke voice-setup`. The build lands in `~/.local/share/keystroke/voxtype`, a systemd drop-in makes it the daemon, and the palette prefers it over the packaged binary; delete `~/.config/systemd/user/voxtype.service.d/keystroke.conf` to go back. Whisper on the GPU is what makes streaming keep up: `voxtype setup gpu --enable` (Vulkan) turns a 2.6 s transcription into 0.2 s on an Intel Arc iGPU, and the CPU cannot re-transcribe the rolling window every half second.
+2. **The transcript becomes a query.** Trailing punctuation goes, so do a leading launcher verb ("open", "go to") and filler ("the", "please"): "Launch Chrome." is searched as `Chrome`. The fuzzy matcher then ranks as if you had typed it.
+3. **The assistant picks a row.** Settings › Voice › **Assistant picks the command** (on by default) sends the raw transcript, with a numbered catalog of every app, menu entry and setting, to a local [llama-server](https://github.com/ggml-org/llama.cpp) running Gemma 4 E2B (Q4_0, ~3 GB on the GPU, `keystroke-llm.service`, `127.0.0.1:18781`). The model answers one number under a grammar (or NONE) and that row is pinned above the matches as *Spoken command*; ↵ runs it. The catalog is the system prompt, built deterministically so llama-server's prefix cache serves it: the palette warms it when it opens and a spoken command then costs about 0.15 s on the same iGPU. Pressing ↵ while still listening waits for the pick (1.5 s at most) before running the best row. The assistant only reorders: with the service down, the fuzzy results are what you get and Settings › Voice says so. Thinking is off and the output is constrained, so the model cannot do anything but choose. What goes into the prompt lives in `core/Intent.js`; providers join the catalog by implementing `catalog()`.
 
 ## Settings
 

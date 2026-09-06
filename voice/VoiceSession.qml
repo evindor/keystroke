@@ -17,7 +17,9 @@ Item {
   readonly property string transcriptPath: runtimeDir + "/keystroke-voice.txt"
   readonly property string statePath: runtimeDir + "/voxtype/state"
 
-  property bool detected: false          // voxtype on PATH
+  property bool detected: false          // a usable voxtype binary was found
+  property string command: "voxtype"     // the binary in use: Keystroke's own build under ~/.local/share/keystroke, else PATH
+  property bool waitFile: false          // the CLI takes --wait-file (1.1); streaming sessions need it, see stop()
   property string version: ""
   property string daemonState: ""        // idle | recording | streaming | transcribing | "" (no daemon)
   readonly property bool daemonRunning: daemonState !== ""
@@ -31,6 +33,9 @@ Item {
   property bool cancelWhenStarted: false
   property double detectedAt: 0
 
+  property string liveText: ""           // words so far, from the daemon's live transcript mirror (streaming engines)
+
+  signal partial(string text)
   signal transcribed(string text)
   signal nothingHeard()
   signal failed(string message)
@@ -43,14 +48,19 @@ Item {
     root.detectedAt = now
     detectProc.running = true
   }
+  // Keystroke's own voxtype build (bin/keystroke voice-setup: the 1.1 line
+  // with the live transcript mirror) wins over the packaged one on the PATH.
   Process {
     id: detectProc
-    command: ["sh", "-c", "command -v voxtype >/dev/null 2>&1 && exec voxtype --version"]
+    command: ["sh", "-c", "for b in \"$HOME/.local/share/keystroke/voxtype/voxtype\" \"$(command -v voxtype 2>/dev/null)\"; do [ -n \"$b\" ] && [ -x \"$b\" ] || continue; printf '%s\\n' \"$b\"; if \"$b\" record stop --help 2>/dev/null | grep -q -- --wait-file; then echo wait-file; else echo -; fi; exec \"$b\" --version; done; exit 1"]
     stdout: StdioCollector { id: detectOut }
     onExited: function(code) {
-      var line = String(detectOut.text || "").trim()
-      root.detected = code === 0 && line.length > 0
-      root.version = root.detected ? line.replace(/^voxtype\s+/i, "") : ""
+      var lines = String(detectOut.text || "").trim().split("\n")
+      var ok = code === 0 && lines.length >= 3 && lines[2].length > 0
+      root.detected = ok
+      root.command = ok ? lines[0].trim() : "voxtype"
+      root.waitFile = ok && lines[1].trim() === "wait-file"
+      root.version = ok ? lines[2].trim().replace(/^voxtype\s+/i, "") : ""
     }
   }
   FileView {
@@ -75,13 +85,14 @@ Item {
     root.level = 0
     root.peak = 0
     root.vad = false
+    root.liveText = ""
     root.phase = "starting"
     startProc.running = true
     return true
   }
   Process {
     id: startProc
-    command: ["sh", "-c", "rm -f \"$1\"; exec voxtype record start --file=\"$1\" --no-osd", "keystroke", root.transcriptPath]
+    command: ["sh", "-c", "rm -f \"$2\"; exec \"$1\" record start --file=\"$2\" --no-osd", "keystroke", root.command, root.transcriptPath]
     stdout: StdioCollector { id: startOut }
     stderr: StdioCollector { id: startErr }
     onExited: function(code) {
@@ -104,9 +115,12 @@ Item {
     root.phase = "transcribing"
     stopProc.running = true
   }
+  // A streaming session consumes the --file override when it starts, so the
+  // CLI cannot find the transcript on its own at stop time: name it.
   Process {
     id: stopProc
-    command: ["voxtype", "record", "stop", "--wait", "--json", "--timeout", "90"]
+    command: root.waitFile ? [root.command, "record", "stop", "--wait", "--wait-file", root.transcriptPath, "--json", "--timeout", "90"]
+                           : [root.command, "record", "stop", "--wait", "--json", "--timeout", "90"]
     stdout: StdioCollector { id: stopOut }
     stderr: StdioCollector { id: stopErr }
     onExited: function(code) {
@@ -148,7 +162,7 @@ Item {
   function cancel() {
     if (root.phase === "starting") { root.cancelWhenStarted = true; return }
     if (root.phase === "idle") return
-    Quickshell.execDetached(["voxtype", "record", "cancel"])
+    Quickshell.execDetached([root.command, "record", "cancel"])
     root.finish()
   }
 
@@ -157,7 +171,33 @@ Item {
     root.level = 0
     root.peak = 0
     root.vad = false
+    root.liveText = ""
     Quickshell.execDetached(["rm", "-f", root.transcriptPath])
+  }
+
+  // ------------------------------------------------------------ live words
+  // With a streaming engine the daemon mirrors the session's text so far to
+  // <runtime>/voxtype/transcript after every partial (empty at the start,
+  // removed at idle). Watched while listening, plus a short poll because the
+  // daemon replaces the file by rename and a watcher can lose the inode.
+  readonly property string livePath: runtimeDir + "/voxtype/transcript"
+  Loader {
+    id: liveLoader
+    active: root.phase === "listening"
+    sourceComponent: FileView {
+      path: root.livePath
+      watchChanges: true
+      printErrors: false
+      onLoaded: root.liveUpdate(text())
+      onFileChanged: reload()
+    }
+  }
+  Timer { interval: 80; repeat: true; running: liveLoader.active; onTriggered: { if (liveLoader.item) liveLoader.item.reload() } }
+  function liveUpdate(raw) {
+    var t = String(raw || "").replace(/\s+/g, " ").trim()
+    if (t === root.liveText) return
+    root.liveText = t
+    if (t) root.partial(t)
   }
 
   // ---------------------------------------------------------------- levels
@@ -165,7 +205,7 @@ Item {
   // records: {"peak":0.42,"rms":0.18,"vad":1,"ts_ms":…}. Only alive while listening.
   Process {
     id: bridge
-    command: ["sh", "-c", "RUST_LOG=error exec voxtype-audio-bridge"]
+    command: ["sh", "-c", "b=\"$(dirname \"$1\")/voxtype-audio-bridge\"; [ -x \"$b\" ] || b=voxtype-audio-bridge; RUST_LOG=error exec \"$b\"", "keystroke", root.command]
     running: root.phase === "listening"
     stdout: SplitParser {
       onRead: function(line) {

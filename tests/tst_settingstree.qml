@@ -106,6 +106,24 @@ TestCase {
                     values: { enabled: true, secondTap: "voice", keys: "SUPER + SPACE" } }
         return m
     }
+    function test_voice_assistant_row_reports_the_server() {
+        var m = voiceModel(true, "installed")
+        m.voice.assist = { enabled: true, available: false, endpoint: "http://127.0.0.1:18781", model: "", lastMs: 0 }
+        var screen = SettingsTree.rows(SettingsTree.build(m).nodes, "settings/voice", "")
+        var row = screen[screen.length - 1]
+        compare(row.title, "Assistant")
+        compare(row.accessory, "Down")
+        verify(row.subtitle.indexOf("voice-setup") > 0)
+        verify(row.disabled)
+        m.voice.assist = { enabled: true, available: true, endpoint: "http://127.0.0.1:18781", model: "gemma-4-E2B-it-Q4_0", lastMs: 150 }
+        row = SettingsTree.rows(SettingsTree.build(m).nodes, "settings/voice", "").pop()
+        compare(row.accessory, "Ready")
+        verify(row.subtitle.indexOf("gemma-4-E2B-it-Q4_0") > 0 && row.subtitle.indexOf("150 ms") > 0)
+        m.voice.assist = { enabled: false, available: false, endpoint: "", model: "", lastMs: 0 }
+        compare(SettingsTree.rows(SettingsTree.build(m).nodes, "settings/voice", "").pop().accessory, "Off")
+        // Status rows are list-only: they never answer a search (the AI provider's "Preferred assistant" still does).
+        verify(titles(SettingsTree.rows(SettingsTree.build(m).nodes, "", "assistant")).indexOf("Assistant") < 0)
+    }
     function test_voice_screen_lists_its_settings_and_the_bindings_row() {
         var t = SettingsTree.build(voiceModel(true, "missing"))
         compare(titles(SettingsTree.rows(t.nodes, "settings", "")).slice(0, 3), ["Appearance", "Voice", "Open config file"])
