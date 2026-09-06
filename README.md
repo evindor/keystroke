@@ -2,7 +2,11 @@
 
 A Raycast-style command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin in QML and JavaScript, running inside the existing `omarchy-shell` process, themed by whatever Omarchy theme is active. Type, or speak, what you want: apps, the whole Omarchy menu, calculations, conversions, colors, emoji, clipboard history, files, Codex, and anything a community extension adds.
 
-<p align="center"><img src="assets/screenshots/root.png" alt="Keystroke at the palette root" width="720"></p>
+<p align="center"><a href="https://evindor.github.io/keystroke/"><img src="site/assets/social-card.png" alt="Keystroke: Raycast-style power for Omarchy" width="960"></a></p>
+
+**[Explore the feature showcase and installation guide →](https://evindor.github.io/keystroke/)**
+
+Screenshots show the real Omarchy interface with public demo data.
 
 ## Install
 
@@ -22,12 +26,12 @@ Requires Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). Like every Omarchy plugin,
 
 <table>
 <tr>
-<td><img src="assets/screenshots/calculator.png" alt="Calculator answer" width="360"></td>
-<td><img src="assets/screenshots/converter.png" alt="Unit conversion" width="360"></td>
+<td><img src="site/assets/screenshots/calculator.png" alt="Calculator answer" width="360"></td>
+<td><img src="site/assets/screenshots/converter.png" alt="Unit conversion" width="360"></td>
 </tr>
 <tr>
-<td><img src="assets/screenshots/fuzzy.png" alt="Fuzzy search into settings" width="360"></td>
-<td><img src="assets/screenshots/extensions.png" alt="Extensions screen" width="360"></td>
+<td><img src="site/assets/screenshots/fuzzy.png" alt="Fuzzy search into settings" width="360"></td>
+<td><img src="site/assets/screenshots/extensions.png" alt="Extensions screen" width="360"></td>
 </tr>
 </table>
 
@@ -45,7 +49,7 @@ Requires Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). Like every Omarchy plugin,
 
 Keystroke is extension-first: anyone can publish a provider as an ordinary Omarchy plugin, and Keystroke installs, updates, enables and removes it from inside the palette.
 
-<p align="center"><img src="assets/screenshots/extension-detail.png" alt="One extension's screen" width="720"></p>
+<p align="center"><img src="site/assets/screenshots/extension-detail.png" alt="One extension's screen" width="720"></p>
 
 Type `ext` and open **Extensions**:
 
@@ -58,7 +62,7 @@ Every install and removal asks for confirmation and states that the code runs un
 
 **Write one.** An extension is an Omarchy plugin of kind `service` whose manifest carries `"x-keystroke": { "apiVersion": 1 }` and whose `Service.qml` exposes a `provider` object with `query(ctx)`. The published reference is [keystroke-timer](https://github.com/evindor/keystroke-timer) (a GitHub template: countdown timers with settings, a scoped screen, a service that outlives the palette and unit tests); the minimal one is [examples/keystroke-hello](examples/keystroke-hello/). The contract is [docs/providers.md](docs/providers.md); the step-by-step guide for people and coding agents, including publishing to the marketplace and to the index, is [AGENTS.md](AGENTS.md).
 
-<p align="center"><img src="assets/screenshots/timer.png" alt="The Timer extension answering timer 10m tea" width="720"></p>
+<p align="center"><img src="site/assets/screenshots/timer.png" alt="The Timer extension answering timer 25m focus" width="720"></p>
 
 ## Voice
 
@@ -84,13 +88,13 @@ Model, language and VAD are voxtype's settings (`voxtype configure`). Whisper on
 
 ## Codex inside Keystroke
 
-<p align="center"><img src="assets/screenshots/codex.png" alt="The Codex screen" width="720"></p>
+<p align="center"><img src="site/assets/screenshots/codex.png" alt="The Codex screen" width="720"></p>
 
 Type or speak, then select **Ask Codex here**, or type `? ` before your question. Answers stream inside the palette. `↵` sends a follow-up, `Shift+↵` adds a line, your voice hotkey fills the composer, **Stop** interrupts, `Esc` closes. **Codex → Recent questions** continues a conversation; **Continue in Codex** (`Ctrl+↵`) hands it to your desktop app or CLI; **Open task in Codex** opens a new request there. Settings → Codex selects the model, Fast/Standard processing, destination and an optional working folder; the default is GPT-5.6 Luna using your existing `codex login`. Keystroke owns one local `codex app-server` process, shuts it down after ten idle minutes, never reads credentials, and stores only its recent-question index and drafts. This integration pins Codex CLI 0.153.2. Details and limits: [docs/codex-integration-verification.md](docs/codex-integration-verification.md).
 
 ## Settings
 
-<p align="center"><img src="assets/screenshots/settings.png" alt="Keystroke Settings" width="720"></p>
+<p align="center"><img src="site/assets/screenshots/settings.png" alt="Keystroke Settings" width="720"></p>
 
 One file, hand-editable and hot-reloaded: `~/.config/omarchy/keystroke.json` (see [keystroke.example.json](keystroke.example.json)). Settings screens are generated from each provider's schema; writes are atomic, preserve unknown fields, and are refused while the file fails to parse. Every screen, setting and choice is searchable from the palette root through its breadcrumb. Appearance: density (compact/comfortable), accent (theme accent or ember/violet/mint), previews on/off. Colors, fonts, radius and spacing follow the active Omarchy theme.
 

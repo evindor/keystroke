@@ -129,3 +129,36 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
   disabled to avoid two resident Gemma models. Voxtype remains available for the
   user's other dictation shortcuts. `bin/keystroke voice-backend voxtype` restores
   the previous backend and services. Switching writes a timestamped config backup.
+
+## Public showcase and GitHub Pages (2026-09-06)
+
+- Added the static landing page in `site/`: feature showcases, full-image views,
+  install-command copying, optional voice/Codex/extension setup, and stock-menu
+  restoration instructions. Responsive CSS, keyboard focus, native dialog close
+  behavior, reduced-motion styles, social metadata and local-only assets are
+  included. No runtime product logic or provider contract changed.
+- Captured 19 screenshots at 2560 x 2160 using the existing `omarchy-shell`
+  process and the real palette, result-row, preview, waveform and conversation
+  QML. A disposable independent overlay supplies public sample data. Calculator,
+  colors, units and dated time-zone results use production logic; other screens,
+  including Codex messages and live voice state, are staged fixtures. These are
+  illustrative captures, not new end-to-end claims about those integrations.
+- Privacy: no real clipboard history, personal file search, recent conversations,
+  microphone audio, desktop background or other windows are captured. Only the
+  card is exported with `grabToImage`. All capture plugins were disabled and
+  removed; plugin listing showed zero remaining, and the normal menu's `ping`
+  returned `ok`. No second Quickshell was launched.
+- Inspected the capture contact sheet and detailed Codex, voice, clipboard, apps,
+  color and social layouts. Produced two collages and four individual feature
+  cards, plus a 2400 x 1260 site social preview. The code-native layouts preserve
+  the screenshot pixels; no generated reconstruction of the interface is used.
+- `python3 site/check.py`: pass (asset/anchor references, unique ids, image
+  descriptions/dimensions, no third-party page resources or private paths).
+  `node --check site/script.js`, Python compile checks for the capture tooling,
+  `bin/keystroke validate`, and `git diff --check`: pass. Local HTTP preview: 200.
+- The GitHub Pages workflow validates and uploads only the public HTML, CSS,
+  JavaScript and assets; official actions are pinned to exact commits. Capture
+  scripts, preflight source and documentation are excluded from the deployment.
+- Not exercised in this pass: end-to-end application launches, real voice/Codex
+  sessions, extension installs, full application regression suite, or browser
+  interaction/responsive-layout testing. No application behavior was changed.
