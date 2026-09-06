@@ -659,8 +659,9 @@ Item {
             required property bool answer
             required property string hint
             width: resultList.width
-            // Top level lists one row per provider, so section headers would only add noise there.
-            readonly property bool showHeader: !root.dmenuActive && !!root.scope && sectionStart && !!section
+            // The idle root lists one row per provider, so headers would label single items there;
+            // they return as soon as a query or a scope groups real sets.
+            readonly property bool showHeader: !root.dmenuActive && (!!root.scope || !!search.text) && sectionStart && !!section
             Item {
               width: parent.width
               height: delegateRoot.showHeader ? Style.space(root.compact ? 22 : 26) : 0
