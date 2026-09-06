@@ -8,6 +8,9 @@ import queue
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
+import contextlib
 import wave
 
 
@@ -20,9 +23,38 @@ def load(name, relative):
 
 cloud = load('cloud_benchmark', 'codex-cloud/benchmark.py')
 audio = load('audio_benchmark', 'gemma-audio/benchmark.py')
+runner = load('audio_runner', 'gemma-audio/run-quantized-test.py')
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_failed_start_restores_previously_active_llm(self):
+        with tempfile.TemporaryDirectory() as work:
+            argv = ['run-quantized-test.py', 'speech.wav', '--output-dir', work]
+            with patch('sys.argv', argv), patch.object(runner.signal, 'signal'), \
+                 patch.object(runner, 'active', side_effect=[False, True, False, True]), \
+                 patch.object(runner, 'command', return_value=SimpleNamespace(stdout='test-invocation', returncode=0)) as cmd, \
+                 patch.object(runner.urllib.request, 'urlopen', side_effect=OSError('not ready')), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaisesRegex(RuntimeError, 'exited during startup'):
+                    runner.main()
+            commands = [call.args for call in cmd.call_args_list]
+            self.assertIn(('systemctl', '--user', 'stop', 'keystroke-llm.service'), commands)
+            self.assertIn(('systemctl', '--user', 'stop', runner.UNIT), commands)
+            self.assertIn(('systemctl', '--user', 'start', 'keystroke-llm.service'), commands)
+            self.assertIn('"installed_llm_restored": true', (Path(work) / 'outcome.json').read_text())
+
+    def test_failed_start_keeps_previously_inactive_llm_inactive(self):
+        with tempfile.TemporaryDirectory() as work:
+            argv = ['run-quantized-test.py', 'speech.wav', '--output-dir', work]
+            with patch('sys.argv', argv), patch.object(runner.signal, 'signal'), \
+                 patch.object(runner, 'active', return_value=False), \
+                 patch.object(runner, 'command', return_value=SimpleNamespace(stdout='test-invocation', returncode=0)) as cmd, \
+                 patch.object(runner.urllib.request, 'urlopen', side_effect=OSError('not ready')), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(RuntimeError):
+                    runner.main()
+            self.assertFalse(any('keystroke-llm.service' in call.args for call in cmd.call_args_list))
+
     def test_rpc_preserves_early_stream_timestamp(self):
         server = cloud.Server.__new__(cloud.Server)
         server.queue = queue.Queue()

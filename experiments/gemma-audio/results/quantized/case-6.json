@@ -1,0 +1,42 @@
+[
+  {
+    "ttft_ms": 147.36,
+    "total_ms": 651.83,
+    "output": "{\"transcript\": \"do auto open a browser\", \"command_id\": \"browser\"}",
+    "parsed": {
+      "transcript": "do auto open a browser",
+      "command_id": "browser"
+    },
+    "usage": {
+      "prompt_tokens": 222,
+      "total_tokens": 241,
+      "completion_tokens": 19
+    },
+    "audio_seconds": 1.6738321995464853,
+    "repeat": 0,
+    "regime": "first_request_for_this_audio",
+    "valid_selection": true,
+    "expected_command_id": null,
+    "routing_correct": false
+  },
+  {
+    "ttft_ms": 82.1,
+    "total_ms": 591.62,
+    "output": "{\"transcript\": \"do auto open a browser\", \"command_id\": \"browser\"}",
+    "parsed": {
+      "transcript": "do auto open a browser",
+      "command_id": "browser"
+    },
+    "usage": {
+      "prompt_tokens": 222,
+      "total_tokens": 241,
+      "completion_tokens": 19
+    },
+    "audio_seconds": 1.6738321995464853,
+    "repeat": 1,
+    "regime": "identical_audio_replay",
+    "valid_selection": true,
+    "expected_command_id": null,
+    "routing_correct": false
+  }
+]

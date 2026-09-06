@@ -1,0 +1,42 @@
+[
+  {
+    "ttft_ms": 254.0,
+    "total_ms": 841.94,
+    "output": "{\"transcript\": \"Copy what I dictated to the clipboard\", \"command_id\": \"clipboard\"}",
+    "parsed": {
+      "transcript": "Copy what I dictated to the clipboard",
+      "command_id": "clipboard"
+    },
+    "usage": {
+      "prompt_tokens": 250,
+      "total_tokens": 271,
+      "completion_tokens": 21
+    },
+    "audio_seconds": 2.7941950113378686,
+    "repeat": 0,
+    "regime": "first_request_for_this_audio",
+    "valid_selection": true,
+    "expected_command_id": "clipboard",
+    "routing_correct": true
+  },
+  {
+    "ttft_ms": 92.81,
+    "total_ms": 671.78,
+    "output": "{\"transcript\": \"Copy what I dictated to the clipboard\", \"command_id\": \"clipboard\"}",
+    "parsed": {
+      "transcript": "Copy what I dictated to the clipboard",
+      "command_id": "clipboard"
+    },
+    "usage": {
+      "prompt_tokens": 250,
+      "total_tokens": 271,
+      "completion_tokens": 21
+    },
+    "audio_seconds": 2.7941950113378686,
+    "repeat": 1,
+    "regime": "identical_audio_replay",
+    "valid_selection": true,
+    "expected_command_id": "clipboard",
+    "routing_correct": true
+  }
+]

@@ -34,7 +34,11 @@ with one explicit “Run with agent” option before considering automatic routi
   sign-in, streaming classification benchmark, and one real read-only terminal
   action. No authentication tokens are extracted or stored by this code.
 - [Gemma 4 audio / Intel XPU](gemma-audio/README.md): isolated driver, Python,
-  vLLM runtime, bounded server configuration, and growing-audio benchmark.
+  vLLM runtime, pinned INT4 checkpoint, and successful native-audio inference.
+  Median new-command response was 0.72 s; model allocation was 6.84 GiB. The
+  default AutoRound library's unsupported CPU instruction was avoided using
+  vLLM's built-in oneDNN backend. Seven of eight synthetic utterances were
+  transcribed and routed correctly; explicit activation remains essential.
 
 Run the offline benchmark protocol checks with:
 

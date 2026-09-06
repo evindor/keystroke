@@ -1,0 +1,42 @@
+[
+  {
+    "ttft_ms": 254.27,
+    "total_ms": 723.41,
+    "output": "{\"transcript\": \"Please open a terminal\", \"command_id\": \"terminal\"}",
+    "parsed": {
+      "transcript": "Please open a terminal",
+      "command_id": "terminal"
+    },
+    "usage": {
+      "prompt_tokens": 222,
+      "total_tokens": 240,
+      "completion_tokens": 18
+    },
+    "audio_seconds": 1.6769160997732426,
+    "repeat": 0,
+    "regime": "first_request_for_this_audio",
+    "valid_selection": true,
+    "expected_command_id": "terminal",
+    "routing_correct": true
+  },
+  {
+    "ttft_ms": 105.92,
+    "total_ms": 577.63,
+    "output": "{\"transcript\": \"Please open a terminal\", \"command_id\": \"terminal\"}",
+    "parsed": {
+      "transcript": "Please open a terminal",
+      "command_id": "terminal"
+    },
+    "usage": {
+      "prompt_tokens": 222,
+      "total_tokens": 240,
+      "completion_tokens": 18
+    },
+    "audio_seconds": 1.6769160997732426,
+    "repeat": 1,
+    "regime": "identical_audio_replay",
+    "valid_selection": true,
+    "expected_command_id": "terminal",
+    "routing_correct": true
+  }
+]

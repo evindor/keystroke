@@ -1,0 +1,50 @@
+[
+  {
+    "wav": "browser.wav",
+    "text": "Open my browser please.",
+    "command_id": "browser",
+    "source": "espeak-ng 1.52.0, en-us, 150 words/minute"
+  },
+  {
+    "wav": "terminal.wav",
+    "text": "Please open a terminal.",
+    "command_id": "terminal",
+    "source": "espeak-ng 1.52.0, en-us, 150 words/minute"
+  },
+  {
+    "wav": "settings.wav",
+    "text": "Open the settings.",
+    "command_id": "settings",
+    "source": "espeak-ng 1.52.0, en-us, 150 words/minute"
+  },
+  {
+    "wav": "clipboard.wav",
+    "text": "Copy what I dictated to the clipboard.",
+    "command_id": "clipboard",
+    "source": "espeak-ng 1.52.0, en-us, 150 words/minute"
+  },
+  {
+    "wav": "weather.wav",
+    "text": "Tomorrow will probably be rainy.",
+    "command_id": null,
+    "source": "espeak-ng 1.52.0, en-us, 150 words/minute"
+  },
+  {
+    "wav": "description.wav",
+    "text": "The browser is already open.",
+    "command_id": null,
+    "source": "espeak-ng 1.52.0, en-us, 150 words/minute"
+  },
+  {
+    "wav": "negation.wav",
+    "text": "Do not open a browser.",
+    "command_id": null,
+    "source": "espeak-ng 1.52.0, en-us, 150 words/minute"
+  },
+  {
+    "wav": "unsupported.wav",
+    "text": "Make my window corners more rounded.",
+    "command_id": null,
+    "source": "espeak-ng 1.52.0, en-us, 150 words/minute"
+  }
+]

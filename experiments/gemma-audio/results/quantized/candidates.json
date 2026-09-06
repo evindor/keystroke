@@ -1,0 +1,81 @@
+[
+  {
+    "id": "Vishva007/gemma-4-E2B-it-W4A16-AutoRound",
+    "revision": "b5c22b35dcc1eb28dc20e801300ec221cd754d71",
+    "active_weights": {
+      "model-00001-of-00004.safetensors": 1072080494,
+      "model-00002-of-00004.safetensors": 1036670096,
+      "model-00003-of-00004.safetensors": 4697620616,
+      "model-00004-of-00004.safetensors": 644350144
+    },
+    "weight_gb": 7.45072135,
+    "audio": true,
+    "quant": {
+      "bits": 4,
+      "group_size": 128,
+      "packing_format": "auto_round:auto_gptq",
+      "quant_method": "auto-round",
+      "sym": true
+    }
+  },
+  {
+    "id": "lvkaokao/gemma-4-E2B-it-autoround-W4A16",
+    "revision": "0e76f9661a010b8ea01e8684d829b872b03b860f",
+    "active_weights": {
+      "model.safetensors": 7440185870
+    },
+    "weight_gb": 7.44018587,
+    "audio": true,
+    "quant": {
+      "quant_method": "auto-round",
+      "packing_format": "auto_round:auto_gptq",
+      "bits": 4,
+      "group_size": 128,
+      "sym": true
+    }
+  },
+  {
+    "id": "simaai/Gemma-4-E2B-it-GPTQ-Safetensors",
+    "revision": "76d5bd4f6429e567b400290a00bb65e1025fd379",
+    "active_weights": {
+      "model.safetensors": 7461603934
+    },
+    "weight_gb": 7.461603934,
+    "audio": true,
+    "quant": {
+      "quant_method": "compressed-tensors"
+    }
+  },
+  {
+    "id": "TheStageAI/gemma-4-E2B-it-qat",
+    "revision": "2070d5b3dd4ed957dc2696fe2f60a896f8cc1021",
+    "active_weights": {
+      "audio_tower.safetensors": 173223791,
+      "model_l.safetensors": 1474644293,
+      "model_m.safetensors": 1198502006,
+      "ple_l.safetensors": 259195353,
+      "ple_m.safetensors": 259195353,
+      "vision_tower.safetensors": 117601758
+    },
+    "weight_gb": 3.482362554,
+    "audio": true,
+    "quant": {}
+  },
+  {
+    "id": "Xingyu-Zheng/gemma-4-E2B-it-int4-foem",
+    "revision": "c07e14a78831dac2d1b156ab0576415eefd5210f",
+    "active_weights": {
+      "model-00001-of-00003.safetensors": 805922264,
+      "model-00002-of-00003.safetensors": 4697620648,
+      "model-00003-of-00003.safetensors": 1960079078
+    },
+    "weight_gb": 7.46362199,
+    "audio": true,
+    "quant": {
+      "bits": 4,
+      "group_size": 128,
+      "quant_method": "gptq",
+      "sym": true
+    }
+  }
+]

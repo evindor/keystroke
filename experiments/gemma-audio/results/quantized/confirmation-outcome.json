@@ -1,0 +1,10 @@
+{
+  "restore_installed_llm": true,
+  "audio_inference_passed": true,
+  "startup_seconds": 88.471,
+  "memory_before_inference": "MemoryCurrent=12282273792\nMemoryPeak=15032385536",
+  "routing_correct_count": 14,
+  "routing_test_count": 16,
+  "memory_after_inference": "MemoryCurrent=12210733056\nMemoryPeak=15032385536",
+  "installed_llm_restored": true
+}
