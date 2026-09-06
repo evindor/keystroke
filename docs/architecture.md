@@ -8,7 +8,7 @@ omarchy-shell
        ├─ window, keys, navigation stack, dmenu protocol, effects, config, frecency
        ├─ providers/Registry.qml
        │    ├─ bundled: OmarchyMenu, Applications, Calculator, Converter, Colors,
-       │    │           Emoji, Clipboard, Files, Codex, AiWeb, Extensions, SettingsProvider
+       │    │           Emoji, Clipboard, Files, Hotkeys, Codex, AiWeb, Extensions, SettingsProvider
        │    └─ community: shell.serviceFor(<plugin id>) for every enabled plugin
        │                  whose manifest carries "x-keystroke"
        ├─ providers/Extensions.qml   install/update/remove/toggle community providers through
@@ -67,6 +67,10 @@ All from Omarchy 4.0.2 source: property injection of `shell`, `manifest`, `plugi
 ## Files
 
 `providers/Files.qml` runs `fd` (in Omarchy's base packages) once per distinct query, bounded by `--max-results 400`, from the home folder, with the query words AND-ed as case-insensitive literal substrings of the path, the last one anchored to the final segment (otherwise one matching folder floods the list with its children); a newer query kills a run still walking, a 3 s watchdog keeps whatever was printed, and results are cached for the length of one summon. `core/Files.js` builds the argv (regex-escaped words after `--and=` and `--`, so nothing is read as a flag), parses the output, re-checks the words against the path below `~` (fd matched the absolute path), scores the candidates with `Match.match` on the file name and the relative path at 0.55 weight with a floor of 12, and keeps the best `limit` (default 10 at the root, 60 in the Files screen). No index lives in the heap: a gitignore-respecting walk of a typical home takes tens of milliseconds, a hidden-inclusive one of 280 k entries about 200 ms. `↵` is `xdg-open`; `Ctrl+↵` is the host's alternate activation (`row.altAction`), here `setsid uwsm-app -- xdg-terminal-exec --dir=…` as Omarchy's own launchers do.
+
+## Hotkeys
+
+`providers/Hotkeys.qml` puts Omarchy's Hyprland keybindings at the root of the palette, named by what they do, with the keys as the row's accessory. It does not read `hyprctl binds` itself: Omarchy's `omarchy-menu-keybindings` (the script behind `Super+K`, which Keystroke already renders over the dmenu protocol) already merges Lua and conf binds, resolves `code:` keys through the keymap, cleans dispatcher arguments, orders the list and caches it under `~/.cache/omarchy/`. The provider sources that script with `--print` (defining its functions with the display lines sent to `/dev/null`) and calls its `output_binding_records`, which prints one record per bind: `"SUPER + F … → Full screen\tlua\thl.dsp.window.fullscreen(…)"`. `core/Hotkeys.js` parses those records, merges a label bound twice to the same action into one row listing both combos (Browser on `Super + Shift + ↵` and `Super + Shift + B`), spells the keys the way the palette's own hints do, and scores rows with `Match.match` on the label, the combo and, for `exec` binds, the command; a query that spells a combo exactly (`super f`) gets a bonus over binds that merely contain those keys. Activation returns an `exec` effect whose argv sources the same script and calls its `dispatch_binding` with the dispatcher and argument as literal arguments, so running a row does what pressing the keys does (Lua expressions through `hyprctl dispatch`, `exec` through `hl.dsp.exec_cmd`, `sendshortcut` through `send_key_state`). Binds whose dispatcher the script could not resolve (Lua closures such as Close window, Universal copy) are shown disabled with "Only from the keyboard". The list is reloaded at most once per 30 s on summon; the script's own cache makes that a hash of `hyprctl binds` and a `cat`.
 
 ## Helpers
 

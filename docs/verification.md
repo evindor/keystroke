@@ -1,6 +1,13 @@
 > Historical checkpoints below include retired local-model implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
 
+## Hotkeys provider (2026-09-06)
+
+- `qmltestrunner -input tests`: **110 passed, 0 failed** (Qt 6.11.2, offscreen). New `tst_hotkeys.qml`: record parsing (arrow split, tabs inside arguments, garbage lines, duplicate binds merged into one row with two combos, same label with a different action gets its own id), key spelling (`SUPER SHIFT + RETURN` → `Super + Shift + ↵`, `XF86AudioRaiseVolume`, mouse buttons, unresolved `code:` keys), literal argv for load and dispatch (a shell-injection argument stays an argument), the screen listing in menu order with keyboard-only binds greyed, root search by abbreviation (`flcrn`), by keys (`super f` beats Full width on `Super + Alt + F`, `SUPER + ALT + F` works with the pluses), by command, and the root cap.
+- `tests/hotkeys_check.py` (now part of `bin/keystroke test`) loads `providers/Hotkeys.qml` in an offscreen Quickshell against the real `omarchy-menu-keybindings` on this machine: first query pending, 219 binds after the records land, `flcrn` → Full screen with `Super + F`, `terminal` → `Super + ↵`, the screen listing all 219 in `Super+K` order with Keybindings first, Close window greyed, activate() translating to the script's `dispatch_binding` with `lua` and the fullscreen expression as separate argv elements. Nothing was dispatched: **PASS**. The check skips itself when `hyprctl binds` does not answer.
+- `bin/keystroke validate`: pass. `tests/lint.sh`: only the known `QProcess::ExitStatus` noise on the new file.
+- Installed with `bin/keystroke install` and `omarchy-restart-shell`; the in-shell journey (type `flcrn`, press `↵`, watch the window go full screen; open **Hotkeys**; press `Super+K` and compare) is left to the user, as is the frecency effect over days.
+
 ## Release 1.0.0: extensions from inside the palette (2026-09-06)
 
 - `qmltestrunner -input tests`: **103 passed, 0 failed** (Qt 6.11.2, offscreen). New `tst_extensions.qml`: git URL acceptance and refusal (options, `ext::`, plain http), `owner/repo` expansion, defensive parsing of the Keystroke index and the marketplace catalog (an extension must name Keystroke the palette, not a key press: "one keystroke away" no longer matches), discovery merge by id and repository, installed listing from the Omarchy registry with both switches, literal argv for add/update/remove/check, the detached job wrapper, screen and detail rows, typed-URL install rows. `tst_settingstree.qml` follows the "Manage extension" row.
