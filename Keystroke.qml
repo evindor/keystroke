@@ -69,15 +69,18 @@ Item {
 
   // Optional provider views share the palette window, focus and voice lifecycle.
   property string activeProviderKey: ""
+  property string providerViewRawQuery: ""
   readonly property bool providerViewActive: activeProviderKey.length > 0
   function closeProviderView() {
     if (providerView.item && typeof providerView.item.dismiss === "function") providerView.item.dismiss()
     root.activeProviderKey = ""
+    root.providerViewRawQuery = ""
     providerView.sourceComponent = null
   }
   function showProviderView(key) {
     var entry = root.registryEntry(key)
     if (!entry || !root.providerEnabled(entry) || !entry.provider.view) { root.errorMessage = "Provider view is unavailable"; return }
+    root.providerViewRawQuery = root.voiceRawText
     root.activeProviderKey = key
     providerView.sourceComponent = entry.provider.view
   }
@@ -568,7 +571,15 @@ Item {
     clipboardTransfer.cancel()
     if (root.confirmPending) { root.confirmPending = null; return true }
     if (root.dmenuActive) return false
+    var priorRawQuery = root.providerViewRawQuery
     root.voiceCancel()
+    if (root.providerViewActive) {
+      root.closeProviderView()
+      root.voiceRawText = priorRawQuery
+      root.runQuery()
+      search.forceActiveFocus()
+      return true
+    }
     if (root.history.length) {
       var prior = root.history[root.history.length - 1]
       root.history = root.history.slice(0, -1)

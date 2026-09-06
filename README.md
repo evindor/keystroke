@@ -77,7 +77,7 @@ To stop speech across reboots: `systemctl --user disable --now voxtype`. Restore
 
 ### Codex inside Keystroke
 
-Type or speak, then select **Ask Codex here**, or type `? ` before your question to put it first. Answers stream inside the palette. **Enter** sends a follow-up; **Shift+Enter** adds a line; your voice hotkey fills the composer. **Update request** steers a running answer. **Stop** interrupts; **Escape** closes and interrupts. Reopen **Codex → Recent questions** to continue.
+Type or speak, then select **Ask Codex here**, or type `? ` before your question to put it first. Answers stream inside the palette. **Enter** sends a follow-up; **Shift+Enter** adds a line; your voice hotkey fills the composer. **Update request** steers a running answer. **Stop** interrupts; **Escape** closes and interrupts. Reopen **Codex → Recent questions** to continue. **Left/Backspace on an empty composer**, or the header’s back arrow, returns to the previous results without closing Keystroke. Buttons and fields use Omarchy’s shared components and follow the current theme.
 
 **Continue in Codex** (Ctrl+Enter in the conversation) saves and hands the same conversation to your configured desktop app or CLI. A running answer stops first. The **Open task in Codex** result opens a new request in that destination; desktop prefills the composer for you to send. Clipboard's Ctrl+Enter still means paste.
 

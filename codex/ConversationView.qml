@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import qs.Commons
+import qs.Ui as Ui
 import "../ui"
 import "../voice"
 
@@ -45,39 +46,48 @@ Item {
     if (event.key === Qt.Key_Escape) { host.cancel(); event.accepted = true }
   }
   Rectangle { anchors.fill: parent; color: host ? host.background : "#222" }
-  component ActionButton: Rectangle {
-    property string label: ""
+  // Use the same theme-controlled kit as the surrounding Omarchy shell.
+  component ActionButton: Ui.Button {
+    id: control
+    property alias label: control.text
     property bool available: true
     signal triggered()
-    implicitWidth: caption.implicitWidth + Style.space(20)
-    implicitHeight: Style.space(30)
-    width: implicitWidth; height: implicitHeight
-    activeFocusOnTab: true
+    focusable: true
     enabled: available
-    Keys.onPressed: function(event) {
-      if (available && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space)) {
-        if (!event.isAutoRepeat) triggered()
-        event.accepted = true
-      }
-    }
-    border.width: activeFocus ? 1 : 0
-    border.color: root.accent
-    radius: Style.space(6)
-    color: mouse.containsMouse && available ? Util.alpha(root.accent, 0.18) : Util.alpha(root.foreground, 0.06)
-    opacity: available ? 1 : 0.4
-    Text { id: caption; anchors.centerIn: parent; text: parent.label; color: root.foreground; font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall }
-    MouseArea { id: mouse; anchors.fill: parent; hoverEnabled: true; enabled: parent.available; onClicked: parent.triggered() }
+    opacity: enabled ? 1 : 0.4
+    foreground: root.foreground
+    accent: root.accent
+    fontFamily: Style.font.menuFamily
+    fontSize: Style.font.bodySmall
+    width: implicitWidth; height: implicitHeight
+    onClicked: triggered()
+    Keys.onReturnPressed: event => { if (!event.isAutoRepeat) triggered(); event.accepted = true }
+    Keys.onEnterPressed: event => { if (!event.isAutoRepeat) triggered(); event.accepted = true }
+    Keys.onSpacePressed: event => { if (!event.isAutoRepeat) triggered(); event.accepted = true }
     Accessible.role: Accessible.Button
-    Accessible.name: label
+    Accessible.name: text
+    Accessible.onPressAction: if (enabled) triggered()
   }
   Item {
     id: top
     enabled: !root.approval
-    x: Style.space(20); y: Style.space(16); width: parent.width - x * 2; height: Style.space(52)
-    Text { text: "✳  Codex · " + (session.mode === "agent" ? "Task" : "Quick question"); color: root.foreground; font.family: Style.font.menuFamily; font.pixelSize: Style.font.title }
-    Text { y: Style.space(27); width: parent.width - external.width - Style.space(15); elide: Text.ElideMiddle; text: session.mode === "agent" ? session.cwd : (session.settings.model || "gpt-5.6-luna") + (session.settings.fast === false ? " · Standard" : " · Fast"); color: root.muted; font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall }
-    ActionButton { id: external; anchors.right: parent.right; label: session.busy ? "Stop & continue ↗" : "Continue in Codex ↗"; available: !!session.threadId; onTriggered: session.requestHandoff() }
+    x: Style.space(22); y: Style.space(12); width: parent.width - x * 2; height: Style.space(74)
+    ActionButton { id: back; objectName: "conversationBack"; label: "←"; tooltipText: "Back to results"; onTriggered: host.goBack() }
+    Row {
+      anchors.left: back.right; anchors.leftMargin: Style.space(10); y: Style.space(8); spacing: Style.space(10)
+      Text { text: "OMARCHY"; color: root.accent; font.family: Style.font.menuFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 2; font.weight: Font.Bold }
+      Text { text: "›"; color: root.muted; font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall }
+      Text { text: "Codex"; color: root.muted; font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall }
+    }
+    Keycap { anchors.right: parent.right; y: Style.space(5); label: "esc"; foreground: root.foreground }
+    Text {
+      y: Style.space(43); width: parent.width - external.width - Style.space(12); elide: Text.ElideMiddle
+      text: session.mode === "agent" ? session.cwd : "Quick question · " + (session.settings.model || "gpt-5.6-luna") + (session.settings.fast === false ? " · Standard" : " · Fast")
+      color: root.muted; font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall
+    }
+    ActionButton { id: external; anchors.right: parent.right; y: Style.space(33); label: session.busy ? "Stop & continue ↗" : "Continue in Codex ↗"; available: !!session.threadId; onTriggered: session.requestHandoff() }
   }
+  Rectangle { y: top.y + top.height; width: parent.width; height: 1; color: Util.alpha(root.foreground, 0.10) }
   ListModel { id: display }
   ListView {
     id: history
@@ -96,7 +106,7 @@ Item {
         id: body; y: label.height + Style.space(6); width: parent.width; height: contentHeight
         text: root.markdown(parent.text); textFormat: TextEdit.MarkdownText; wrapMode: TextEdit.Wrap
         readOnly: true; selectByMouse: true; color: root.foreground
-        selectionColor: Util.alpha(root.accent, 0.4)
+        selectionColor: Style.selectionFillFor(root.foreground, root.accent)
         font.family: Style.font.menuFamily; font.pixelSize: parent.role === "activity" ? Style.font.bodySmall : Style.font.body
         onLinkActivated: function(link) { if (/^https?:\/\//.test(link)) Qt.openUrlExternally(link) }
       }
@@ -110,13 +120,15 @@ Item {
     color: session.error ? Color.urgent : root.muted; elide: Text.ElideRight
     font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall
   }
-  Rectangle {
+  Ui.BorderSurface {
     id: inputBox
     enabled: !root.approval
     x: Style.space(18); width: parent.width - x * 2
     height: Math.min(Style.space(115), Math.max(Style.space(50), composer.contentHeight + Style.space(24)))
-    y: bottom.y - height - Style.space(12)
-    radius: Style.space(8); color: Util.alpha(root.foreground, 0.05); border.color: Util.alpha(root.foreground, 0.15)
+    y: bottom.y - height - Style.space(20)
+    radius: Style.cornerRadius
+    color: Style.controlFill(composer.activeFocus, false, root.foreground, root.accent)
+    borderSpec: Border.controlSpec(composer.activeFocus ? "focus" : "normal", root.foreground, root.accent)
     Flickable {
       id: editorScroll
       x: Style.space(12); y: Style.space(12); width: parent.width - Style.space(80); height: parent.height - y * 2
@@ -133,7 +145,7 @@ Item {
       width: editorScroll.width; height: Math.max(editorScroll.height, contentHeight)
       text: session.draft; wrapMode: TextEdit.Wrap; clip: true; selectByMouse: true
       onCursorRectangleChanged: editorScroll.revealCursor()
-      color: root.foreground; selectionColor: Util.alpha(root.accent, 0.4)
+      color: root.foreground; selectionColor: Style.selectionFillFor(root.foreground, root.accent)
       font.family: Style.font.menuFamily; font.pixelSize: Style.font.body
       onTextChanged: if (activeFocus && text !== session.draft) session.draft = text
       Keys.priority: Keys.BeforeItem
@@ -146,6 +158,9 @@ Item {
           if (host.isModifierKey(event.key)) return
           host.voiceCancel()
         }
+        if ((event.key === Qt.Key_Left || event.key === Qt.Key_Backspace) && !text && !preeditText && event.modifiers === Qt.NoModifier) {
+          host.goBack(); event.accepted = true; return
+        }
         if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
           if (event.modifiers & Qt.ControlModifier) session.requestHandoff(); else session.submit()
           event.accepted = true
@@ -157,15 +172,16 @@ Item {
     VoiceWave { anchors.right: parent.right; anchors.rightMargin: Style.space(12); anchors.verticalCenter: parent.verticalCenter; width: Style.space(48); height: Style.space(32); visible: host && host.voice.active; mode: host ? host.voice.phase : "idle"; level: host ? host.voice.level : 0; history: host ? host.voice.history : []; accent: root.accent; foreground: root.foreground }
     ActionButton { anchors.right: parent.right; anchors.rightMargin: Style.space(9); anchors.verticalCenter: parent.verticalCenter; visible: host && !host.voice.active; label: "Mic"; onTriggered: { root.focusInput(); host.voiceBegin("tap") } }
   }
+  Rectangle { y: bottom.y - Style.space(10); width: parent.width; height: 1; color: Util.alpha(root.foreground, 0.10) }
   Row {
     id: bottom
     enabled: !root.approval
     x: Style.space(18); y: parent.height - height - Style.space(16); spacing: Style.space(8); height: Style.space(30)
-    ActionButton { label: session.busy ? "Update request ↵" : "Send ↵"; available: session.draft.trim().length > 0 && (!session.busy || session.phase === "running") && !root.approval; onTriggered: session.submit() }
+    ActionButton { label: session.busy ? "Update request" : "Send"; available: session.draft.trim().length > 0 && (!session.busy || session.phase === "running") && !root.approval; onTriggered: session.submit() }
+    Keycap { anchors.verticalCenter: parent.verticalCenter; label: "↵"; bright: true; foreground: root.foreground }
     ActionButton { label: "Stop"; available: session.busy; onTriggered: session.stop() }
     ActionButton { label: "Copy answer"; available: session.answer().length > 0; onTriggered: answerCopy.submit(session.answer(), false) }
     ActionButton { label: "New question"; available: !session.busy; onTriggered: { session.newQuestion(""); root.focusInput() } }
-    ActionButton { label: "Esc Close"; onTriggered: host.cancel() }
   }
   ClipboardTransfer { id: answerCopy; onCopied: root.localStatus = "Answer copied"; onFailed: message => root.localStatus = message }
   Rectangle {
@@ -187,8 +203,10 @@ Item {
           required property var modelData
           width: parent.width; spacing: Style.space(8)
           Text { width: parent.width; wrapMode: Text.Wrap; text: modelData.question + ((modelData.options || []).length ? "\n" + modelData.options.map(x => x.label).join(" · ") : ""); color: root.foreground; font.family: Style.font.menuFamily; font.pixelSize: Style.font.body }
-          Rectangle { width: parent.width; height: Style.space(38); color: Util.alpha(root.foreground, 0.1); radius: Style.space(6)
-            TextInput { anchors.fill: parent; anchors.margins: Style.space(8); color: root.foreground; font.family: Style.font.menuFamily; font.pixelSize: Style.font.body; onTextEdited: { var a = Object.assign({}, root.answers); a[modelData.id] = text; root.answers = a } }
+          Ui.TextField {
+            width: parent.width; foreground: root.foreground; accent: root.accent
+            font.family: Style.font.menuFamily; font.pixelSize: Style.font.body
+            onTextEdited: { var a = Object.assign({}, root.answers); a[modelData.id] = text; root.answers = a }
           }
         }
       }

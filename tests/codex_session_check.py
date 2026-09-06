@@ -22,6 +22,8 @@ ShellRoot {
  QtObject { id: stub
    property color foreground: "#eeeeee"; property color muted: "#aaaaaa"; property color accent: "#aabbff"; property color background: "#222222"
    property var voice: ({active:false,phase:"idle",level:0,history:[]})
+   property int backCalls: 0
+   function goBack() { backCalls++; return true }
    function cancel() { session.dismiss() }
    function isModifierKey(key) { return key===Qt.Key_Shift }
    function voiceCancel() { voice = ({active:false,phase:"idle",level:0,history:[]}) }
@@ -33,6 +35,11 @@ ShellRoot {
    view.transcript("Open the document, please. Keep two lines!\\nSecond line.",true)
    test.check(session.draft.indexOf("Open the document,")===0 && session.draft.indexOf("Second line.")>0,"voice preserves complete prose")
    var editor=keys.findChild(view,"composer");test.check(!!editor,"composer is reachable")
+   view.focusInput();session.draft="edit me";editor.cursorPosition=4
+   keys.keyClick(Qt.Key_Left);test.check(stub.backCalls===0 && editor.cursorPosition===3,"Left edits a nonempty draft")
+   session.draft="";keys.keyClick(Qt.Key_Left);keys.keyClick(Qt.Key_Backspace)
+   test.check(stub.backCalls===2,"empty composer uses palette back navigation")
+   session.draft="first question"
    view.focusInput();stub.voice=({active:true,phase:"listening",level:0,history:[]})
    keys.keyClick(Qt.Key_Return);test.check(!session.busy && stub.voice.phase==="transcribing","Enter finishes voice without sending")
    keys.keyClick(Qt.Key_A);test.check(!stub.voice.active,"manual correction cancels voice")
