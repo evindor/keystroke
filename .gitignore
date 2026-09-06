@@ -3,4 +3,5 @@ __pycache__/
 .pytest_cache/
 .venv/
 .DS_Store
-core
+# Core dumps only; core/ is the JavaScript library.
+core.[0-9]*
