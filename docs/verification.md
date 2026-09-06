@@ -162,3 +162,7 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
 - Not exercised in this pass: end-to-end application launches, real voice/Codex
   sessions, extension installs, full application regression suite, or browser
   interaction/responsive-layout testing. No application behavior was changed.
+- Publication completed successfully in [GitHub Actions run 34052616102](https://github.com/evindor/keystroke/actions/runs/34052616102).
+  The live HTTPS index and all 23 assets matched local SHA-256 hashes. The
+  preflight script, site notes, and capture tooling returned 404 from Pages.
+  Repository homepage now points to <https://evindor.github.io/keystroke/>.
