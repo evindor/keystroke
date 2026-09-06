@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix='keystroke-palette-') as temp:
         (work/name).symlink_to(target)
     p=project/'Keystroke.qml'
     s=p.read_text().replace('  id: root\n', '''  id: root
-  property alias testVoice: voice
+  property alias testVoice: root.voice
   property alias testSearch: search
   property alias testTransfer: clipboardTransfer
   property alias testSpoken: spoken
@@ -51,6 +51,12 @@ Item {
   function cancel() { phase = "idle" }
 }
 ''')
+    if os.environ.get('KEYSTROKE_TEST_AUDIO'):
+        fake = (project/'voice/VoiceSession.qml').read_text().replace('Item {', 'Item {\n  property bool watching: false\n  property bool available: true\n  property string endpoint: ""\n  property var catalog: []\n  property int lastMs: 0\n  property string warmedPrompt: ""\n  signal recognized(int index, string text, int ms)\n  function warm(items) {}\n', 1)
+        (project/'voice/AudioSession.qml').write_text(fake)
+        config_dir = work/'.config/omarchy'
+        config_dir.mkdir(parents=True)
+        (config_dir/'keystroke.json').write_text('{"version":1,"voice":{"backend":"vllm"}}')
     helper=work/'copy.py'
     helper.write_text('import pathlib,sys\np=pathlib.Path(__file__).parent\n(p/sys.argv[1]).write_text(sys.stdin.read() if sys.argv[1]=="clipboard" else "pasted")\n')
     cfg=work/'shell.qml'

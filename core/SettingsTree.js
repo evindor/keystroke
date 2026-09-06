@@ -65,9 +65,11 @@ function voiceNodes(nodes, screens, rootParts, voice) {
   var parts = rootParts.concat(["Voice"])
   var scope = "settings/voice"
   var values = voice.values || {}
+  var nativeAudio = voice.backend === "vllm"
+  var engine = nativeAudio ? "" : "Voxtype "
   var on = !!(voice.detected && values.enabled)
   nodes.push(node("settings", parts, { id: "voice", icon: "󰍬", section: "Keystroke", order: 1, lift: 1,
-    subtitle: voice.detected ? (on ? "On" : "Off") + " · voxtype " + (voice.version || "") + " · " + daemonLabel(voice) : "Voxtype is not installed",
+    subtitle: voice.detected ? (on ? "On" : "Off") + " · " + engine + (voice.version || "") + " · " + daemonLabel(voice) : (nativeAudio ? "PipeWire recorder is not installed" : "Voxtype is not installed"),
     keywords: "voxtype dictation speech microphone", description: "voice dictation voxtype speech microphone hold to talk transcribe",
     action: navigate(scope, "Voice") }))
   if (!voice.detected) {
@@ -90,14 +92,15 @@ function voiceNodes(nodes, screens, rootParts, voice) {
     keywords: "hyprland bindings hold", description: "hyprland keybinding long press release install bindings.lua",
     confirm: (st === "missing" ? "Add" : "Rewrite") + " the Keystroke voice block in " + path + " and reload Hyprland?",
     action: { type: "voice-bindings" } }))
-  nodes.push(node(scope, parts.concat(["Voxtype " + (voice.version || "")]), { id: "voice/status", icon: "󰍬", verb: "", order: 60, disabled: true, listOnly: true,
+  nodes.push(node(scope, parts.concat([engine + (voice.version || "")]), { id: "voice/status", icon: "󰍬", verb: "", order: 60, disabled: true, listOnly: true,
     subtitle: daemonLabel(voice) + " · tap the hotkey again or hold it while the palette is open", action: { type: "noop" } }))
   var a = voice.assist
   if (a) {
     var where = String(a.endpoint || "")
     nodes.push(node(scope, parts.concat(["Assistant"]), { id: "voice/assist-status", icon: "✳", verb: "", order: 61, disabled: true, listOnly: true,
       subtitle: !a.enabled ? "Off · spoken commands go through the fuzzy matcher only"
-              : a.available ? "llama-server ready at " + where + (a.model ? " · " + a.model : "") + (a.lastMs ? " · last answer " + a.lastMs + " ms" : "")
+              : a.available ? (nativeAudio ? "vLLM ready at " : "llama-server ready at ") + where + (a.model ? " · " + a.model : "") + (a.lastMs ? " · last answer " + a.lastMs + " ms" : "")
+              : nativeAudio ? "vLLM is starting or unavailable at " + where + " · systemctl --user status keystroke-vllm"
               : "llama-server is not answering at " + where + " · bin/keystroke voice-setup, then systemctl --user start keystroke-llm",
       accessory: !a.enabled ? "Off" : a.available ? "Ready" : "Down", action: { type: "noop" } }))
   }

@@ -86,3 +86,33 @@ Afterwards: `omarchy plugin disable evindor.keystroke`, directory removed, `resc
 - Keyboard interaction (pointer hover selection made IPC-driven selection tests non-deterministic on the live desktop); Ctrl+K, Delete-to-uninstall and PageUp/PageDown were reviewed, not exercised.
 - Launching apps, `hyprpicker`, image clipboard copy, the AI CLI hand-off, and light themes. The desktop deep links were verified separately on 2026-09-06 by opening them and reading the resulting windows: `claude://claude.ai/new?q=…&surface=chat` prefilled a new Claude chat; `codex://threads/new?prompt=…` prefilled a new Codex thread; a `chatgpt.com` URL handed to the Codex app only opened a signed-out tab in its embedded browser, which is why browser mode uses the real browser. Typing never contacts a provider; nothing destructive was executed.
 - Performance budgets from the review (open latency, PSS, wakeups): not measured yet; the design removes the resident process and the empty first frame by construction, but numbers are still owed.
+
+## Native audio live checkpoint — 2026-09-06
+
+Branch `codex/gemma-audio-vllm` adds the resident vLLM backend to the installed
+Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
+
+- 114 QML tests passed. Both voice process lifecycle tests, synthetic native
+  capture/SSE test, clipboard helper test, and palette clipboard tests with each
+  backend passed. Time-zone checks passed. qmllint completed with the existing
+  shell/type-metadata warnings, including QProcess::ExitStatus on the new process
+  handlers; these handlers were exercised in real Quickshell.
+- One aggregate host test run timed out in the offscreen palette subprocess.
+  Both palette variants passed separately in the sandbox. The HTTP capture test
+  ran on the host because the sandbox prohibits binding its loopback test socket.
+- Installed through the plugin CLI and restarted the shared shell to clear cached
+  QML. Native shell IPC reported `backend:vllm`, `available:true`, `warmed:true`,
+  349 catalog rows, and no plugin/config errors. Existing hotkey bindings remain
+  installed. The automated test used a synthetic recorder, not the microphone.
+- The actual AudioSession → audio_record.py → resident vLLM path processed
+  `Open my browser please.` using that catalog. A partial `open my gb` was revised
+  to `open my browser please`; the final result selected catalog row 151, Browser,
+  in 1,061 ms. This is a short synthetic utterance, not an accuracy/latency survey.
+- The live service uses the same pinned INT4 checkpoint and oneDNN XPU kernel as
+  the completed experiment, with a 16k context and 512 MiB KV cache for the full
+  catalog. Observed cgroup memory ranged from about 8.7–12.4 GiB as file cache was
+  reclaimed. It had zero restarts during the live checks.
+- `keystroke-vllm` is enabled for subsequent graphical logins; `keystroke-llm` is
+  disabled to avoid two resident Gemma models. Voxtype remains available for the
+  user's other dictation shortcuts. `bin/keystroke voice-backend voxtype` restores
+  the previous backend and services. Switching writes a timestamped config backup.

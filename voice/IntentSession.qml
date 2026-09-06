@@ -44,6 +44,14 @@ Item {
       root.status = root.assistant.warming ? "Preparing assistant…" : "Finding your command…"
     } else root.requestedKey = ""
   }
+  function acceptAudio(index, transcript, ms) {
+    if (!root.active || Intent.transcriptKey(transcript) !== root.key) return
+    root.answeredKey = root.key
+    root.requestedKey = ""
+    root.pick = index >= 1 && index <= root.catalog.rows.length ? root.catalog.rows[index - 1] : null
+    root.status = root.pick ? "Suggested: " + root.pick.title + " · " + ms + " ms"
+                            : "Transcribed · search results are ready"
+  }
   function cancel(keepWarm) {
     partialTimer.stop()
     root.active = false

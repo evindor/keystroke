@@ -1,6 +1,6 @@
 # Keystroke
 
-A Raycast-inspired command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin, written in QML/JavaScript, running inside the existing `omarchy-shell` process. No extra runtime, no resident helper, nothing running while it is hidden.
+A Raycast-inspired command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin, written in QML/JavaScript, running inside the existing `omarchy-shell` process. The palette uses the existing shell runtime. Optional voice backends keep their speech/model services resident.
 
 Every capability is a provider: applications, the complete Omarchy menu, calculator, unit and time-zone conversion, colors, emoji, clipboard history, files and folders under your home, AI/web continuation, and the settings screens themselves. Community providers are ordinary Omarchy plugins.
 
@@ -77,6 +77,35 @@ The assistant is text-only: the service does not load a vision/audio projector. 
 
 To stop voice services **and keep them off after reboot**: `systemctl --user disable --now keystroke-llm voxtype`. `stop` alone does not disable startup. To enable them again: `systemctl --user enable --now keystroke-llm voxtype`. Run `bin/keystroke voice-setup` explicitly to install/update the text-only service and restart it.
 
+### Experimental native audio with vLLM
+
+On the prepared Intel XPU reference machine, `bin/keystroke voice-backend vllm`
+installs/enables `keystroke-vllm.service`, disables the previous llama service,
+and sets `voice.backend` to `vllm`. Run `bin/keystroke install` after checking out
+this branch, then `omarchy restart shell` if the shell retains the previous QML.
+The isolated runtime and quantized model must already be prepared as described
+in [experiments/gemma-audio](experiments/gemma-audio/README.md).
+
+Gemma 4 E2B W4A16 AutoRound receives microphone audio directly: whole-recording
+revisions produce both the transcript and an optional catalog suggestion.
+The first words stream; subsequent completed revisions replace the text without
+clearing it. Recording is limited to 60 seconds, kept in memory, and ends on
+stop/cancel. Model output never executes an action. Clipboard shortcuts are the
+same as the default backend. The voice assistant switch disables catalog routing
+while retaining native transcription.
+
+The resident service listens only on `127.0.0.1:18782`, uses the verified oneDNN
+INT4 XPU kernel, a 16,384-token context, and 512 MiB KV cache. Model allocation is
+6.84 GiB; total service memory measured about 12.4 GiB, including runtime and file
+cache. Startup takes roughly 90 seconds, then the model stays loaded. In a live
+349-row catalog test, a short browser request took 1.06 seconds for the final
+inference. This is one synthetic utterance, not a general latency guarantee.
+
+Switch back with `bin/keystroke voice-backend voxtype`; both backend choices
+persist across login. To stop this experimental server and keep it off, use
+`systemctl --user disable --now keystroke-vllm`. The helper creates a timestamped
+config backup before switching. It does not change the system Intel drivers.
+
 ## Settings
 
 One file, hand-editable and hot-reloaded: `~/.config/omarchy/keystroke.json` (see [keystroke.example.json](keystroke.example.json)). The `voice` section holds the integration switch, the second-tap behaviour and the hotkeys the Hyprland block is generated for. Settings screens are generated from each provider's schema; writes are atomic, preserve unknown fields, and are refused while the file fails to parse. Bundled providers default to enabled, community providers to disabled. Appearance: density (compact/comfortable), accent (theme accent or ember/violet/mint), previews on/off. Colors, fonts, radius and spacing follow the active Omarchy theme.
@@ -98,4 +127,4 @@ bin/keystroke test         # qmltestrunner unit tests, time-zone helper checks, 
 
 ## Requirements
 
-Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). `python3` is used only for IANA time-zone conversion, on demand. Omarchy's MIT-licensed menu model is vendored in [omarchy/MenuModel.js](omarchy/MenuModel.js); see [LICENSE](LICENSE).
+Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). `python3` is used for IANA time-zone conversion and optional native-audio capture, on demand. Omarchy's MIT-licensed menu model is vendored in [omarchy/MenuModel.js](omarchy/MenuModel.js); see [LICENSE](LICENSE).

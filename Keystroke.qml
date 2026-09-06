@@ -113,10 +113,27 @@ Item {
   // palette is open (a further tap stops). Enter finishes recording; a fresh
   // Enter after transcription runs the visible selection. Replies never execute.
   VoiceSession {
-    id: voice
+    id: voxtypeVoice
     host: root
     onPartial: function(text) { root.voiceLive(text) }
     onTranscribed: function(text) { root.voiceTranscribed(text) }
+    onNothingHeard: { root.dictationPending = ""; spoken.cancel(); if (root.opened) root.statusMessage = "Nothing heard" }
+    onFailed: function(message) { root.dictationPending = ""; spoken.cancel(); if (root.opened) root.errorMessage = message }
+  }
+  readonly property bool nativeAudio: root.voiceSettings.backend === "vllm"
+  readonly property var voice: root.nativeAudio ? audioVoice : voxtypeVoice
+  AudioSession {
+    id: audioVoice
+    host: root
+    enabled: root.nativeAudio
+    watching: root.opened
+    endpoint: String(root.voiceSettings.audioEndpoint || "http://127.0.0.1:18782")
+    onAvailableChanged: { if (available && root.opened && !voice.active) root.voiceWarm() }
+    onPartial: function(text) { root.voiceLive(text) }
+    onTranscribed: function(text) { root.voiceTranscribed(text) }
+    onRecognized: function(index, text, ms) {
+      if (root.opened && !root.voiceDiscard && !root.dictationMode) spoken.acceptAudio(index, text, ms)
+    }
     onNothingHeard: { root.dictationPending = ""; spoken.cancel(); if (root.opened) root.statusMessage = "Nothing heard" }
     onFailed: function(message) { root.dictationPending = ""; spoken.cancel(); if (root.opened) root.errorMessage = message }
   }
@@ -126,12 +143,16 @@ Item {
   Assist {
     id: assist
     watching: root.opened
-    enabled: root.voiceEnabled && !root.dictationMode && root.voiceSettings.assist === true
+    enabled: !root.nativeAudio && root.voiceEnabled && !root.dictationMode && root.voiceSettings.assist === true
     endpoint: String(root.voiceSettings.assistEndpoint || "")
     onAvailableChanged: { if (available && root.opened && !spoken.active) root.voiceWarm() }
   }
   readonly property var voiceSchema: [
-    { key: "enabled", type: "boolean", label: "Voxtype voice command integration", "default": voice.detected,
+    { key: "backend", type: "enum", label: "Voice backend", "default": "voxtype", options: ["voxtype", "vllm"],
+      description: "Voxtype uses Whisper; vLLM uses resident Gemma native audio (requires voice-backend setup)" },
+    { key: "audioEndpoint", type: "string", label: "vLLM audio endpoint", "default": "http://127.0.0.1:18782",
+      description: "Local native-audio server installed by bin/keystroke voice-backend vllm" },
+    { key: "enabled", type: "boolean", label: "Voice command integration", "default": true,
       description: "Hold the palette hotkey, or tap it again while the palette is open, to dictate the query" },
     { key: "secondTap", type: "enum", label: "Second tap of the hotkey", "default": "voice", options: ["voice", "close"],
       description: "Voice starts dictation and a third tap stops it (Esc closes); Close is the stock toggle" },
@@ -161,15 +182,16 @@ Item {
   }
   readonly property string voiceBindingsStatus: root.bindingsKnown ? VoiceBindings.status(root.bindingsText, root.voiceSettings.keys) : "missing"
   readonly property string voiceStamp: [voice.detected, voice.version, voice.daemonState, root.voiceBindingsStatus, root.bindingsKnown,
-                                         assist.enabled, assist.available, assist.modelName, assist.lastMs, assist.endpoint].join("|")
+                                         assist.enabled, assist.available, assist.modelName, assist.lastMs, assist.endpoint, root.nativeAudio, audioVoice.available, audioVoice.lastMs].join("|")
   function voiceModel() {
-    return { schemas: root.voiceSchema, values: root.voiceSettings, detected: voice.detected, version: voice.version, daemonState: voice.daemonState,
+    return { backend: root.nativeAudio ? "vllm" : "voxtype", schemas: root.voiceSchema, values: root.voiceSettings, detected: voice.detected, version: voice.version, daemonState: voice.daemonState,
              bindings: root.voiceBindingsStatus, bindingsPath: "~/.config/hypr/bindings.lua",
-             assist: { enabled: assist.enabled, available: assist.available, endpoint: assist.endpoint, model: assist.modelName, lastMs: assist.lastMs } }
+             assist: root.nativeAudio ? { enabled: root.voiceSettings.assist === true, available: audioVoice.available, endpoint: audioVoice.endpoint, model: audioVoice.version, lastMs: audioVoice.lastMs }
+                                      : { enabled: assist.enabled, available: assist.available, endpoint: assist.endpoint, model: assist.modelName, lastMs: assist.lastMs } }
   }
   IntentSession {
     id: spoken
-    assistant: assist
+    assistant: root.nativeAudio ? null : assist
     onPickChanged: root.requery()
     onStatusChanged: { if (root.opened && status) root.statusMessage = status }
   }
@@ -194,7 +216,7 @@ Item {
   property var voiceCatalog: null
   readonly property bool liveText: voice.active && search.text.length > 0
   function voiceLive(text) {
-    if (!root.opened || voice.phase !== "listening" || root.voiceDiscard) return
+    if (!root.opened || (voice.phase !== "listening" && !(root.nativeAudio && voice.phase === "transcribing")) || root.voiceDiscard) return
     root.voiceRawText = String(text || "")
     var t = root.dictationMode ? String(text || "") : String(text || "").replace(/\s+/g, " ").trim()
     if (!root.dictationMode) spoken.update(t, false)
@@ -225,7 +247,10 @@ Item {
     root.voiceCatalog = { items: items, rows: rows, stamp: Intent.stamp(items) }
     return root.voiceCatalog
   }
-  function voiceWarm() { if (assist.ready) assist.warm(root.catalogForVoice().items) }
+  function voiceWarm() {
+    if (root.nativeAudio) audioVoice.warm(root.dictationMode || root.voiceSettings.assist !== true ? [] : root.catalogForVoice().items)
+    else if (assist.ready) assist.warm(root.catalogForVoice().items)
+  }
   function installVoiceBindings() {
     if (!root.bindingsKnown) { root.errorMessage = "Could not read " + root.bindingsPath; return }
     var next = VoiceBindings.apply(root.bindingsText, root.voiceSettings.keys)
@@ -247,7 +272,10 @@ Item {
     if (!root.dictationMode && assist.ready) assist.warm(spoken.catalog.items)
     root.errorMessage = ""
     root.statusMessage = ""
-    return voice.start()
+    if (root.nativeAudio) audioVoice.catalog = root.dictationMode || root.voiceSettings.assist !== true ? [] : spoken.catalog.items
+    var started = voice.start()
+    if (!started) spoken.cancel()
+    return started
   }
   function voiceStop() { if (voice.phase === "starting" || voice.phase === "listening") voice.stop() }
   function voiceCancel() {
@@ -399,7 +427,7 @@ Item {
     }
     voice.refresh()
     assist.check()
-    if (assist.ready) Qt.callLater(root.voiceWarm)
+    if (root.nativeAudio || assist.ready) Qt.callLater(root.voiceWarm)
   }
 
   function openDmenu(payload) {
@@ -724,12 +752,14 @@ Item {
     }
   }
 
+  function inspectVoiceCatalog() { return JSON.stringify(root.catalogForVoice().items) }
+
   function inspect() {
     return JSON.stringify({ opened: root.opened, mode: root.mode, scope: root.scope, query: search.text, count: root.rows.length,
       titles: root.rows.map(function(r) { return r.title }), selected: root.selected, pending: root.pending,
       modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems,
       error: root.errorMessage, configError: root.configError, status: root.statusMessage,
-      voice: { state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
+      voice: { warmed: root.nativeAudio && audioVoice.warmedPrompt.length > 0, backend: root.nativeAudio ? "vllm" : "voxtype", available: root.nativeAudio ? audioVoice.available : voice.daemonRunning, lastMs: root.nativeAudio ? audioVoice.lastMs : assist.lastMs, state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
                command: voice.command, daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length, live: voice.liveText },
       assist: { enabled: assist.enabled, available: assist.available, model: assist.modelName, lastMs: assist.lastMs, warmed: assist.warmedStamp,
                 pick: spoken.pick ? spoken.pick.title : "", catalog: root.voiceCatalog ? root.voiceCatalog.rows.length : 0 } })

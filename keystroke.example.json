@@ -6,6 +6,8 @@
     "showPreview": true
   },
   "voice": {
+    "backend": "voxtype",
+    "audioEndpoint": "http://127.0.0.1:18782",
     "enabled": true,
     "secondTap": "voice",
     "keys": "SUPER + SPACE",
