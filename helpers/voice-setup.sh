@@ -46,27 +46,36 @@ status() {
   ls "$XDG_RUNTIME_DIR/voxtype/" 2>/dev/null | tr '\n' ' ' | sed 's/^/  runtime: /'; echo
 }
 
-# Puts $SRC at FORK_COMMIT, detached, and refuses to go on with anything
-# else: nothing is built from a moving branch. An existing checkout is only
-# accepted at that commit (its working tree may carry the revision patch);
-# KEYSTROKE_VOXTYPE_SRC pointing at a checkout of another commit is an error,
-# not something to silently rebuild.
+# Fetches the fork into $SRC without checking anything out; the build step
+# below checks out FORK_COMMIT detached, so nothing is built from a moving
+# branch. An existing checkout (KEYSTROKE_VOXTYPE_SRC) is used as is and gets
+# the same detached checkout; local edits that conflict with it stop the build.
 pinned_source() {
   if [[ ! $FORK_COMMIT =~ ^[0-9a-f]{40}$ ]]; then
     note "FORK_COMMIT is not a full 40-character commit SHA; refusing to fetch source"
     exit 1
   fi
   if [[ ! -d $SRC/.git ]]; then
-    note "fetching $FORK_URL at $FORK_COMMIT into $SRC"
+    note "fetching $FORK_URL into $SRC (built at $FORK_COMMIT)"
     git clone -q --no-checkout "$FORK_URL" "$SRC"
-    git -C "$SRC" checkout -q --detach "$FORK_COMMIT"
   fi
-  local head
-  head="$(git -C "$SRC" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
-  if [[ $head != "$FORK_COMMIT" ]]; then
-    note "$SRC is at ${head:-no commit}, not the pinned $FORK_COMMIT"
-    note "check out that commit there (git -C \"$SRC\" checkout --detach $FORK_COMMIT) or remove the folder to fetch it again"
+  if ! git -C "$SRC" cat-file -e "$FORK_COMMIT^{commit}" 2>/dev/null; then
+    note "$SRC does not contain the pinned commit $FORK_COMMIT; fetch it there or remove the folder"
     exit 1
+  fi
+}
+
+# The whole-request revision on top of the pinned commit. Applied once; a
+# checkout that already carries it is left alone.
+apply_revision_patch() {
+  local revision_patch="$HELPERS/voxtype-full-request.patch"
+  if git -C "$SRC" apply --reverse --check "$revision_patch" 2>/dev/null; then
+    note "whole-request revision patch already applied"
+  elif git -C "$SRC" apply --check "$revision_patch"; then
+    git -C "$SRC" apply "$revision_patch"
+  else
+    note "Whole-request patch does not match this voxtype checkout; resolve it before building."
+    return 1
   fi
 }
 
@@ -83,17 +92,10 @@ elif ! command -v cmake >/dev/null; then
   note "cmake not found: pacman -S cmake (whisper.cpp builds with it), or drop a cmake under $KS/toolchain"
 else
   pinned_source
-  revision_patch="$HELPERS/voxtype-full-request.patch"
-  if git -C "$SRC" apply --reverse --check "$revision_patch" 2>/dev/null; then
-    note "whole-request revision patch already applied"
-  elif git -C "$SRC" apply --check "$revision_patch"; then
-    git -C "$SRC" apply "$revision_patch"
-  else
-    note "Whole-request patch does not match this voxtype checkout; resolve it before building."
-    exit 1
-  fi
-  note "building in $SRC (whisper.cpp + Vulkan; several minutes the first time)"
-  (cd "$SRC" && cargo build --release --features gpu-vulkan --bin voxtype --bin voxtype-audio-bridge)
+  note "building in $SRC at $FORK_COMMIT (whisper.cpp + Vulkan; several minutes the first time)"
+  # One fail-closed chain: the exact commit (spelled out, same as FORK_COMMIT)
+  # is checked out detached, then patched, then built; any failure stops here.
+  git -C "$SRC" checkout -q --detach 60082b10e61af51b63b97ce86254686aadb8af88 && apply_revision_patch && (cd "$SRC" && cargo build --release --features gpu-vulkan --bin voxtype --bin voxtype-audio-bridge) || { note "voxtype build at the pinned commit failed; nothing installed"; exit 1; }
   install -m 755 "$SRC/target/release/voxtype" "$KS/voxtype/voxtype.new"
   install -m 755 "$SRC/target/release/voxtype-audio-bridge" "$KS/voxtype/voxtype-audio-bridge"
   mv -f "$KS/voxtype/voxtype.new" "$VOXTYPE"
