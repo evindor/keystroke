@@ -95,7 +95,7 @@ else
   note "building in $SRC at $FORK_COMMIT (whisper.cpp + Vulkan; several minutes the first time)"
   # One fail-closed chain: the exact commit (spelled out, same as FORK_COMMIT)
   # is checked out detached, then patched, then built; any failure stops here.
-  git -C "$SRC" checkout -q --detach 60082b10e61af51b63b97ce86254686aadb8af88 && apply_revision_patch && (cd "$SRC" && cargo build --release --features gpu-vulkan --bin voxtype --bin voxtype-audio-bridge) || { note "voxtype build at the pinned commit failed; nothing installed"; exit 1; }
+  git -C "$SRC" checkout -q --detach 60082b10e61af51b63b97ce86254686aadb8af88 && apply_revision_patch && cargo build --manifest-path "$SRC/Cargo.toml" --release --features gpu-vulkan --bin voxtype --bin voxtype-audio-bridge || { note "voxtype build at the pinned commit failed; nothing installed"; exit 1; }
   install -m 755 "$SRC/target/release/voxtype" "$KS/voxtype/voxtype.new"
   install -m 755 "$SRC/target/release/voxtype-audio-bridge" "$KS/voxtype/voxtype-audio-bridge"
   mv -f "$KS/voxtype/voxtype.new" "$VOXTYPE"
