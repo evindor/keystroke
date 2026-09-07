@@ -3,8 +3,8 @@
 # time to update one piece:
 #
 #   1. voxtype 1.1 with the live transcript mirror, built from Keystroke's
-#      fork (github.com/evindor/voxtype, branch feature/live-transcript-file,
-#      proposed upstream) with whisper on Vulkan, installed under
+#      fork (github.com/evindor/voxtype, proposed upstream) at the exact
+#      commit FORK_COMMIT below, with whisper on Vulkan, installed under
 #      ~/.local/share/keystroke/voxtype and made the daemon through a systemd
 #      drop-in. The packaged voxtype stays where it is; removing the drop-in
 #      restores it.
@@ -20,7 +20,12 @@ set -euo pipefail
 KS="$HOME/.local/share/keystroke"
 SRC="${KEYSTROKE_VOXTYPE_SRC:-$HOME/Documents/ChatGPT/voxtype}"
 FORK_URL="https://github.com/evindor/voxtype.git"
-FORK_BRANCH="feature/live-transcript-file"
+# The one commit this script builds: the source is fetched and checked out
+# detached at exactly this revision (where feature/live-transcript-file
+# pointed when it was reviewed), so what gets compiled is what was reviewed,
+# whatever the branch points at later. helpers/voxtype-full-request.patch is
+# written against it; bump the two together.
+FORK_COMMIT="60082b10e61af51b63b97ce86254686aadb8af88"
 HELPERS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UNIT_DIR="$HOME/.config/systemd/user"
 DROPIN="$UNIT_DIR/voxtype.service.d/keystroke.conf"
@@ -41,6 +46,30 @@ status() {
   ls "$XDG_RUNTIME_DIR/voxtype/" 2>/dev/null | tr '\n' ' ' | sed 's/^/  runtime: /'; echo
 }
 
+# Puts $SRC at FORK_COMMIT, detached, and refuses to go on with anything
+# else: nothing is built from a moving branch. An existing checkout is only
+# accepted at that commit (its working tree may carry the revision patch);
+# KEYSTROKE_VOXTYPE_SRC pointing at a checkout of another commit is an error,
+# not something to silently rebuild.
+pinned_source() {
+  if [[ ! $FORK_COMMIT =~ ^[0-9a-f]{40}$ ]]; then
+    note "FORK_COMMIT is not a full 40-character commit SHA; refusing to fetch source"
+    exit 1
+  fi
+  if [[ ! -d $SRC/.git ]]; then
+    note "fetching $FORK_URL at $FORK_COMMIT into $SRC"
+    git clone -q --no-checkout "$FORK_URL" "$SRC"
+    git -C "$SRC" checkout -q --detach "$FORK_COMMIT"
+  fi
+  local head
+  head="$(git -C "$SRC" rev-parse --verify 'HEAD^{commit}' 2>/dev/null || true)"
+  if [[ $head != "$FORK_COMMIT" ]]; then
+    note "$SRC is at ${head:-no commit}, not the pinned $FORK_COMMIT"
+    note "check out that commit there (git -C \"$SRC\" checkout --detach $FORK_COMMIT) or remove the folder to fetch it again"
+    exit 1
+  fi
+}
+
 if [[ ${1:-} == --status ]]; then status; exit 0; fi
 
 mkdir -p "$KS/voxtype" "$UNIT_DIR/voxtype.service.d"
@@ -53,10 +82,7 @@ if ! command -v cargo >/dev/null; then
 elif ! command -v cmake >/dev/null; then
   note "cmake not found: pacman -S cmake (whisper.cpp builds with it), or drop a cmake under $KS/toolchain"
 else
-  if [[ ! -d $SRC/.git ]]; then
-    note "cloning $FORK_URL ($FORK_BRANCH) into $SRC"
-    git clone -q --branch "$FORK_BRANCH" "$FORK_URL" "$SRC"
-  fi
+  pinned_source
   revision_patch="$HELPERS/voxtype-full-request.patch"
   if git -C "$SRC" apply --reverse --check "$revision_patch" 2>/dev/null; then
     note "whole-request revision patch already applied"

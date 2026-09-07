@@ -1,6 +1,12 @@
 > Historical checkpoints below include retired local-model implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
 
+## Pinned voxtype source for the marketplace baseline (2026-09-07)
+
+- The marketplace's automated security baseline on submission omacom/omarchy-plugin-marketplace#5292 flagged `helpers/voice-setup.sh` for cloning a branch of the voxtype fork (`remote-git-execution-unpinned`). The script now carries `FORK_COMMIT` (`60082b10e61af51b63b97ce86254686aadb8af88`, the commit `helpers/voxtype-full-request.patch` is written against and where `feature/live-transcript-file` pointed), refuses anything that is not a 40-character SHA, clones with `--no-checkout` and checks that commit out detached, and verifies an existing checkout's `HEAD` is that commit before the patch is applied or `cargo build` runs. A checkout at another commit stops the script with the command that fixes it.
+- Checked: `bash -n` on the script (shellcheck is not installed on this machine); the `pinned_source` function exercised in a temporary HOME against a local repository standing in for the fork, with a fresh fetch landing detached at the pinned commit, an existing checkout at that commit accepted, and one at another commit refused; `bin/keystroke voice-status` on this machine, whose fork checkout at `~/Documents/ChatGPT/voxtype` is at the pinned commit. Not exercised: a full `voice-setup` rebuild (minutes of cargo; the build step itself did not change).
+- Manifest 1.1.1. Submitted for a new validation by editing issue #5292 with the new `main` SHA.
+
 ## Hotkeys provider (2026-09-06)
 
 - `qmltestrunner -input tests`: **110 passed, 0 failed** (Qt 6.11.2, offscreen). New `tst_hotkeys.qml`: record parsing (arrow split, tabs inside arguments, garbage lines, duplicate binds merged into one row with two combos, same label with a different action gets its own id), key spelling (`SUPER SHIFT + RETURN` → `Super + Shift + ↵`, `XF86AudioRaiseVolume`, mouse buttons, unresolved `code:` keys), literal argv for load and dispatch (a shell-injection argument stays an argument), the screen listing in menu order with keyboard-only binds greyed, root search by abbreviation (`flcrn`), by keys (`super f` beats Full width on `Super + Alt + F`, `SUPER + ALT + F` works with the pluses), by command, and the root cap.

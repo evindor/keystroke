@@ -67,7 +67,7 @@ Every install and removal asks for confirmation and states that the code runs un
 
 ## Voice
 
-Keystroke dictates through [voxtype](https://voxtype.io), the dictation daemon Omarchy installs from Install › AI › Dictation. Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the PATH, and offers Omarchy's installer when it is not. `bin/keystroke voice-setup` (no root) installs a voxtype build with live words and whole-request revision.
+Keystroke dictates through [voxtype](https://voxtype.io), the dictation daemon Omarchy installs from Install › AI › Dictation. Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the PATH, and offers Omarchy's installer when it is not. `bin/keystroke voice-setup` (no root) installs a voxtype build with live words and whole-request revision, compiled from Keystroke's fork of voxtype at one fixed commit (`FORK_COMMIT` in `helpers/voice-setup.sh`, checked out detached and verified before anything is built), never from a moving branch.
 
 Two ways in, both while the palette is open:
 
