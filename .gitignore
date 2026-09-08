@@ -7,3 +7,6 @@ __pycache__/
 core.[0-9]*
 # Local agent worktrees and settings.
 .claude/
+# Agent instruction files never ship in the plugin tree (marketplace review); keep any local ones untracked.
+CLAUDE.md
+AGENTS.md

@@ -1,6 +1,6 @@
 # Working on Keystroke
 
-This file is for people and coding agents who want to build a Keystroke extension or change Keystroke itself. Read it first; it says where things are, what the conventions are, and how to prove a change works. The provider contract proper is in [docs/providers.md](docs/providers.md); the design in [docs/architecture.md](docs/architecture.md).
+This file is for anyone who wants to build a Keystroke extension or change Keystroke itself. It says where things are, what the conventions are, and how to prove a change works. The provider contract proper is in [docs/providers.md](docs/providers.md); the design in [docs/architecture.md](docs/architecture.md).
 
 ## What Keystroke is
 

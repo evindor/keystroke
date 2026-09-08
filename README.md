@@ -61,7 +61,7 @@ Type `ext` and open **Extensions**:
 
 Every install and removal asks for confirmation and states that the code runs unsandboxed in your shell. The work is done by Omarchy's own scripts (`omarchy plugin add --yes --enable`, `omarchy plugin update --yes`, `omarchy plugin remove --yes`), which refuse git transport helpers, validate the manifest and reject symlinks, so the palette and the CLI never disagree. Because the shell reloads all plugins after an install or removal, the palette closes for a moment and a notification confirms the outcome. Extensions installed from the palette are enabled at once; extensions installed with `omarchy plugin add` start off until you turn them on.
 
-**Write one.** An extension is an Omarchy plugin of kind `service` whose manifest carries `"x-keystroke": { "apiVersion": 1 }` and whose `Service.qml` exposes a `provider` object with `query(ctx)`. The published reference is [keystroke-timer](https://github.com/evindor/keystroke-timer) (a GitHub template: countdown timers with settings, a scoped screen, a service that outlives the palette and unit tests); the minimal one is [examples/keystroke-hello](examples/keystroke-hello/). The contract is [docs/providers.md](docs/providers.md); the step-by-step guide for people and coding agents, including publishing to the marketplace and to the index, is [AGENTS.md](AGENTS.md).
+**Write one.** An extension is an Omarchy plugin of kind `service` whose manifest carries `"x-keystroke": { "apiVersion": 1 }` and whose `Service.qml` exposes a `provider` object with `query(ctx)`. The published reference is [keystroke-timer](https://github.com/evindor/keystroke-timer) (a GitHub template: countdown timers with settings, a scoped screen, a service that outlives the palette and unit tests); the minimal one is [examples/keystroke-hello](examples/keystroke-hello/). The contract is [docs/providers.md](docs/providers.md); the step-by-step guide for people and coding agents, including publishing to the marketplace and to the index, is [CONTRIBUTING.md](CONTRIBUTING.md).
 
 <p align="center"><img src="site/assets/screenshots/timer.png" alt="The Timer extension answering timer 25m focus" width="720"></p>
 
@@ -106,7 +106,7 @@ bin/keystroke validate     # omarchy plugin validate
 bin/keystroke test         # qmltestrunner unit tests, Quickshell integration checks, qmllint
 ```
 
-[docs/verification.md](docs/verification.md) records what was run on the reference machine; [docs/architecture.md](docs/architecture.md) describes the design; [AGENTS.md](AGENTS.md) is the contributor guide.
+[docs/verification.md](docs/verification.md) records what was run on the reference machine; [docs/architecture.md](docs/architecture.md) describes the design; [CONTRIBUTING.md](CONTRIBUTING.md) is the contributor guide.
 
 ## License
 

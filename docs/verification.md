@@ -1,6 +1,11 @@
 > Historical checkpoints below include retired local-model implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
 
+## No agent-instruction files in the plugin tree (2026-09-08)
+
+- The marketplace's security review at `a6b09bd` blocked on root `AGENTS.md`: the repository tree is what gets installed, so a file that agents read automatically ships into the plugin root and becomes an instruction channel unrelated to the runtime. `AGENTS.md` is now `CONTRIBUTING.md` (same content, addressed to contributors), `CLAUDE.md` (which only pointed at it and is the same class of file) is removed, and `.gitignore` keeps any local `CLAUDE.md`/`AGENTS.md` untracked so they cannot ship again. References in `README.md`, `docs/providers.md` and the hello example updated.
+- Checked: no `AGENTS` reference left (`grep`), `bin/keystroke validate` pass, the QML test suite unchanged. Manifest 1.1.4; issue #5292 edited with the new `main` SHA for fresh validation.
+
 ## Pinned voxtype source for the marketplace baseline (2026-09-07)
 
 - The marketplace's automated security baseline on submission omacom/omarchy-plugin-marketplace#5292 flagged `helpers/voice-setup.sh` for cloning a branch of the voxtype fork (`remote-git-execution-unpinned`). The script now carries `FORK_COMMIT` (`60082b10e61af51b63b97ce86254686aadb8af88`, the commit `helpers/voxtype-full-request.patch` is written against and where `feature/live-transcript-file` pointed), refuses anything that is not a 40-character SHA, clones with `--no-checkout`, requires the commit to exist in the checkout, and builds through one fail-closed chain: `git -C "$SRC" checkout --detach <the SHA, spelled out> && apply_revision_patch && cargo build --manifest-path "$SRC/Cargo.toml" …`, with an explicit stop when any link fails (`set -e` ignores failures inside an `&&` list). The build no longer `cd`s into the checkout: the detector carries a `cd` forward as the working directory of every later command, so the unrelated `python3` step that edits voxtype's config was reported as executing the checkout (second attempt, commit `e79591c`).
