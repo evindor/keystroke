@@ -17,6 +17,7 @@ import "core/VoiceBindings.js" as VoiceBindings
 import "core/Intent.js" as Intent
 import "core/Patterns.js" as Patterns
 import "core/SmartMatch.js" as SmartMatch
+import "core/Motion.js" as Motion
 import "matching" as Matching
 
 // Keystroke: an extension-first command palette that replaces the Omarchy
@@ -90,6 +91,7 @@ Item {
     root.providerViewRawQuery = root.voiceRawText
     root.activeProviderKey = key
     providerView.sourceComponent = entry.provider.view
+    root.slideLevel(1)
   }
   // A view whose provider was removed, unloaded or turned off while it was
   // showing (a community plugin disabled from the CLI, say) must not linger
@@ -113,7 +115,11 @@ Item {
   readonly property var paletteSchema: [
     { key: "density", type: "enum", label: "Layout density", "default": "compact", options: ["compact", "comfortable"], description: "Compact uses a narrower window and shorter rows" },
     { key: "accent", type: "enum", label: "Accent color", "default": "theme", options: ["theme", "ember", "violet", "mint"], description: "Theme follows the active Omarchy theme" },
-    { key: "showPreview", type: "boolean", label: "Show result previews", "default": true }
+    { key: "showPreview", type: "boolean", label: "Show result previews", "default": true },
+    { key: "animations", type: "enum", label: "Animations", "default": "snappy", options: ["off", "snappy", "fluid"],
+      description: "Off shows every change at once; Snappy ties changes together over a couple of frames; Fluid eases them" },
+    { key: "windowTransition", type: "enum", label: "Window transition", "default": "fade", options: ["fade", "slide"], optionLabels: { fade: "Fade", slide: "Slide up" },
+      description: "How the palette appears and leaves while animations are on" }
   ]
   property var paletteSettings: Settings.values(config, ["palette"], paletteSchema)
   readonly property var matchingSchema: SmartMatch.SCHEMA
@@ -367,6 +373,62 @@ Item {
   readonly property bool clipboardChoice: root.dictationMode || !!(root.current.action && root.current.action.type === "dictation-copy")
   readonly property bool previewVisible: !dmenuActive && paletteSettings.showPreview !== false && !!(current.preview || current.previewImage || current.swatch)
 
+  // ---------------------------------------------------------------- motion
+  // Three tiers (core/Motion.js) drive every transition: the window's
+  // reveal, a menu level entering, the selection gliding and the activated
+  // row's flash. A duration of 0 turns a transition into a plain assignment.
+  readonly property var motion: Motion.profile(paletteSettings.animations)
+  readonly property bool windowSlides: paletteSettings.windowTransition === "slide"
+  // 0 hidden … 1 shown; the scrim and the card follow it. The layer stays
+  // mapped, without keyboard focus, while `closing` runs it back down.
+  property real reveal: 0
+  property bool closing: false
+  property double flashUntil: 0             // wall clock at which the activated row's flash peaks
+  signal flashed(string uid)
+  onOpenedChanged: {
+    hideDelay.stop()
+    revealAnim.stop()
+    if (root.opened) {
+      root.closing = false
+      if (root.motion.window > 0) { revealAnim.to = 1; revealAnim.duration = root.motion.window; revealAnim.restart() }
+      else root.reveal = 1
+    } else if (root.motion.window > 0) {
+      // Leaving waits for the flash to peak, so a launch still reads as "that row".
+      root.closing = true
+      hideDelay.interval = Math.max(0, root.flashUntil - Date.now())
+      hideDelay.restart()
+    } else { root.reveal = 0; root.closing = false }
+  }
+  Timer { id: hideDelay; onTriggered: { if (root.opened) return; revealAnim.to = 0; revealAnim.duration = root.motion.window; revealAnim.restart() } }
+  NumberAnimation {
+    id: revealAnim; target: root; property: "reveal"; easing.type: Easing.OutQuad
+    onFinished: if (!root.opened && revealAnim.to === 0) root.closing = false
+  }
+  function flash(uid) {
+    if (root.motion.flashRise + root.motion.flashFall <= 0 || !uid) return
+    root.flashUntil = Date.now() + root.motion.flashRise
+    root.flashed(uid)
+  }
+  // A menu level enters from the side it lives on: a deeper screen from the
+  // right, the parent from the left. Only the entering level moves; rows are
+  // reconciled in place, so there is no outgoing copy to slide away.
+  property real levelOpacity: 1
+  Translate { id: levelShift }
+  function slideLevel(direction) {
+    if (root.motion.slide <= 0 || !root.opened) return
+    levelAnim.stop()
+    levelShift.x = Motion.levelOffset(direction, Style.space(Motion.LEVEL_SLIDE_PX))
+    root.levelOpacity = 0
+    levelAnim.duration = root.motion.slide
+    levelAnim.restart()
+  }
+  ParallelAnimation {
+    id: levelAnim
+    property int duration: 0
+    NumberAnimation { target: levelShift; property: "x"; to: 0; duration: levelAnim.duration; easing.type: Easing.OutCubic }
+    NumberAnimation { target: root; property: "levelOpacity"; to: 1; duration: levelAnim.duration; easing.type: Easing.OutQuad }
+  }
+
   // Theme surfaces, same tokens as the stock menu.
   readonly property color background: Color.menu.background
   readonly property color foreground: Color.menu.text
@@ -403,8 +465,8 @@ Item {
 
   // ---------------------------------------------------------------- opening
   function resetSelection() {
-    root.selected = 0
     root.selectionTouched = false
+    root.selected = 0
     root.ctrlHeld = false
     pointerGate.reset()
   }
@@ -783,6 +845,7 @@ Item {
     root.applyRows([])
     root.runQuery()
     resultList.positionViewAtBeginning()
+    root.slideLevel(1)
   }
 
   function goBack() {
@@ -796,6 +859,7 @@ Item {
       root.voiceRawText = priorRawQuery
       root.runQuery()
       search.forceActiveFocus()
+      root.slideLevel(-1)
       return true
     }
     if (root.history.length) {
@@ -809,6 +873,7 @@ Item {
     root.applyRows([])
     root.runQuery()
     resultList.positionViewAtBeginning()
+    root.slideLevel(-1)
     return true
   }
 
@@ -856,7 +921,7 @@ Item {
     if (debounce.running || refresh.running) root.runQuery()
     if (root.dmenuActive) {
       if (root.mode === "input") { root.applyDmenuSelection(search.text); return }
-      if (root.rows.length) root.applyDmenuSelection(root.current.value)
+      if (root.rows.length) { root.flash(root.current.uid); root.applyDmenuSelection(root.current.value) }
       return
     }
     var row = root.current
@@ -874,6 +939,7 @@ Item {
       try { effect = entry.provider.activate(row, { host: root, settings: root.settingsFor(entry), alternate: alternate === true }) || effect } catch (e) { root.errorMessage = entry.provider.name + ": " + e; return }
     }
     if (!effect) return
+    root.flash(row.uid)
     var run = function() { root.remember(row); root.perform(effect, row) }
     if (row.confirm) root.confirmPending = { message: row.confirm, confirmText: "Confirm", run: run }
     else run()
@@ -973,15 +1039,16 @@ Item {
 
   PanelWindow {
     id: panel
-    visible: root.opened
+    visible: root.opened || root.closing
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "omarchy-menu"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    // A launch must find the keyboard free at once, however long the fade-out runs.
+    WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    Rectangle { anchors.fill: parent; color: root.scrim; MouseArea { anchors.fill: parent; onClicked: root.cancel() } }
+    Rectangle { anchors.fill: parent; color: root.scrim; opacity: root.reveal; MouseArea { anchors.fill: parent; onClicked: root.cancel() } }
 
     BorderSurface {
       id: card
@@ -990,7 +1057,9 @@ Item {
         ? Math.min(root.headerHeight + (root.mode === "input" ? Style.space(12) : root.dmenuRowsHeight + Style.space(20)), panel.height - Style.gapsOut * 2)
         : Math.min(Style.space(root.compact ? 540 : 580), panel.height - Style.gapsOut * 2)
       anchors.horizontalCenter: parent.horizontalCenter
-      y: root.dmenuActive ? Math.max(Style.gapsOut, Math.round((panel.height - height) / 2)) : Math.max(Style.gapsOut, Math.round((panel.height - height) * 0.38))
+      y: (root.dmenuActive ? Math.max(Style.gapsOut, Math.round((panel.height - height) / 2)) : Math.max(Style.gapsOut, Math.round((panel.height - height) * 0.38)))
+         + (root.windowSlides ? Math.round((1 - root.reveal) * Style.space(Motion.WINDOW_SLIDE_PX)) : 0)
+      opacity: root.reveal
       radius: Style.cornerRadius
       color: root.background
       borderSpec: root.borderSpec
@@ -1018,6 +1087,8 @@ Item {
         id: providerView
         anchors.fill: viewBackdrop
         z: 5
+        transform: levelShift
+        opacity: root.levelOpacity
         onLoaded: { item.host = root; if (typeof item.focusInput === "function") Qt.callLater(item.focusInput) }
       }
 
@@ -1145,6 +1216,8 @@ Item {
       Row {
         id: crumbs
         visible: !root.dmenuActive
+        transform: levelShift
+        opacity: root.levelOpacity
         x: Style.space(root.compact ? 22 : 26); y: root.headerHeight + Style.space(8)
         height: root.crumbHeight
         spacing: Style.space(10)
@@ -1161,6 +1234,8 @@ Item {
       // Results and preview
       Item {
         id: content
+        transform: levelShift
+        opacity: root.levelOpacity
         x: Style.space(12)
         y: root.dmenuActive ? root.headerHeight + Style.space(10) : root.headerHeight + root.crumbHeight + Style.space(10)
         width: parent.width - Style.space(24)
@@ -1178,8 +1253,28 @@ Item {
           boundsBehavior: Flickable.StopAtBounds
           currentIndex: root.selected
           cacheBuffer: root.rowHeight * 4
+          // One highlight glides between rows instead of each row painting
+          // its own; its geometry is bound here so it covers the row and not
+          // the delegate's section header.
+          highlightFollowsCurrentItem: false
+          highlight: BorderSurface {
+            readonly property var row: resultList.currentItem
+            z: 0
+            visible: !!row && root.rows.length > 0
+            width: resultList.width
+            height: row ? row.rowHeight : root.rowHeight
+            y: row ? row.y + row.rowY : 0
+            opacity: row && row.disabled ? 0.62 : 1
+            radius: Style.cornerRadius
+            color: root.selectedBackground
+            borderSpec: root.selectedBorderSpec
+            Behavior on y { enabled: root.selectionTouched && root.motion.selection > 0; NumberAnimation { duration: root.motion.selection; easing.type: Easing.OutCubic } }
+          }
           delegate: Column {
             id: delegateRoot
+            z: 1
+            readonly property real rowY: rowItem.y
+            readonly property real rowHeight: rowItem.height
             required property int index
             required property string uid
             required property string title
@@ -1213,7 +1308,10 @@ Item {
               }
             }
             ResultRow {
+              id: rowItem
               width: parent.width
+              paintsSelection: false
+              flashRise: root.motion.flashRise; flashFall: root.motion.flashFall
               title: delegateRoot.title; subtitle: delegateRoot.subtitle; icon: delegateRoot.icon; iconFont: delegateRoot.iconFont
               iconSource: delegateRoot.iconSource; tint: delegateRoot.tint; verb: delegateRoot.verb; accessory: delegateRoot.accessory
               badge: delegateRoot.badge; hint: delegateRoot.hint; disabled: delegateRoot.disabled; answer: delegateRoot.answer
@@ -1224,6 +1322,7 @@ Item {
               selectedBackground: root.selectedBackground; selectedText: root.selectedText; selectedBorderSpec: root.selectedBorderSpec
               onHovered: function(item, mouse) { root.selectFromPointer(delegateRoot.index, item, mouse) }
               onActivated: { root.selectionTouched = true; root.selected = delegateRoot.index; root.activate() }
+              Connections { target: root; function onFlashed(uid) { if (uid === delegateRoot.uid) rowItem.flash() } }
             }
           }
         }

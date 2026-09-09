@@ -3,7 +3,9 @@
   "palette": {
     "density": "compact",
     "accent": "theme",
-    "showPreview": true
+    "showPreview": true,
+    "animations": "snappy",
+    "windowTransition": "fade"
   },
   "voice": {
     "enabled": true,

@@ -1,5 +1,46 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Animation tiers (2026-09-09)
+
+Appearance gained **Animations** (Off, Snappy, Fluid; default Snappy) and
+**Window transition** (Fade, Slide up; default Fade). `core/Motion.js` holds the
+one table of durations: Snappy 32 ms for the level slide, the selection glide
+and the window, with a 12 + 28 ms flash; Fluid 90 ms with a 20 + 50 ms flash;
+Off is all zeros and takes every path as a plain assignment. Four transitions:
+
+- A menu level (results, breadcrumb, or a provider view) enters from the right
+  after `navigate` and from the left after `goBack`; rows are reconciled in
+  place, so only the entering level moves.
+- The selection is one `ListView` highlight that glides between rows (rows no
+  longer paint their own background); a reset after typing or a level change
+  jumps instead of gliding.
+- The activated row flashes with the selected text color, and a launch waits
+  for the flash to peak before the window starts leaving.
+- The window fades (or slides up 20 px while fading) in and out; the layer
+  stays mapped for the fade-out without keyboard focus, so the launched app
+  gets the keyboard at once.
+
+Checked offscreen (`QT_QPA_PLATFORM=offscreen`, software backend):
+
+- `tests/tst_motion.qml` (6 tests): tier ranges, fallback to Snappy, offsets.
+- `tests/palette_motion_check.py` on the real palette with a fixture provider:
+  the reveal starts below 1 and reaches 1; the highlight exists, covers the row
+  and not its section header, glides after `select()` and jumps after a reset;
+  `navigate`/`goBack` enter from the right/left and settle; activation flashes
+  the activated row; closing keeps the window mapped until the fade ends and
+  the slide-up leaves the card lower; reopening while leaving cancels the
+  fade-out; with animations Off the reveal, highlight, level and window change
+  at once and nothing flashes; the row's flash overlay brightens then settles
+  and a zero-length flash does nothing.
+- Card renders grabbed mid-glide and mid-flash confirmed the highlight is
+  painted under the row text and the flash reads as a brightening of the row.
+- `qmltestrunner` (148 tests), the shortcut, matching, dictation and catalog
+  checks pass; qmllint warnings unchanged (81).
+
+Not exercised: the live layer-shell window (fade-in timing against surface
+mapping, keyboard focus release during the fade-out) and the exact durations;
+the numbers are the starting points to tune by feel, all in `core/Motion.js`.
+
 ## Smart Match performance and compiled engine (2026-09-09)
 
 Profiled offscreen with `tools/profile_palette.py` on the laptop (Core Ultra X7

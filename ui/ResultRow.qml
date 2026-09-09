@@ -21,6 +21,12 @@ BorderSurface {
   property bool disabled: false
   property bool answer: false
   property bool selected: false
+  // Off when the host paints one gliding highlight behind the rows instead.
+  property bool paintsSelection: true
+  // The activation flash: a brief pulse of the selected text color, rising
+  // then fading, in milliseconds. Both 0 disables it.
+  property int flashRise: 0
+  property int flashFall: 0
   property bool compact: true
   property color accent: Color.accent
   property color foreground: Color.menu.text
@@ -35,12 +41,29 @@ BorderSurface {
 
   height: compact ? Style.space(46) : Style.space(56)
   radius: Style.cornerRadius
-  color: selected ? selectedBackground : "transparent"
-  borderSpec: selected ? selectedBorderSpec : Border.none()
+  color: selected && paintsSelection ? selectedBackground : "transparent"
+  borderSpec: selected && paintsSelection ? selectedBorderSpec : Border.none()
   opacity: disabled ? 0.62 : 1
   Accessible.role: Accessible.ListItem
   Accessible.name: title + ". " + subtitle
   Accessible.onPressAction: root.activated()
+
+  function flash() {
+    if (root.flashRise + root.flashFall <= 0) return
+    flashAnim.restart()
+  }
+  Rectangle {
+    id: flashLayer
+    anchors.fill: parent
+    radius: root.radius
+    color: root.selectedText
+    opacity: 0
+    SequentialAnimation {
+      id: flashAnim
+      NumberAnimation { target: flashLayer; property: "opacity"; to: 0.3; duration: root.flashRise; easing.type: Easing.OutQuad }
+      NumberAnimation { target: flashLayer; property: "opacity"; to: 0; duration: root.flashFall; easing.type: Easing.InQuad }
+    }
+  }
 
   Rectangle {
     id: iconChip
