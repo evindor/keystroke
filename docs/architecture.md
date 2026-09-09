@@ -74,7 +74,7 @@ All from Omarchy 4.0.2 source: property injection of `shell`, `manifest`, `plugi
 
 ## Helpers
 
-The optional Codex and speech transports are described above. File search uses `fd`. `helpers/timezone.py` QML's JavaScript has no IANA zone data; the converter spawns the helper once per distinct time query after a regex gate matches, with a 1 s timeout, and caches the answer.
+The optional Codex and speech transports are described above. File search uses `fd`. `helpers/timezone.py` QML's JavaScript has no IANA zone data; the converter spawns the helper once per distinct time query after a regex gate matches, with a 1 s timeout, and caches the answer. The helper owns the grammar (abbreviations such as `pt`/`cet`/`ist`, city and country names, IANA zones, UTC offsets, `now in <zone>`, relative dates); the gate in `core/Units.js` only checks that the query is time-shaped. Answers marked `live` ("now in london") are re-run every 30 s while shown.
 
 ## Settings and state
 

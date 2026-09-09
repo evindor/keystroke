@@ -2,7 +2,8 @@
 
 // Unit and temperature conversion in JS. IANA time zones need tzdata, which
 // QML's JavaScript engine does not expose, so time queries are gated here
-// (isTimeQuery) and resolved by helpers/timezone.py on demand.
+// (isTimeQuery) and resolved by helpers/timezone.py on demand. The gate only
+// has to be time-shaped: the helper owns the grammar and rejects the rest.
 
 var UNITS = [
   [1, "length", "m meter meters metre metres"], [0.01, "length", "cm centimeter centimeters"],
@@ -26,7 +27,14 @@ for (var u = 0; u < UNITS.length; u++) {
 }
 var TEMPERATURES = { c: "c", celsius: "c", f: "f", fahrenheit: "f", k: "k", kelvin: "k" }
 var UNIT_RE = /^\s*(-?\d+(?:\.\d+)?)\s*([\w\/°]+)\s+(?:in|to)\s+([\w\/°]+)\s*$/i
-var TIME_RE = /^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s+(?:in|from)\s+(.+?)(?:\s+to\s+(.+?))?(?:\s+on\s+(\d{4}-\d{2}-\d{2}))?\s*$/i
+// "tomorrow", "next monday", "sep 6", "6 sep 2027", "2026-09-06", each with
+// an optional "on" before and "at" after, ahead of the time.
+var DATE_PREFIX_RE = /^\s*(?:on\s+)?(?:today|tonight|tomorrow|tmrw|tmr|yesterday|(?:next\s+|this\s+)?(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*|\d{4}-\d{2}-\d{2}|\d{1,2}(?:st|nd|rd|th)?\s+[a-z]{3,9}(?:\s+\d{4})?|[a-z]{3,9}\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?)\s+(?:at\s+)?/i
+// 10am, 10:30pm, 10.30, 1530, noon, midnight at the start of the query.
+var TIME_TOKEN_RE = /^\s*(?:\d{1,2}(?:[:.][0-5]\d)?\s*(?:a\.?m\.?|p\.?m\.?)(?![a-z])|\d{1,2}[:.][0-5]\d(?![\d.])|(?:[01]\d|2[0-3])[0-5]\d(?!\d)|noon|midday|midnight)(?![a-z])/i
+var BARE_HOUR_RE = /^\s*\d{1,2}\s+(?:in|from|at)\s+\S/i
+var NOW_RE = /^\s*(?:(?:what(?:'s|\s+is)?\s+(?:the\s+)?)?(?:current\s+|local\s+)?time(?:\s+is\s+it)?(?:\s+(?:right\s+)?now)?|now|(?:the\s+)?date)\s+(?:in|at|for|of)\s+\S/i
+var ZONE_TIME_RE = /^\s*\S.*\s+(?:time|now)\s*$/i
 
 // Returns { value, unit } or throws Error.
 function convert(text) {
@@ -47,8 +55,15 @@ function convert(text) {
   return { value: value * s.factor / t.factor, unit: target }
 }
 
+// True for anything that looks like "<time> <zone...>", "10 in <zone>",
+// "now in <zone>" or "<zone> time". Deliberately loose: a false positive
+// costs one helper run per distinct query, a false negative hides the answer.
 function isTimeQuery(text) {
-  return TIME_RE.test(String(text || ""))
+  var t = String(text || "")
+  if (NOW_RE.test(t) || ZONE_TIME_RE.test(t) || BARE_HOUR_RE.test(t)) return true
+  var undated = t.replace(DATE_PREFIX_RE, "")
+  var m = TIME_TOKEN_RE.exec(undated)
+  return !!m && undated.slice(m[0].length).trim().length > 0
 }
 
 function detailFor(unit) {

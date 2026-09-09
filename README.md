@@ -35,7 +35,7 @@ Requires Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). Like every Omarchy plugin,
 </tr>
 </table>
 
-- **Type anything**: apps, Omarchy commands, `sqrt(144) + 15% of 80`, `2m in feet`, `32 F to C`, `10 am in London`, `#ff6644`, `:smile`, `readme`, `timer 10m tea`.
+- **Type anything**: apps, Omarchy commands, `sqrt(144) + 15% of 80`, `2m in feet`, `32 F to C`, `10am pt`, `10 am in London`, `now in tokyo`, `#ff6644`, `:smile`, `readme`, `timer 10m tea`.
 - **Fuzzy everywhere, into submenus.** From the root, `prefp`, `keysepro` and `setaiprv` all land on Keystroke Settings › AI & Web Search › Preferred assistant, `prefcla` on its Claude choice, `sysshut` on System › Shutdown. Letters may skip whole words of the breadcrumb, words can come in any order (`ai prov`), descriptions match by word. Inside a submenu the same search covers everything below it.
 - **Answers first.** Computed results appear as answer rows with a preview; matches next; Google and the assistants last.
 - **Files and folders** under `~` join the results from two characters on, found by `fd` (hidden and gitignored entries are skipped unless you turn hidden entries on). The words of the query are literal substrings: the last one has to be in the name, earlier ones anywhere in the path, so `docs readme` finds README files under a docs folder. `↵` opens a file with its default app and a folder in your file manager; `Ctrl+↵` opens a terminal there. At most ten mix into the root (Settings → Files); the Files screen shows up to sixty.
