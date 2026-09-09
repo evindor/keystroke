@@ -140,3 +140,32 @@ Sizes are the other half of that. The palette sets its rows in `title` and its s
 ## Installing from a local checkout
 
 The Extensions screen accepts `file:///absolute/path/to/repo.git` as well as https and `owner/repo`: Omarchy's plugin scripts clone the `file` transport, which makes a local bare repository the way to try an extension in the real palette before it is published (`git clone --bare <your checkout> /tmp/thing.git`, then type the `file://` URL). Relative paths, plain paths and anything containing `..` are refused.
+
+## Optional Smart Match catalog
+
+API 1 providers may add `catalog: function(ctx) { return rows }`. It enumerates
+current available command/navigation rows for the requested scope, independently
+of query wording. Use the normal stable IDs, actions, confirmations, and display
+metadata, plus `path`, `keywords`, `description`, and optionally a single-sentence
+`intentDescription` stating the outcome. Return quickly from cached state and call
+`ctx.pending()` / `host.requery()` when asynchronous catalog state changes. Filter
+unavailable actions and other scopes before returning them. Do not enumerate
+clipboard contents, file contents, recent conversations, or unbounded data.
+
+The host uses at most 6,000 catalog rows in a query. It sends IDs and descriptive
+text to a local embedding helper; executable actions stay in QML and are resolved
+against the latest catalog. Disabled rows are never semantic suggestions. Providers
+without this optional method keep their existing lexical behavior; bundled providers
+also contribute their root navigation entries. Extensions are never enumerated by
+calling their query method with invented empty input.
+
+`intentFamily`, when supplied, can identify `launch`, `navigate`, `install`, `remove`,
+`default`, `restart`, `record-start`, `record-stop`, `toggle`, `enable`, or `disable`.
+This constrains suggestions for explicit command families and directions; it does
+not authorize execution. Do not describe a toggle as an idempotent on/off action
+unless the action actually implements that behavior. Existing confirmations and
+provider `activate()` are preserved.
+
+Enum setting schemas can optionally provide `optionLabels: { value: "Visible label" }`.
+The stored option values and validation remain unchanged; both choice rows and the
+current-value accessory use the label when provided.

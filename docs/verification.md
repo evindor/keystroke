@@ -1,5 +1,43 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Smart Match (2026-09-09, dev / 1.2.0)
+
+- Full offscreen `bin/keystroke test` exits 0: **139 QML tests**, all prior
+  integration checks, and new worker, session, catalog and palette matching checks.
+  Used `QT_QPA_PLATFORM=offscreen`, `QT_QPA_PLATFORMTHEME=generic`,
+  `QT_QUICK_BACKEND=software`; dependencies were cached and `UV_OFFLINE=1` was set.
+- Pure logic covers spoken arithmetic, ambiguous prose, defaults and enum labels,
+  launch-vs-install filtering, Chromium-only alias, typo distance, negation,
+  recording direction, volume direction, on/off setters, and confirmation-preserving
+  command deduplication. Typed provider arguments keep case and raw input.
+- Real QML process checks cover one-in-flight/latest-queued requests, stale replies,
+  Off unloading, changing size during loading, cancellation, idle unloading without
+  immediately reloading on a status refresh, waking with a fresh index, and no
+  leaked helper processes. Targeted session/palette checks were rerun after the idle
+  lifecycle refinement and passed.
+- Actual palette checks cover Only voice vs typed input, Voice and text, Off,
+  scoped enumeration, removal from a live catalog, raw transcript preservation,
+  ordinary matching fallback and stable selection during result reordering.
+  The same palette harness also passed with the real installed 2M worker offline.
+- Catalog checks execute no menu actions: unresolved/false guards and guarded
+  ancestors are excluded from semantic enumeration; subtree scope and later changes
+  are respected. Worker checks cover input limits, cache reuse/eviction, replacement
+  of catalog IDs and IDs/scores-only replies.
+- The pinned installer was exercised with Python 3.13 and the desktop's Python
+  3.14.7. Small (2M) is installed under the current user's Keystroke data directory;
+  Large (8M) was downloaded and validated only in an isolated `/tmp` directory.
+  The installed small model subsequently served requests with `HF_HUB_OFFLINE=1`.
+- Rendered and inspected Matching, Smart match choices and Matching model choices
+  offscreen: correct labels, selected defaults, existing theme/layout and no clipped
+  setting text. These were temporary screenshots, not new product artwork.
+- `bin/keystroke validate` and `git diff --check` pass. Lint has no new warning
+  messages compared with the untouched dev checkout; existing Quickshell/Qt metadata
+  warnings remain. The 618 descriptions and source fingerprints have full coverage.
+- No live desktop commands were activated, no real microphone recordings were
+  tested, and the running plugin was not replaced. Installation/download performance
+  was not measured on low-end laptops. This is a local suggestions system, not an
+  automatic command executor or a production accuracy claim for arbitrary speech.
+
 ## Release 1.1.5 (2026-09-09)
 
 - Full offscreen `bin/keystroke test`: 119 QML tests, application-library

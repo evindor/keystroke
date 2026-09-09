@@ -89,3 +89,30 @@ Every provider that owns a tree searches all of it when a query is present: the 
 ## Deferred
 
 Match highlighting in rows and a permanent publishing id.
+
+## Smart Match
+
+`matching/Session.qml` manages one CPU helper, at most one in-flight request and one
+latest queued request. `helpers/matching-start.py` provisions a hash-locked per-user
+runtime and then execs `matching-worker.py`; fixed Model2Vec revisions are downloaded
+once and subsequently loaded locally. Off stops the process immediately, a model
+change replaces it, and two minutes of inactivity unloads it. Errors retain lexical
+search and expose a retry in Settings > Matching. See `matching/README.md` for
+storage, installation, protocol and model details.
+
+The host gathers available catalog rows from opted-in providers and root navigation
+rows from remaining bundled providers, applies intent/scope constraints, and sends
+only metadata to the helper. Cache keys include the query, scope, model and catalog.
+Late replies are ignored; removed entries cannot be revived by an old response.
+`core/SmartMatch.js` combines exact/fuzzy scores, bounded typo recovery, app aliases
+and semantic suggestions without promoting them above explicit computed answers.
+Equivalent commands retain the stricter confirmation, and async result reordering
+preserves a user-selected UID. Typed provider arguments keep their case; spoken
+arithmetic normalization is a separate whole-expression parser in `core/Intent.js`.
+
+Curated intent sentences are paired with original titles and MD5 fingerprints of
+source definitions, preventing accidental reuse after ordinary catalog customization.
+These are metadata identity checks, not a security boundary. For menu entries the
+source key is `[action,target,provider].join(String.fromCharCode(31))`; for hotkeys it is dispatcher,
+a unit separator and argument; for apps it is the displayed name. No machine-specific
+command strings are shipped in the fingerprint map. Changed entries use live metadata.

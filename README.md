@@ -20,6 +20,11 @@ That is all. Enabling Keystroke makes it the menu: `Super+Space`, every `omarchy
 
 From a checkout, `bin/keystroke install` copies the tree into `~/.config/omarchy/plugins/evindor.keystroke` (no symlinks) and enables it; `bin/keystroke uninstall` reverses that.
 
+Smart Match defaults to **Voice and text** with the small **2M** embedding model.
+The first matching query downloads its CPU runtime and model using Python 3 and
+`uv`; ordinary search remains available during setup. Checkout installation
+prepares the small model ahead of time. After setup, matching works offline.
+
 **Bar-widget note (Omarchy 4.0.x).** Keystroke also ships the menu button as a bar widget, so enabling it puts a button in your bar (replacing the stock one in place if you had it). For a third-party plugin, "enabled" means "referenced in shell.json", so removing that button from the bar also disables the menu. If you do not want the button, keep the plugin listed under `plugins[]` in `~/.config/omarchy/shell.json` instead.
 
 Requires Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). Like every Omarchy plugin, Keystroke runs unsandboxed inside your shell with your permissions; the code is here to read.
@@ -113,3 +118,25 @@ bin/keystroke test         # qmltestrunner unit tests, Quickshell integration ch
 ## License
 
 MIT, see [LICENSE](LICENSE). Omarchy's MIT-licensed menu model is vendored in [omarchy/MenuModel.js](omarchy/MenuModel.js).
+
+## Smart Match
+
+**Keystroke Settings > Matching** contains:
+
+- **Smart match** — “Match queries using an embedding model”: **Off** (model
+  unloaded), **Only voice**, or **Voice and text** (default).
+- **Matching model** — **Small (2M)** (default) or **Large (8M)**. Large downloads
+  once when first used; switching Off releases the model but keeps its files.
+
+Smart Match supplements exact and fuzzy search with action descriptions and local
+semantic suggestions. It keeps launch/install/remove and start/stop distinct,
+recognizes small typos, and offers Chromium for “launch Chrome” when Chrome is
+absent. Spoken arithmetic such as “27 plus 90” becomes `27 + 90`; dictation and
+assistant prompts retain the original transcript. Results still require Enter and
+keep their existing confirmations. Ambiguous speech can still need correction.
+
+Both models run locally on CPU. The runtime unloads after two idle minutes, and a
+setup failure leaves ordinary matching available. Use **Retry Smart Match** in the
+Matching settings screen or `bin/keystroke matching` to retry installation. Runtime
+files live under `~/.local/share/keystroke/matching` (or `XDG_DATA_HOME`). More detail
+is in [the matching runtime documentation](matching/README.md).

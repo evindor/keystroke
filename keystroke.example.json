@@ -10,6 +10,10 @@
     "secondTap": "voice",
     "keys": "SUPER + SPACE"
   },
+  "matching": {
+    "mode": "all",
+    "model": "small"
+  },
   "providers": {
     "omarchy": {
       "enabled": true,

@@ -15,6 +15,8 @@ import "core/Settings.js" as Settings
 import "core/VoiceBindings.js" as VoiceBindings
 import "core/Intent.js" as Intent
 import "core/Patterns.js" as Patterns
+import "core/SmartMatch.js" as SmartMatch
+import "matching" as Matching
 
 // Keystroke: an extension-first command palette that replaces the Omarchy
 // menu. Hosted by omarchy-shell as a `menu` plugin (see manifest.json).
@@ -83,6 +85,7 @@ Item {
   function showProviderView(key) {
     var entry = root.registryEntry(key)
     if (!entry || !root.providerEnabled(entry) || !entry.provider.view) { root.errorMessage = "Provider view is unavailable"; return }
+    matchingSession.cancelRequest()
     root.providerViewRawQuery = root.voiceRawText
     root.activeProviderKey = key
     providerView.sourceComponent = entry.provider.view
@@ -112,6 +115,36 @@ Item {
     { key: "showPreview", type: "boolean", label: "Show result previews", "default": true }
   ]
   property var paletteSettings: Settings.values(config, ["palette"], paletteSchema)
+  readonly property var matchingSchema: SmartMatch.SCHEMA
+  readonly property var matchingSettings: Settings.values(config, ["matching"], matchingSchema)
+  readonly property string matchingStamp: matchingSession.status + "|" + matchingSession.error
+  function matchingModel() { return { schemas: root.matchingSchema, values: root.matchingSettings, status: matchingSession.status, error: matchingSession.error } }
+  Matching.Session {
+    id: matchingSession
+    enabled: root.matchingSettings.mode !== "off"
+    model: root.matchingSettings.model
+    onChanged: if (root.opened && !root.confirmPending) root.requery()
+  }
+  property var intentDescriptions: ({})
+  property var intentDescriptionKeys: ({})
+  FileView {
+    path: Qt.resolvedUrl("matching/descriptions.json").toString().replace("file://", "")
+    printErrors: false
+    onLoaded: { try { root.intentDescriptions = JSON.parse(text()); root.requery() } catch (_) { } }
+  }
+  FileView {
+    path: Qt.resolvedUrl("matching/description-keys.json").toString().replace("file://", "")
+    printErrors: false
+    onLoaded: { try { root.intentDescriptionKeys = JSON.parse(text()); root.requery() } catch (_) { } }
+  }
+  function describe(row) {
+    var prefix = row.providerKey === "omarchy" ? "menu:" : row.providerKey === "applications" ? "app:" : row.providerKey === "hotkeys" ? "hotkey:" : ""
+    var id = prefix + row.id
+    if (prefix === "app:" && !root.intentDescriptionKeys[id]) id += ".desktop"
+    var key = root.intentDescriptionKeys[id]
+    if (key && key.title === row.title && key.key === Qt.md5(String(row.descriptionKey || ""))) row.intentDescription = root.intentDescriptions[id] || ""
+    return row
+  }
   function paletteValues() { return root.paletteSettings }
   function settingsFor(entry) { return Settings.values(root.config, ["providers", entry.key], entry.provider.settings || []) }
   function providerEnabled(entry) { return Settings.isEnabled(root.config, ["providers", entry.key], entry.source === "bundled") }
@@ -406,6 +439,7 @@ Item {
   }
 
   function openDmenu(payload) {
+    matchingSession.cancelRequest()
     root.closeProviderView()
     clipboardTransfer.cancel()
     if (root.dmenuActive && root.requestActive) root.finishRequest(null)   // a new caller cancels the previous one
@@ -441,6 +475,7 @@ Item {
   }
 
   function cancel(preserveTransfer) {
+    matchingSession.cancelRequest()
     root.closeProviderView()
     if (preserveTransfer !== true) clipboardTransfer.cancel()
     if (root.dmenuActive) root.finishRequest(null)
@@ -470,10 +505,16 @@ Item {
     if (!root.opened || root.providerViewActive) return
     if (root.dmenuActive) { root.applyRows(root.dmenuRows()); root.pending = false; root.afterRows(); return }
     root.generation++
-    var q = root.voiceRawText && !root.dictationMode ? Intent.normalize(root.voiceRawText) : search.text, sc = root.scope
+    var raw = root.voiceRawText || search.text, sc = root.scope
+    var smart = !root.dictationMode && SmartMatch.enabled(root.matchingSettings.mode, !!root.voiceRawText)
+    var req = SmartMatch.request(raw)
+    // Provider queries keep case and arguments (paths, units, extension input).
+    // Command rewrites belong to catalog matching; only whole arithmetic is substituted.
+    var q = root.voiceRawText && !root.dictationMode ? Intent.normalize(root.voiceRawText) : search.text
+    if (smart && req.math) q = req.math
     var owner = sc.split("/")[0]
     var sub = sc.indexOf("/") >= 0 ? sc.slice(owner.length + 1) : ""
-    var collected = [], errors = [], pend = false, matchedPatterns = ({})
+    var collected = [], catalog = [], errors = [], pend = false, matchedPatterns = ({})
     var mark = function() { pend = true }
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var entry = providerRegistry.entries[i]
@@ -491,16 +532,46 @@ Item {
           var row = root.normalize(out[r], entry, q, patterns.boost)
           if (row) collected.push(row)
         }
+        if (smart && q && !req.blocked && !req.math) {
+          var candidates = []
+          if (typeof entry.provider.catalog === "function") candidates = entry.provider.catalog(ctx) || []
+          else if (!sc && entry.source === "bundled") {
+            // Older providers contribute only navigation rows, never arbitrary
+            // clipboard/file content or executable results from an empty query.
+            var emptyCtx = Object.assign({}, ctx, { query: "", rawQuery: "" })
+            candidates = (entry.provider.query(emptyCtx) || []).filter(function(c) { return c.action && c.action.type === "navigate" })
+          }
+          for (var c = 0; c < candidates.length && catalog.length < 6000; c++) {
+            var candidate = root.normalize(candidates[c], entry, "", 0)
+            if (candidate && !candidate.disabled && candidate.tier === "item") catalog.push(root.describe(candidate))
+          }
+        }
       } catch (e) {
         errors.push(entry.provider.name + ": " + e)
         console.warn("keystroke: provider", entry.key, "failed:", e)
       }
     }
     if (root.configError) errors.push(root.configError)
+    if (smart && q) {
+      var documents = [], seen = ({}), documentSize = 0
+      catalog = catalog.filter(function(c) { if (seen[c.uid]) return false; seen[c.uid] = true; return true })
+      for (var d = 0; d < catalog.length; d++) if (SmartMatch.allowed(req, catalog[d], true)) {
+        var document = { id: catalog[d].uid, text: SmartMatch.document(catalog[d]) }
+        documentSize += JSON.stringify(document).length
+        if (documentSize > 3 * 1024 * 1024) break
+        documents.push(document)
+      }
+      var matchKey = JSON.stringify([raw, sc, root.matchingSettings.model, documents])
+      var hasAnswer = collected.some(function(r) { return r.tier === "answer" })
+      if (documents.length && !req.math && !req.blocked && !hasAnswer && raw.length <= 1024) matchingSession.submit(matchKey, raw, documents)
+      else matchingSession.cancelRequest()
+      collected = SmartMatch.merge(collected, catalog, req, matchingSession.resultKey === matchKey ? matchingSession.matches : [])
+    } else matchingSession.cancelRequest()
     var ranked = Match.rank(collected, root.bonusFor)
     root.applyRows(ranked.slice(0, 120))
     root.lastPatterns = matchedPatterns
-    root.pending = pend
+    root.pending = pend || (smart && matchingSession.requestedKey !== "" && matchingSession.busy)
+    if (smart && matchingSession.error) errors.push(matchingSession.error)
     root.errorMessage = errors.join(" · ")
     root.afterRows()
   }
@@ -560,6 +631,7 @@ Item {
 
   // Reconcile by uid so delegates update in place while typing.
   function applyRows(next) {
+    var selectedUid = root.selectionTouched && root.current ? root.current.uid : ""
     var wanted = ({})
     for (var n = 0; n < next.length; n++) wanted[next[n].uid] = true
     var order = root.uids.slice()
@@ -580,6 +652,9 @@ Item {
     }
     root.uids = order
     root.rows = next
+    if (selectedUid) {
+      for (var s = 0; s < next.length; s++) if (next[s].uid === selectedUid) { root.selected = s; break }
+    }
   }
 
   function afterRows() {
@@ -671,8 +746,14 @@ Item {
     }
     var row = root.current
     if (!row || !row.uid || row.disabled) return
+    if (row.smartMatch) {
+      var selectedId = row.uid
+      root.runQuery()
+      row = root.rows.filter(function(r) { return r.uid === selectedId })[0]
+      if (!row || row.disabled) return
+    }
     var entry = root.registryEntry(row.providerKey)
-    if (!entry) return
+    if (!entry || !root.providerEnabled(entry)) return
     var effect = alternate && row.altAction ? row.altAction : row.action
     if (typeof entry.provider.activate === "function") {
       try { effect = entry.provider.activate(row, { host: root, settings: root.settingsFor(entry), alternate: alternate === true }) || effect } catch (e) { root.errorMessage = entry.provider.name + ": " + e; return }
@@ -698,6 +779,7 @@ Item {
 
   function perform(effect, row) {
     var type = effect.type
+    if (type === "matching-retry") { matchingSession.retry(); root.requery(); return }
     if (type === "noop") return
     if (type === "provider-view") { root.showProviderView(effect.provider); return }
     if (type === "dictate") {
@@ -756,6 +838,7 @@ Item {
       current: { uid: root.current.uid || "", icon: root.current.icon || "", iconSource: root.current.iconSource || "", badge: root.current.badge || "", tier: root.current.tier || "" },
       modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems,
       applications: { library: !!root.appLibrary, entries: appEntries.length },
+      matching: { mode: root.matchingSettings.mode, model: root.matchingSettings.model, loaded: matchingSession.loaded, status: matchingSession.status, error: matchingSession.error },
       error: root.errorMessage, configError: root.configError, status: root.statusMessage,
       voice: { backend: "voxtype", state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
                command: voice.command, daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length, live: voice.liveText } })
