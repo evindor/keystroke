@@ -63,6 +63,7 @@ case "${1:-help}" in
   validate) exec omarchy plugin validate "$ROOT" ;;
   test)
     (cd "$ROOT/tests" && /usr/lib/qt6/bin/qmltestrunner -silent -input .)
+    python3 "$ROOT/tests/applications_check.py"
     python3 "$ROOT/tests/voice_session_check.py"
     python3 "$ROOT/tests/clipboard_transfer_check.py"
     python3 "$ROOT/tests/codex_session_check.py"

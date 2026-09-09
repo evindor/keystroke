@@ -10,6 +10,11 @@ Item {
   readonly property var library: host ? host.appLibrary : null
   property var searchCache: ({})
 
+  onLibraryChanged: {
+    root.searchCache = ({})
+    if (root.host) root.host.requery()
+  }
+
   readonly property var provider: ({
     apiVersion: 1,
     id: "applications",

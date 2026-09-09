@@ -8,6 +8,7 @@ import qs.Ui
 import "ui"
 import "providers"
 import "voice"
+import "core"
 import "core/Match.js" as Match
 import "core/Frecency.js" as Frecency
 import "core/Settings.js" as Settings
@@ -26,7 +27,8 @@ Item {
   property var manifest: null
   property var pluginRegistry: null
   property var barWidgetRegistry: null
-  readonly property var appLibrary: shell ? shell.appLibrary : null
+  readonly property var appLibrary: applicationLibrary.library
+  ApplicationLibrary { id: applicationLibrary; hostShell: root.shell; omarchyPath: root.omarchyPath }
   readonly property string home: Quickshell.env("HOME")
   readonly property string configPath: home + "/.config/omarchy/keystroke.json"
   readonly property string usagePath: home + "/.local/state/keystroke/usage.json"
@@ -739,11 +741,21 @@ Item {
     var c = providerRegistry.bundled.find(x => x.provider.id === "codex").session
     return JSON.stringify({ threadId: c.threadId, phase: c.phase, ready: c.server.ready, error: c.error, activity: c.activity, messages: c.messages, draft: c.draft, firstTextMs: c.firstTextMs, lastMs: c.lastMs })
   }
+  function inspectApplications() {
+    var entries = root.appLibrary ? root.appLibrary.sortedEntries("") : []
+    return JSON.stringify({ shell: !!root.shell, shellPluginId: root.shell ? root.shell.pluginId : "",
+      manifestId: root.manifest ? root.manifest.id : "", manifestKinds: root.manifest ? root.manifest.kinds : [],
+      library: !!root.appLibrary, sharedLibrary: !!applicationLibrary.sharedLibrary, entries: entries.length,
+      providerLibrary: !!providerRegistry.bundled[1].library,
+      providerEntries: providerRegistry.bundled[1].library ? providerRegistry.bundled[1].library.sortedEntries("").length : -1 })
+  }
   function inspect() {
+    var appEntries = root.appLibrary ? root.appLibrary.sortedEntries("") : []
     return JSON.stringify({ opened: root.opened, mode: root.mode, view: root.activeProviderKey, scope: root.scope, query: search.text, count: root.rows.length,
       titles: root.rows.map(function(r) { return r.title }), selected: root.selected, pending: root.pending, patterns: root.lastPatterns,
       current: { uid: root.current.uid || "", icon: root.current.icon || "", iconSource: root.current.iconSource || "", badge: root.current.badge || "", tier: root.current.tier || "" },
       modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems,
+      applications: { library: !!root.appLibrary, entries: appEntries.length },
       error: root.errorMessage, configError: root.configError, status: root.statusMessage,
       voice: { backend: "voxtype", state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
                command: voice.command, daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length, live: voice.liveText } })

@@ -207,3 +207,28 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
   The live HTTPS index and all 23 assets matched local SHA-256 hashes. The
   preflight script, site notes, and capture tooling returned 404 from Pages.
   Repository homepage now points to <https://evindor.github.io/keystroke/>.
+
+## Omarchy 4.0.2 / 4.0.3 application compatibility (2026-09-09)
+
+- The stock menu manifests and `shell/services/AppLibrary.qml` are identical
+  between upstream tags `v4.0.2` and `v4.0.3`. The change is in `shell.qml`:
+  4.0.3 gives third-party plugins a scoped shell, and gates `appLibrary` on
+  `manifestHasKind(manifest, "menu")` using `Array.isArray(manifest.kinds)`.
+  The panel Instantiator converts the nested array into a QML sequence for which
+  that check is false, even though `indexOf("menu")` returns zero. The stock
+  first-party menu bypasses this scoped-shell path; cloning does not bypass it.
+- Reproduced on the live 4.0.3-1 host: the injected shell and manifest were
+  present, but both the palette and provider had no app library and zero apps.
+- Keystroke now prefers the injected library and, if absent, loads the installed
+  Omarchy AppLibrary component. This retains native filtering, icons, launch
+  feedback and removal without copying its implementation or changing system
+  files. The fallback is unloaded if a shared library becomes available.
+- `tests/applications_check.py` reproduces the manifest conversion and checks
+  both injection paths, hidden/NoDisplay and configured hides, root keyword
+  search, refresh delegation, app-change notifications and fallback lifetime.
+  Live 4.0.3 verification returned 73 applications after the fix. Compatibility
+  with 4.0.2 is checked through its shared-library contract and the identical
+  upstream library source; a separate 4.0.2 desktop was not available.
+- Validation: 119 QML tests, application compatibility and palette integration
+  checks passed. Plugin validation and qmllint passed (existing metadata
+  warnings only). The live Applications screen rendered all 73 result rows.
