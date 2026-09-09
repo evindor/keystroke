@@ -1,5 +1,22 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.1.5 (2026-09-09)
+
+- Full offscreen `bin/keystroke test`: 119 QML tests, application-library
+  compatibility, voice lifecycle, clipboard, Codex, palette, 48 time-zone cases,
+  extension lifecycle and qmllint passed. The sandbox skipped the live hotkey
+  check because it cannot reach Hyprland; the host run passed with 205 bindings.
+- Updated the live hotkey check to derive Close window availability from its
+  current binding record. This host uses a runnable `hl.dsp.window.close()`
+  action instead of the reference machine's keyboard-only closure. Fixed
+  closure behavior remains covered by the QML unit tests.
+- `site/check.py`, `node --check site/script.js`, plugin validation and
+  `git diff --check` passed. Existing QML metadata warnings remain. The earlier
+  live application check on Omarchy 4.0.3-1 returned and rendered 73 rows.
+- Release scope: the five commits from the 1.1.4 marketplace snapshot
+  `4e7409b` through `b1cfbb9`, plus release documentation and the host-aware
+  integration-test correction. See [release notes](releases/v1.1.5.md).
+
 ## Non-intrusive Voxtype integration (2026-09-09)
 
 - Retired the pinned Voxtype fork, build helper, bundled patch, systemd drop-in writer and TOML rewriting. Keystroke now resolves only the user's ordinary `voxtype` from `PATH`; the absent-Voxtype row still launches Omarchy's installer only when the user explicitly selects it. Keystroke passes `--file` and `--no-osd` for its own recording and otherwise leaves the user's daemon and preferences alone.

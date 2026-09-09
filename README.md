@@ -6,6 +6,8 @@ A Raycast-style command palette that **replaces the Omarchy menu**. One native O
 
 **[Explore the feature showcase and installation guide →](https://evindor.github.io/keystroke/)**
 
+[Release notes: 1.1.5](docs/releases/v1.1.5.md) — Omarchy 4.0.3 compatibility, time-zone queries, and voice and extension improvements.
+
 Screenshots show the real Omarchy interface with public demo data.
 
 ## Install
