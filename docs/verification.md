@@ -1,5 +1,49 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Smart Match performance and compiled engine (2026-09-09)
+
+Profiled offscreen with `tools/profile_palette.py` on the laptop (Core Ultra X7
+358H, 16 threads): the actual providers, this machine's Omarchy menu, 58 apps,
+230 hotkeys and home folder, the installed small model, and 41 typed keystrokes
+across four queries. Milliseconds are wall time of one `runQuery()` on the UI
+thread (1 ms resolution).
+
+| per query on the UI thread | before (`cdcfffe`) | after |
+| --- | --- | --- |
+| total, median / p90 / max | 35 / 148 / 287 | 10 / 16 / 21 |
+| rank (frecency + sort) | 5 / 96 / 245 | 0 / 1 / 1 |
+| providers + catalog enumeration | 23 / 30 / 56 | 8 / 15 / 18 |
+| documents + request key | 2 / 3 / 4 | 0 / 0 / 1 |
+| merge (lexical + semantic) | 4 / 7 / 9 | 1 / 3 / 6 |
+
+- The ranking cost was `Qt.md5` (about 25 µs per call in the engine) run four
+  times per comparison inside the sort; keys are now memoized and the bonus is
+  computed once per row. Learned query keys changed shape to item hash, colon,
+  context hash; previous learned entries decay out of `usage.json` unchanged.
+- The catalog (rows, intent descriptions, fingerprint hashes, filtered documents
+  and their digest) is built once per summon, scope, configuration or provider
+  change and prewarmed while the palette waits for the first keystroke; the
+  first-keystroke enumeration hitch (34 ms) is gone. Refreshes from one provider
+  (`fd` finishing, an embedding reply) re-run only that provider; lexical scores
+  are reused across the refreshes of one keystroke. Files and Hotkeys build rows
+  only for the survivors; menu visibility is memoized until guards change.
+- Engine: `matching/engine` (Rust, 600 KB, no ML framework) replaces the Python
+  runtime when cargo is available. Tokenizer parity with `tokenizers` on 3,771
+  texts (618 descriptions, catalog keys, 2,500 random and unicode strings):
+  identical. Scores agree with the Python worker within 4e-7 and produce the same
+  top-30 order for every checked query. Ready in 18 ms (65 ms submit-to-result
+  through `Session.qml` after an idle unload, versus about 250 ms), 16 MiB
+  resident versus 92 MiB for the live Python worker, 1,500 documents embedded in
+  5 ms, a query in under 0.1 ms. Model files are fetched by URL with pinned
+  SHA-256 digests; `huggingface_hub` is no longer needed. The Python path remains
+  as the fallback without cargo and serves the same protocol.
+- Full `bin/keystroke test` except one pre-existing failure: 142 QML tests, all
+  integration checks and the new `matching_engine_check.py` (build, protocol,
+  parity) pass; `tests/extensions_check.py` fails at "update applied" on the
+  untouched `cdcfffe` checkout as well. qmllint warning count is unchanged (283).
+  Plugin validation and `git diff --check` pass. The installed plugin was not
+  replaced; the live check is the user's.
+
 ## Fuzzy file search and tilde prefix (2026-09-09)
 
 - Fixed candidate generation: `dwnlds` now reaches Downloads. `~` isolates Files

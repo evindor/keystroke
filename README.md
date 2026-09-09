@@ -21,9 +21,12 @@ That is all. Enabling Keystroke makes it the menu: `Super+Space`, every `omarchy
 From a checkout, `bin/keystroke install` copies the tree into `~/.config/omarchy/plugins/evindor.keystroke` (no symlinks) and enables it; `bin/keystroke uninstall` reverses that.
 
 Smart Match defaults to **Voice and text** with the small **2M** embedding model.
-The first matching query downloads its CPU runtime and model using Python 3 and
-`uv`; ordinary search remains available during setup. Checkout installation
-prepares the small model ahead of time. After setup, matching works offline.
+The first matching query fetches the model (8 MB, pinned digest) and builds the
+small compiled engine with `cargo` (about ten seconds once; 16 MiB resident,
+ready in tens of milliseconds). Without a Rust toolchain, Python 3 with `uv`
+installs the equivalent pinned runtime instead. Ordinary search remains available
+during setup; checkout installation prepares everything ahead of time. After
+setup, matching works offline.
 
 **Bar-widget note (Omarchy 4.0.x).** Keystroke also ships the menu button as a bar widget, so enabling it puts a button in your bar (replacing the stock one in place if you had it). For a third-party plugin, "enabled" means "referenced in shell.json", so removing that button from the bar also disables the menu. If you do not want the button, keep the plugin listed under `plugins[]` in `~/.config/omarchy/shell.json` instead.
 

@@ -88,21 +88,27 @@ def serve(model, stream):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', choices=MODELS, default='small')
-    parser.add_argument('--data-dir', type=Path, required=True)
+    parser.add_argument('--model-dir', type=Path, help='directory holding config.json, tokenizer.json and model.safetensors (verified by matching-start.py)')
+    parser.add_argument('--data-dir', type=Path, help='legacy huggingface_hub cache root, used when --model-dir is absent')
     parser.add_argument('--install-only', action='store_true')
     args = parser.parse_args()
-    from huggingface_hub import snapshot_download
     from model2vec import StaticModel
-    name, revision = MODELS[args.model]
-    cache = args.data_dir / 'models'
     files = ['config.json', 'tokenizer.json', 'model.safetensors']
-    try:
-        location = snapshot_download(name, revision=revision, cache_dir=cache, local_files_only=True, allow_patterns=files)
-        if not all((Path(location) / f).exists() for f in files):
-            raise FileNotFoundError('Model download incomplete')
-    except (FileNotFoundError, OSError):
-        emit({'type':'status', 'message':'Downloading ' + args.model + ' matching model'})
-        location = snapshot_download(name, revision=revision, cache_dir=cache, allow_patterns=files)
+    if args.model_dir is not None:
+        location = args.model_dir
+        if not all((location / f).exists() for f in files):
+            raise FileNotFoundError('Model files are missing')
+    else:
+        from huggingface_hub import snapshot_download
+        name, revision = MODELS[args.model]
+        cache = args.data_dir / 'models'
+        try:
+            location = snapshot_download(name, revision=revision, cache_dir=cache, local_files_only=True, allow_patterns=files)
+            if not all((Path(location) / f).exists() for f in files):
+                raise FileNotFoundError('Model download incomplete')
+        except (FileNotFoundError, OSError):
+            emit({'type':'status', 'message':'Downloading ' + args.model + ' matching model'})
+            location = snapshot_download(name, revision=revision, cache_dir=cache, allow_patterns=files)
     if args.install_only:
         # Loading validates a complete model before reporting installation success.
         StaticModel.from_pretrained(location)
