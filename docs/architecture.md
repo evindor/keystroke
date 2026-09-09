@@ -54,6 +54,18 @@ Quick mode explicitly disables shell, code execution, local environments, inheri
 
 ## Query flow
 
+Selection learning is the final ranking pass, after lexical and semantic matching.
+Remembered rows retain their general frecency bonus (12 points for one selection,
+capped at 36). A choice for the same normalized query and scope adds a separate
+72-point first-selection bonus, capped at 108, so a preferred file can overcome
+the file provider's score discount. Both weights decay with a 14-day half-life.
+Only current matching candidates in the item tier are reordered; learning cannot
+revive filtered rows or overtake computed answers. Query-specific choices share
+the existing bounded usage store as hashed keys, with no raw query text. Old usage
+data remains valid; query preferences start with selections made after this update.
+Query case and repeated whitespace are normalized; different prefixes and scopes
+learn independently. No embedding model or retraining is required for learning.
+
 Keystrokes debounce 16 ms, then the host calls `query(ctx)` on every enabled provider (root) or the owning provider (scoped). Before each call the host tests the provider's declared `patterns` (`core/Patterns.js`, compiled once per registry rebuild in `providers/Registry.qml`) against the query: the matched ids reach the provider as `ctx.patterns`, and the largest boost is added in `normalize()` to every row the provider returns that already has a positive score. Providers return rows synchronously. Anything slow (guards, dynamic menu providers, the time-zone helper) returns what it has, calls `ctx.pending()`, and later calls `host.requery()`; the host re-runs the query and keeps the selection. Rows are normalized, ranked by host-owned tiers (`answer > item > fallback`), scored within a tier, and reconciled into a fixed-role `ListModel` by uid so delegates update in place while typing. Previews are read from the selected row's JS object, never copied into the model.
 
 ## Omarchy menu parity

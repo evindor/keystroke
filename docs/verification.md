@@ -287,3 +287,14 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
 - Validation: 119 QML tests, application compatibility and palette integration
   checks passed. Plugin validation and qmllint passed (existing metadata
   warnings only). The live Applications screen rendered all 73 result rows.
+# Query-specific selection learning — 2026-09-09
+
+- Reproduced the `downlo` ranking with actual file scoring and Smart Match merge:
+  the Downloads folder loses to hotkeys before learning and ranks first after
+  one selection, with embeddings enabled or disabled.
+- Verified serialization, query/scope isolation, normalization, decaying/capped
+  weights, and answer/fallback tier boundaries. The actual palette integration
+  test activates a remembered result, reopens, and verifies the learned ranking.
+- Full `bin/keystroke test`: 140 QML tests passed, plus all integration checks;
+  plugin validation and `git diff --check` passed. The installed plugin was not
+  replaced as part of this change.

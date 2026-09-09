@@ -6,6 +6,7 @@
 var HALF_LIFE = 14 * 86400
 var MAX_ENTRIES = 2000
 var MAX_BONUS = 36
+var MAX_QUERY_BONUS = 108
 
 function parse(text) {
   var entries = {}
@@ -29,6 +30,19 @@ function serialize(entries) {
 
 function key(providerId, rowId) {
   return Qt.md5(String(providerId) + "/" + String(rowId))
+}
+
+// Separate namespace preserves existing usage data without storing search text.
+// Learn the actual query, not the embedding rewrite; scope keeps intent local.
+function queryKey(providerId, rowId, query, scope) {
+  var normalized = String(query || "").trim().toLowerCase().replace(/\s+/g, " ")
+  if (!normalized) return ""
+  return Qt.md5(JSON.stringify(["query", String(providerId), String(rowId), String(scope || ""), normalized]))
+}
+
+function queryBonus(entries, k, now) {
+  if (!k) return 0
+  return Math.min(MAX_QUERY_BONUS, 72 * Math.log2(1 + weight(entries, k, now)))
 }
 
 function weight(entries, k, now) {

@@ -33,7 +33,7 @@ queued query is kept while a request is in flight.
 
 The host retains exact matching, adds bounded typo recovery and a conditional
 Chrome-to-Chromium alias, and then adds semantic suggestions above fallbacks but
-below exact hits. It filters negation, command family, volume/brightness direction,
+below exact hits before applying learned query preferences. It filters negation, command family, volume/brightness direction,
 start/stop and contradictory on/off setters. A toggle is still presented as a
 **Toggle**: unknown current state is never treated as a guaranteed on/off setter.
 Equivalent commands are deduplicated while retaining confirmations. Results never

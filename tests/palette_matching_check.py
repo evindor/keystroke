@@ -79,6 +79,23 @@ ShellRoot {
      var chosen=palette.rows[0]
      palette.applyRows([{uid:"new",title:"New",score:130},chosen])
      test.check(palette.current.uid===chosen.uid,"late ranking preserves selected UID")
+     palette.usage={}
+     palette.registry.entries=[{key:"fixture",source:"bundled",patterns:[],provider:{name:"Fixture",settings:[],
+       query:function(ctx) { return [
+         {id:"video",title:"Download video from web app",score:100,remember:true,action:{type:"noop"}},
+         {id:"downloads",title:"Downloads",score:55,remember:true,action:{type:"noop"}}
+       ] }
+     }}]
+     palette.setQuery("downlo"); palette.requery()
+     test.check(palette.rows[0].id==="video","unlearned provider scores establish order")
+     var learningFixture=palette.registry.entries
+     palette.selected=1; palette.activate(false)
+     palette.open('{}'); palette.registry.entries=learningFixture; palette.setQuery("downlo"); palette.requery()
+     test.check(palette.rows[0].id==="downloads","one activation teaches the host query preference")
+     test.configure("all"); palette.requery()
+     test.check(palette.rows[0].id==="downloads","smart merge preserves learned ranking")
+     palette.setQuery("download video"); palette.requery()
+     test.check(palette.rows[0].id==="video","learning is local to the chosen query")
      palette.cancel()
      console.log("PASS palette matching modes, scope, catalog invalidation, raw text, exact fallback and selection")
      Qt.quit(); test.stage=4

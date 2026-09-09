@@ -311,11 +311,18 @@ Item {
   Process { id: stateDir; command: ["mkdir", "-p", root.home + "/.local/state/keystroke"]; running: true }
   function remember(row) {
     if (!row.remember) return
-    root.usage = Frecency.record(root.usage, Frecency.key(row.providerKey, row.id), Date.now() / 1000)
+    var now = Date.now() / 1000
+    var next = Frecency.record(root.usage, Frecency.key(row.providerKey, row.id), now)
+    var queryKey = Frecency.queryKey(row.providerKey, row.id, root.voiceRawText || search.text, root.scope)
+    if (queryKey) next = Frecency.record(next, queryKey, now)
+    root.usage = next
     usageFile.setText(Frecency.serialize(root.usage))
   }
   function bonusFor(row) {
-    return row.remember ? Frecency.bonus(root.usage, Frecency.key(row.providerKey, row.id), Date.now() / 1000) : 0
+    if (!row.remember) return 0
+    var now = Date.now() / 1000
+    return Frecency.bonus(root.usage, Frecency.key(row.providerKey, row.id), now)
+      + Frecency.queryBonus(root.usage, Frecency.queryKey(row.providerKey, row.id, root.voiceRawText || search.text, root.scope), now)
   }
 
   // ----------------------------------------------------------------- state

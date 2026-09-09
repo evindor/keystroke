@@ -138,7 +138,8 @@ function merge(base, catalog, req, matches) {
     put(row, lexical(req, row, hasChrome), false)
   }
   // Similarity generates suggestions, not an execution-confidence decision.
-  // Exact lexical hits remain above semantic-only suggestions; Enter still runs.
+  // Exact lexical hits start above semantic-only suggestions; the host applies
+  // learned preferences afterward. Enter still runs the selected action.
   for (i = 0; i < (matches || []).length && i < 30; i++) {
     var hit = matches[i], candidate = candidates[hit.id]
     if (candidate && typeof hit.score === "number" && isFinite(hit.score) && hit.score >= 0.5)
