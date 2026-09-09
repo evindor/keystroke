@@ -28,6 +28,32 @@ Item {
   function rebuild() {}
 }
 ''')
+# Smart Match's descriptions are public data; its worker never starts.
+(DEST / 'matching').mkdir(exist_ok=True)
+for name in ('descriptions.json', 'description-keys.json'):
+    shutil.copy2(ROOT / 'matching' / name, DEST / 'matching' / name)
+(DEST / 'matching/Session.qml').write_text('''import QtQuick
+Item {
+  property bool enabled: false
+  property string model: "small"
+  property bool ready: false
+  property bool starting: false
+  property bool failed: false
+  property string status: "Model unloaded"
+  property string error: ""
+  property string requestedKey: ""
+  property string resultKey: ""
+  property var matches: []
+  readonly property bool loaded: false
+  readonly property bool busy: false
+  signal changed()
+  function configure() {}
+  function shutdown() {}
+  function retry() {}
+  function cancelRequest() {}
+  function submit(key, query, rows, catalogKey) {}
+}
+''')
 (DEST / 'voice/VoiceSession.qml').write_text('''import QtQuick
 Item {
   property var host: null
