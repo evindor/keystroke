@@ -2,11 +2,11 @@
 .import "Match.js" as Match
 
 // Extensions: community providers as installable Omarchy plugins, managed
-// from inside the palette. Pure functions over the Omarchy plugin registry,
-// the Keystroke extension index, the marketplace catalog and the output of the
+// from inside the palette. Pure functions over the plugin folder scan, the
+// Keystroke extension index, the marketplace catalog and the output of the
 // git/omarchy commands the provider runs. providers/Extensions.qml owns the
-// processes; everything that decides what to show or run lives here so it can
-// be unit-tested.
+// processes and providers/Registry.qml the services; everything that decides
+// what to show or run lives here so it can be unit-tested.
 //
 // Scopes: extensions (the screen) › extensions/<plugin id> (one extension)
 
@@ -103,19 +103,23 @@ function discover(indexEntries, catalogEntries) {
   return out
 }
 
-// Installed extensions from the Omarchy registry: every plugin carrying the
-// marker, loaded or not. isEnabled(id): Omarchy's own switch (shell.json);
-// enabledIn(id): Keystroke's (keystroke.json); git: { id: { head, remote,
-// remoteHead } } from the last update check.
-function installed(installedPlugins, isEnabled, enabledIn, git) {
+// Installed extensions: every folder under the plugins directory whose
+// manifest carries the marker, as the scan found them (parseScan).
+// enabledIn(id): Keystroke's switch (keystroke.json); problems: the
+// registry's [{ pluginId, message }], the first of which per id is shown;
+// git: { id: { head, remote, remoteHead } } from the last update check.
+function installed(manifests, enabledIn, git, problems) {
+  var trouble = ({})
+  for (var p = 0; p < (problems || []).length; p++)
+    if (problems[p] && !trouble[problems[p].pluginId]) trouble[problems[p].pluginId] = safeString(problems[p].message, 300)
   var out = []
-  for (var id in installedPlugins || {}) {
-    var m = installedPlugins[id]
+  for (var id in manifests || {}) {
+    var m = manifests[id]
     if (!m || typeof m !== "object" || !m[MARKER] || typeof m[MARKER] !== "object") continue
     var g = git && git[id] ? git[id] : null
     out.push({ id: id, name: safeString(m.name, 80) || id, version: safeString(m.version, 64), description: safeString(m.description, 300),
                author: safeString(m.author, 80), homepage: safeString(m.homepage, 512), apiVersion: m[MARKER].apiVersion,
-               loaded: isEnabled ? !!isEnabled(id) : false, enabled: enabledIn ? !!enabledIn(id) : false,
+               enabled: enabledIn ? !!enabledIn(id) : true, problem: trouble[id] || "",
                git: g ? g.git !== false : true, remote: g ? g.remote : "", checked: !!(g && g.fetched),
                updateAvailable: !!(g && g.head && g.remoteHead && g.head !== g.remoteHead) })
   }
@@ -142,8 +146,13 @@ function iconOf(e) { return { icon: e.icon || ICON, iconFont: e.iconFont || "", 
 function pluginsDir(home) { return home + "/.config/omarchy/plugins" }
 function bin(omarchyPath, name) { return omarchyPath + "/bin/" + name }
 
-function installArgv(omarchyPath, url) { return [bin(omarchyPath, "omarchy-plugin-add"), url, "--yes", "--enable"] }
+// Never --enable: Keystroke loads the service itself, and a plugins[] entry
+// in shell.json would only make omarchy-shell run a second, idle copy.
+function installArgv(omarchyPath, url) { return [bin(omarchyPath, "omarchy-plugin-add"), url, "--yes"] }
 function updateArgv(omarchyPath, id) { return [bin(omarchyPath, "omarchy-plugin-update"), id, "--yes"] }
+// The QML engine keeps the old component cached (Quickshell 0.3.1 has no
+// Qt.clearComponentCache), so an update's new code runs after a shell restart.
+function updatedText(name) { return "Updated " + name + " · omarchy-restart-shell loads its new code" }
 function removeArgv(omarchyPath, id) { return [bin(omarchyPath, "omarchy-plugin-remove"), id, "--yes"] }
 
 // One fetch per git-managed extension; prints `id \t HEAD \t remote HEAD \t remote url`
@@ -157,6 +166,58 @@ var CHECK_SCRIPT = 'dir="$1"; shift; for id in "$@"; do d="$dir/$id"; ' +
 
 function checkArgv(home, ids) {
   return ["env", "GIT_TERMINAL_PROMPT=0", "GIT_SSH_COMMAND=ssh -oBatchMode=yes", "bash", "-c", CHECK_SCRIPT, "keystroke-extensions", pluginsDir(home)].concat(ids || [])
+}
+
+// ------------------------------------------------------------------- scan
+// omarchy-shell shows a third-party plugin only its own manifest and hands
+// out only its own service, so Keystroke reads the plugins directory itself.
+// One record per manifest, NUL-terminated: the path on the first line, the
+// file after it (JSON never contains a raw NUL). The shell glob skips dot
+// folders such as the backups bin/keystroke install leaves behind.
+var SCAN_SCRIPT = 'dir="$1"; for m in "$dir"/*/manifest.json; do [ -f "$m" ] || continue; printf "%s\\n" "$m"; cat "$m"; printf "\\0"; done'
+function scanArgv(home) { return ["bash", "-c", SCAN_SCRIPT, "keystroke-extensions-scan", pluginsDir(home)] }
+
+// { manifests: { id: manifest with __sourceDir }, problems: [{ pluginId, message }] }.
+// Folders without the marker are other Omarchy plugins and are ignored; a
+// marked manifest that cannot be used is reported so the Extensions screen
+// and Settings can say why. The folder name must equal the id: that is what
+// omarchy-plugin-add produces and what update, remove and the git check key on.
+function parseScan(text) {
+  var manifests = ({}), problems = []
+  var records = String(text || "").split("\u0000")
+  for (var i = 0; i < records.length; i++) {
+    var rec = records[i], nl = rec.indexOf("\n")
+    if (nl < 0) continue
+    var path = rec.slice(0, nl), body = rec.slice(nl + 1)
+    var dir = path.replace(/\/manifest\.json$/, ""), folder = dir.slice(dir.lastIndexOf("/") + 1)
+    var m
+    try { m = JSON.parse(body) }
+    catch (e) { if (body.indexOf('"' + MARKER + '"') >= 0) problems.push({ pluginId: folder, message: "manifest.json is not valid JSON" }); continue }
+    if (!m || typeof m !== "object" || !m[MARKER] || typeof m[MARKER] !== "object") continue
+    var id = safeString(m.id, 120)
+    if (id !== folder) { problems.push({ pluginId: folder, message: "Folder name must equal the plugin id (" + (id || "missing") + ")" }); continue }
+    m.__sourceDir = dir
+    manifests[id] = m
+  }
+  return { manifests: manifests, problems: problems }
+}
+
+// file:// URL of the service entry point, or "" when the manifest declares
+// none or points outside its folder.
+function serviceUrl(manifest) {
+  if (!manifest || typeof manifest !== "object" || !manifest.__sourceDir) return ""
+  var kinds = Array.isArray(manifest.kinds) ? manifest.kinds : []
+  var ep = manifest.entryPoints && typeof manifest.entryPoints === "object" ? manifest.entryPoints.service : ""
+  if (kinds.indexOf("service") < 0 || typeof ep !== "string" || !ep) return ""
+  if (ep.charAt(0) === "/" || ep.split("/").indexOf("..") >= 0) return ""
+  return "file://" + manifest.__sourceDir + "/" + ep
+}
+
+// The manifest an extension sees: its own file, without the host's stamps.
+function publicManifest(manifest) {
+  var copy = JSON.parse(JSON.stringify(manifest || {}))
+  for (var k in copy) if (k.indexOf("__") === 0) delete copy[k]
+  return copy
 }
 
 function parseCheck(text) {
@@ -179,11 +240,13 @@ function fetchArgv(url) { return ["curl", "-fsSL", "--max-time", "20", "--", url
 
 // Jobs run detached from the palette: omarchy-plugin-add/update/remove ask
 // the shell to rescan its plugins, and a rescan destroys and recreates every
-// plugin instance, this provider included. The wrapper records the job in
-// <dir>/job.json, runs the command, writes <dir>/result.json (job, exit code,
-// output) and, for anything but a check, tells the user through a
-// notification; whichever provider instance is alive next reads the result.
-var JOB_SCRIPT = 'dir="$1"; job="$2"; notify="$3"; label="$4"; shift 4; mkdir -p "$dir"; printf "%s" "$job" > "$dir/job.json"; ' +
+// plugin instance, this provider included. The wrapper drops the previous
+// job's result, records the job in <dir>/job.json, runs the command, writes
+// <dir>/result.json (job, exit code, output) and, for anything but a check,
+// tells the user through a notification; whichever provider instance is
+// alive next reads the result. Nothing else deletes result.json: a detached
+// removal could take a newer job's result with it.
+var JOB_SCRIPT = 'dir="$1"; job="$2"; notify="$3"; label="$4"; shift 4; mkdir -p "$dir"; rm -f "$dir/result.json"; printf "%s" "$job" > "$dir/job.json"; ' +
   '"$@" > "$dir/log" 2>&1; code=$?; ' +
   'jq -n --arg code "$code" --rawfile log "$dir/log" --argjson job "$job" \'{job: $job, code: ($code | tonumber), output: $log}\' > "$dir/result.tmp" && mv "$dir/result.tmp" "$dir/result.json"; ' +
   'rm -f "$dir/job.json"; ' +
@@ -209,19 +272,24 @@ function navRow(score) {
            description: "extensions plugins store marketplace community providers install update", action: navigate(KEY, "Extensions") }
 }
 
+// Keystroke's switch is a plain setting effect; the host writes it and requeries.
+function enableEffect(id, value) {
+  return { type: "setting", path: ["providers", id], key: "enabled", value: !!value, schema: { key: "enabled", type: "boolean" } }
+}
+
 function stateText(e) {
-  if (!e.loaded) return "Not loaded"
+  if (e.problem) return "Needs attention"
   return e.enabled ? "On" : "Off"
 }
 
 function installedRow(e, scoped) {
   var state = e.updateAvailable ? "Update available" : stateText(e)
-  var sub = (e.version ? "v" + e.version + " · " : "") + (e.loaded ? (e.enabled ? "Enabled" : "Installed, off in Keystroke") : "Installed, not loaded in omarchy-shell") + " · " + e.id
+  var sub = (e.version ? "v" + e.version + " · " : "") + (e.problem ? e.problem : e.enabled ? "Enabled" : "Off in Keystroke") + " · " + e.id
   var ic = iconOf(e)
   return { id: "installed/" + e.id, title: e.name, subtitle: sub, icon: ic.icon, iconFont: ic.iconFont, iconSource: ic.iconSource, tint: ic.tint,
            section: "Installed", verb: "Open", tier: "item", order: 0,
            accessory: state, keywords: e.id, description: e.description, badge: "plugin", path: scoped ? "" : "Extensions › " + e.name,
-           action: navigate(KEY + "/" + e.id, e.name), altAction: e.enabled ? op("enable", { id: e.id, name: e.name, value: false }) : op("enable", { id: e.id, name: e.name, value: true }),
+           action: navigate(KEY + "/" + e.id, e.name), altAction: enableEffect(e.id, !e.enabled),
            hint: e.enabled ? "ctrl ↵ turn off" : "ctrl ↵ turn on" }
 }
 
@@ -278,13 +346,12 @@ function screenRows(query, state) {
 function detailRows(query, e, state) {
   var rows = []
   if (state && state.job && state.job.id === e.id) rows.push(jobRow(state.job))
-  var loadedSchema = { key: "loaded", type: "boolean" }
-  rows.push({ id: e.id + "/enabled", title: "Enabled", subtitle: e.loaded ? "Include this extension's results in Keystroke" : "Turning it on also loads the plugin into omarchy-shell",
+  rows.push({ id: e.id + "/enabled", title: "Enabled", subtitle: "Include this extension's results in Keystroke",
               icon: "", section: e.name, verb: "Toggle", tier: "item", order: 0, accessory: e.enabled ? "On" : "Off", keywords: "enable disable on off",
-              action: op("enable", { id: e.id, name: e.name, value: !e.enabled }) })
-  rows.push({ id: e.id + "/loaded", title: "Loaded in omarchy-shell", subtitle: e.loaded ? "The plugin's service is running in your shell" : "Not loaded: omarchy plugin enable " + e.id,
-              icon: "", section: e.name, verb: "Toggle", tier: "item", order: 1, accessory: e.loaded ? "On" : "Off", keywords: "load unload shell omarchy",
-              action: op("load", { id: e.id, name: e.name, value: !e.loaded }) })
+              action: enableEffect(e.id, !e.enabled) })
+  if (e.problem)
+    rows.push({ id: e.id + "/problem", title: "Needs attention", subtitle: e.problem, icon: "󰀦", section: e.name, verb: "", tier: "item", order: 1,
+                disabled: true, keywords: "problem error attention", action: { type: "noop" } })
   rows.push({ id: e.id + "/settings", title: "Settings", subtitle: "Keystroke Settings › " + e.name, icon: "󰒓", section: e.name, verb: "Open", tier: "item", order: 2,
               action: navigate("settings/" + e.id, e.name) })
   if (e.git) {
@@ -299,7 +366,7 @@ function detailRows(query, e, state) {
   if (e.homepage || e.remote)
     rows.push({ id: e.id + "/repo", title: "Open repository", subtitle: e.homepage || e.remote, icon: "", section: e.name, verb: "Open", tier: "item", order: 4,
                 keywords: "repository github source homepage", action: { type: "url", url: e.homepage || e.remote } })
-  rows.push({ id: e.id + "/remove", title: "Remove", subtitle: "Unloads the plugin and deletes " + e.id + " from ~/.config/omarchy/plugins", icon: "󰆴", section: e.name,
+  rows.push({ id: e.id + "/remove", title: "Remove", subtitle: "Stops the extension and deletes " + e.id + " from ~/.config/omarchy/plugins", icon: "󰆴", section: e.name,
               verb: "Remove", tier: "item", order: 9, keywords: "remove uninstall delete",
               confirm: "Remove " + e.name + "? Its Keystroke settings stay in keystroke.json.", action: op("remove", { id: e.id, name: e.name }) })
   var ic = iconOf(e)

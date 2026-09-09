@@ -3,10 +3,12 @@
 
 A fake HOME holds the plugin folder, a local bare git repository plays the
 extension's upstream, a file:// index plays the Keystroke index, and a stub
-`omarchy-shell` answers the IPC calls the scripts make (rescan, list, enable).
-Everything else is real: omarchy-plugin-add/update/remove/validate, git, curl.
-The harness installs, checks for updates, updates, toggles, and removes the
-extension through the provider's own query()/activate() entry points.
+`omarchy-shell` answers the IPC calls the scripts make (rescan, list).
+Everything else is real: omarchy-plugin-add/update/remove/validate, git, curl,
+and the plugin-folder scan the registry uses (core/Extensions.js scanArgv and
+parseScan) stands in for providers/Registry.qml. The harness installs, checks
+for updates, updates, toggles, and removes the extension through the
+provider's own query()/activate() entry points.
 """
 import json
 import os
@@ -96,6 +98,7 @@ elif args[:2] in (["shell", "enablePlugin"], ["shell", "setPluginEnabled"]):
 import Quickshell
 import Quickshell.Io
 import "project/providers" as Providers
+import "project/core/Extensions.js" as Extensions
 ShellRoot {
   id: test
   property int stage: 0
@@ -109,40 +112,25 @@ ShellRoot {
   function titles() { return rows.map(function(r) { return r.title }).join(" | ") }
   function row(id) { for (var i = 0; i < rows.length; i++) if (rows[i].id === id) return rows[i]; return null }
 
-  // Stand-in for the shell's PluginRegistry: manifests are read from disk on rescan().
+  // Stand-in for providers/Registry.qml as Extensions.qml sees it: the same scan, the same parser.
   QtObject {
-    id: registry
-    signal pluginsChanged()
-    property var installedPlugins: ({})
-    property var enabledIds: ({})
-    property string lastEnableError: ""
-    function isEnabled(id) { return !!enabledIds[id] }
-    function setEnabled(id, value, placement) {
-      if (value && !installedPlugins[id]) { lastEnableError = "unknown"; return false }
-      var next = ({}); for (var k in enabledIds) next[k] = enabledIds[k]
-      if (value) next[id] = true; else delete next[id]
-      enabledIds = next; pluginsChanged(); return true
-    }
+    id: reg
+    property var manifests: ({})
+    property var problems: []
+    function scan() { scanProc.running = true }
   }
   Process {
-    id: scan
-    command: ["bash", "-c", "for m in \\"$1\\"/*/manifest.json; do [ -f \\"$m\\" ] || continue; echo \\"===$m\\"; cat \\"$m\\"; done", "scan", %(plugins)s]
-    stdout: StdioCollector { onStreamFinished: {
-      var out = ({}), parts = text.split("===").filter(Boolean)
-      for (var i = 0; i < parts.length; i++) { var nl = parts[i].indexOf("\\n"); try { var m = JSON.parse(parts[i].slice(nl + 1)); out[m.id] = m } catch (e) {} }
-      registry.installedPlugins = out
-      var en = ({}); for (var id in out) en[id] = true   // omarchy-plugin-add --enable enables what it installs
-      registry.enabledIds = en
-      registry.pluginsChanged()
-    } }
+    id: scanProc
+    command: Extensions.scanArgv(%(home)s)
+    stdout: StdioCollector { onStreamFinished: { var found = Extensions.parseScan(text); reg.manifests = found.manifests; reg.problems = found.problems } }
     onExited: test.advance()
   }
-  function rescan() { scan.running = true }
+  function rescan() { reg.scan() }
 
   // Stand-in for Keystroke.qml as providers see it.
   QtObject {
     id: host
-    property var pluginRegistry: registry
+    property var registry: reg
     property var config: ({ version: 1, providers: {} })
     property string statusMessage: ""
     property string errorMessage: ""
@@ -174,7 +162,7 @@ ShellRoot {
   Timer { id: guard; interval: 40000; running: true; onTriggered: { console.log("FAIL timeout at stage", test.stage, "job", JSON.stringify(ext.job), "fetching", ext.fetching); Qt.quit() } }
 
   function advance() {
-    if (scan.running) return
+    if (scanProc.running) return
     switch (stage) {
     case 0:   // fresh: nothing installed, index fetched from file://
       stage = 1; rescan(); return
@@ -205,15 +193,19 @@ ShellRoot {
       check(host.errorMessage === "", "install succeeded: " + host.errorMessage)
       check(host.statusMessage === "Installed Probe", "status after install: " + host.statusMessage)
       stage = 3; rescan(); return
-    case 3:   // the registry now knows the plugin; afterInstall's retry should turn it on in keystroke.json and check it
-      if (!idle() || !(host.config.providers[%(id)s] || {}).enabled) return
+    case 3:   // afterInstall rescanned the folder and checked the fresh clone; nothing was written to keystroke.json
+      if (!idle() || !reg.manifests[%(id)s]) return
       query("extensions", "")
       var r = row("installed/" + %(id)s)
       check(r !== null && r.accessory === "On", "installed row is on: " + JSON.stringify(r && r.accessory))
+      check(Object.keys(host.config.providers).length === 0, "install writes nothing to keystroke.json: " + JSON.stringify(host.config.providers))
+      check(!(reg.manifests[%(id)s].__sourceDir === undefined), "scan stamps the source folder")
       stage = 4; return
     case 4:
       if (!idle()) return
-      check(host.statusMessage === "Extensions are up to date", "fresh clone is up to date: " + host.statusMessage)
+      check(host.statusMessage === "Installed Probe", "the quiet check after an install keeps the install status: " + host.statusMessage)
+      query("extensions", "")
+      check(row("check").subtitle.indexOf("Checked ") === 0, "fresh clone was checked: " + row("check").subtitle)
       test.bumpUpstream(); stage = 5; return
     case 5:   // a new upstream commit: check finds it, update applies it, validation passes
       if (bumpProc.running) return
@@ -232,26 +224,28 @@ ShellRoot {
       stage = 7; return
     case 7:
       if (!idle()) return
-      check(host.statusMessage === "Updated Probe", "update applied: " + host.statusMessage + " " + host.errorMessage)
+      check(host.statusMessage === "Updated Probe · omarchy-restart-shell loads its new code", "update applied, restart advised: " + host.statusMessage + " " + host.errorMessage)
       stage = 8; rescan(); return
     case 8:
       query("extensions/" + %(id)s, "")
-      check(registry.installedPlugins[%(id)s].version === "1.1.0", "manifest on disk is the new version")
+      check(reg.manifests[%(id)s].version === "1.1.0", "manifest on disk is the new version")
       check(row(%(id)s + "/update").title === "Check for updates", "no pending update after the merge")
-      // Turning off and on: Keystroke's switch is a setting effect; loading is the registry's.
+      check(row(%(id)s + "/loaded") === null, "no second switch: the shell does not load extensions")
+      // Turning off and on: Keystroke's switch is a setting effect the host writes.
       var off = activate(row(%(id)s + "/enabled"))
       check(off.type === "setting" && off.value === false && off.path[1] === %(id)s, "disable is a setting effect")
-      host.saveConfig({ version: 1, providers: {} })
-      var unload = activate(row(%(id)s + "/loaded"))
-      check(unload.type === "noop" && !registry.isEnabled(%(id)s), "unload goes through PluginRegistry.setEnabled")
+      var saved = { version: 1, providers: {} }; saved.providers[%(id)s] = { enabled: false }
+      host.saveConfig(saved)
       query("extensions/" + %(id)s, "")
-      check(row(%(id)s + "/enabled").subtitle.indexOf("also loads") > 0, "enable explains it will load")
+      check(row(%(id)s + "/enabled").accessory === "Off", "off once saved")
       var on = activate(row(%(id)s + "/enabled"))
-      check(on.type === "setting" && on.value === true && registry.isEnabled(%(id)s), "enable loads the plugin first")
+      check(on.type === "setting" && on.value === true, "enable is a setting effect")
+      host.saveConfig({ version: 1, providers: {} })
       // Ctrl+Enter on the list row toggles too.
       query("extensions", "")
+      check(row("installed/" + %(id)s).accessory === "On", "on again with nothing saved")
       var alt = activate(row("installed/" + %(id)s), true)
-      check(alt.type === "setting" && alt.value === true, "alternate action toggles enabled")
+      check(alt.type === "setting" && alt.value === false, "alternate action toggles enabled")
       activate(row(%(id)s + "/remove") || query("extensions/" + %(id)s, "") && row(%(id)s + "/remove"))
       check(ext.job && ext.job.kind === "remove", "remove job started")
       stage = 9; return
@@ -272,7 +266,7 @@ ShellRoot {
   Process { id: bumpProc; command: ["python3", %(bump)s]; onExited: function(code) { if (code !== 0) console.log("FAIL bump", code) } }
   function bumpUpstream() { bumpProc.running = true }
 }
-''' % dict(project=str(project), index=json.dumps("file://" + str(index)), upstream=json.dumps(str(upstream)), plugins=json.dumps(str(plugins)), id=json.dumps(PLUGIN_ID), bump=json.dumps(str(work / "bump.py"))))
+''' % dict(project=str(project), index=json.dumps("file://" + str(index)), upstream=json.dumps(str(upstream)), home=json.dumps(str(home)), id=json.dumps(PLUGIN_ID), bump=json.dumps(str(work / "bump.py"))))
 
     (work / "bump.py").write_text(f'''import json, subprocess, os
 src = {json.dumps(str(src))}; up = {json.dumps(str(upstream))}
