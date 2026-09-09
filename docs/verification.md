@@ -1,5 +1,31 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.2.0 (2026-09-09)
+
+- Full offscreen `bin/keystroke test` on the release tree (`QT_QPA_PLATFORM=offscreen`,
+  `QT_QPA_PLATFORMTHEME=generic`, `QT_QUICK_BACKEND=software`, `UV_OFFLINE=1`):
+  148 QML tests, the application, file, catalog, matching session, palette
+  matching, shortcut and motion checks, the matching worker and engine checks
+  (build, protocol, tokenizer parity, shipped-binary digest), voice, clipboard,
+  Codex, dictation and 48 time-zone cases passed. The suite then stopped at
+  `tests/extensions_check.py`, which fails its "update applied" step
+  ("Extensions are up to date" instead of "Updated Probe") on three runs here and
+  identically on the exported 1.1.5 tree (`origin/main` at `4798c4a`): the
+  update job schedules a check job the moment it finishes and the check's status
+  overwrites the update's before the harness reads it, the race recorded under
+  the time-zone entry below. Every other step of that check passes (install,
+  update detection, update job, manifest at the new version, toggles, removal).
+- Run separately after that stop: `tests/hotkeys_check.py` against the live
+  `omarchy-menu-keybindings` on this machine passed; `tests/lint.sh` exits 0
+  with 81 warnings, unchanged from the animation-tiers entry; `bin/keystroke
+  validate`, `git diff --check`, `site/check.py` and `node --check site/script.js`
+  pass.
+- Release scope: the fourteen commits on `dev` after the 1.1.5 release merge,
+  `c7cc2cb` (Smart Match) through `c2213e2` (Instant window transition), plus
+  the release documentation. The installed plugin was not replaced and no live
+  desktop check was run for this release; the manifest was already at 1.2.0.
+  See [release notes](releases/v1.2.0.md).
+
 ## Animation tiers (2026-09-09)
 
 Appearance gained **Animations** (Off, Snappy, Fluid; default Snappy) and

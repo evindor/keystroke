@@ -1,12 +1,12 @@
 # Keystroke
 
-A Raycast-style command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin in QML and JavaScript, running inside the existing `omarchy-shell` process, themed by whatever Omarchy theme is active. Type, or speak, what you want: apps, the whole Omarchy menu, calculations, conversions, colors, emoji, clipboard history, files, Codex, and anything a community extension adds.
+A Raycast-style command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin in QML and JavaScript, running inside the existing `omarchy-shell` process, themed by whatever Omarchy theme is active. Type, or speak, what you want: apps, the whole Omarchy menu, calculations, conversions, colors, emoji, clipboard history, files, Codex, and anything a community extension adds. Smart Match, a small embedding model running locally, understands what you mean when the words do not match exactly.
 
 <p align="center"><a href="https://evindor.github.io/keystroke/"><img src="site/assets/social-card.png" alt="Keystroke: Raycast-style power for Omarchy" width="960"></a></p>
 
 **[Explore the feature showcase and installation guide →](https://evindor.github.io/keystroke/)**
 
-[Release notes: 1.1.5](docs/releases/v1.1.5.md) — Omarchy 4.0.3 compatibility, time-zone queries, and voice and extension improvements.
+[Release notes: 1.2.0](docs/releases/v1.2.0.md) — Smart Match on a compiled engine, fuzzy file search with `~`, `Ctrl+1`…`Ctrl+8`, animation tiers, and a lighter UI thread. Earlier: [1.1.5](docs/releases/v1.1.5.md).
 
 Screenshots show the real Omarchy interface with public demo data.
 
@@ -54,8 +54,30 @@ Requires Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). Like every Omarchy plugin,
 - **Assistant hand-offs** open the target with your prompt already in its composer, nothing goes through the clipboard: Claude desktop via `claude://claude.ai/new?q=…`, the Codex desktop app via `codex://threads/new?prompt=…`, or the browser (`claude.ai/new?q=`, `chatgpt.com/?prompt=`; `?q=` sends immediately when **Send immediately in the browser** is on). CLI mode opens a terminal with `claude` or `codex` and the prompt as a literal argument.
 - **Keys**: `↑`/`↓` or `Ctrl+P`/`Ctrl+N` move, `PageUp`/`PageDown` jump six rows, `↵` or `→` activates, `Ctrl+1`…`Ctrl+8` activate the first to eighth result directly (holding `Ctrl` shows each row's number in place of its icon), `Ctrl+↵` runs a row's alternate action, `Esc` closes, `Ctrl+U` clears the query, `←`/`Backspace` on an empty query goes back, `Del` on an application offers to uninstall it, `Ctrl+,` opens Settings, `Ctrl+K` opens the selected provider's settings.
 - **Destructive Omarchy actions** (shutdown, reboot, logout, hibernate, removals, config resets) ask for confirmation; turn this off in Settings → Omarchy.
-- **Frecency.** Selections of apps, Omarchy commands and hotkeys earn a bounded bonus (14-day half-life). State lives in `~/.local/state/keystroke/usage.json` as hashed ids only.
+- **Frecency and learned preferences.** Selections of apps, Omarchy commands and hotkeys earn a bounded bonus (14-day half-life), and choosing a result for a query lifts that result the next time the same query is typed or spoken in the same scope. State lives in `~/.local/state/keystroke/usage.json` as hashed ids only, never as query text.
 - **Every `omarchy menu` route works as before**: submenus open scoped (`omarchy menu toggle system`), leaf aliases run immediately (`omarchy menu summon reminder-set`), `apps` opens the Applications provider. Pickers honor `width`/`maxHeight`; a new picker request cancels a pending one.
+
+## Smart Match
+
+**Keystroke Settings > Matching** contains:
+
+- **Smart match** — “Match queries using an embedding model”: **Off** (model
+  unloaded), **Only voice**, or **Voice and text** (default).
+- **Matching model** — **Small (2M)** (default) or **Large (8M)**. Large downloads
+  once when first used; switching Off releases the model but keeps its files.
+
+Smart Match supplements exact and fuzzy search with action descriptions and local
+semantic suggestions. It keeps launch/install/remove and start/stop distinct,
+recognizes small typos, and offers Chromium for “launch Chrome” when Chrome is
+absent. Spoken arithmetic such as “27 plus 90” becomes `27 + 90`; dictation and
+assistant prompts retain the original transcript. Results still require Enter and
+keep their existing confirmations. Ambiguous speech can still need correction.
+
+Both models run locally on CPU. The runtime unloads after two idle minutes, and a
+setup failure leaves ordinary matching available. Use **Retry Smart Match** in the
+Matching settings screen or `bin/keystroke matching` to retry installation. Runtime
+files live under `~/.local/share/keystroke/matching` (or `XDG_DATA_HOME`). More detail
+is in [the matching runtime documentation](matching/README.md).
 
 ## Extensions
 
@@ -122,25 +144,3 @@ bin/keystroke test         # qmltestrunner unit tests, Quickshell integration ch
 ## License
 
 MIT, see [LICENSE](LICENSE). Omarchy's MIT-licensed menu model is vendored in [omarchy/MenuModel.js](omarchy/MenuModel.js).
-
-## Smart Match
-
-**Keystroke Settings > Matching** contains:
-
-- **Smart match** — “Match queries using an embedding model”: **Off** (model
-  unloaded), **Only voice**, or **Voice and text** (default).
-- **Matching model** — **Small (2M)** (default) or **Large (8M)**. Large downloads
-  once when first used; switching Off releases the model but keeps its files.
-
-Smart Match supplements exact and fuzzy search with action descriptions and local
-semantic suggestions. It keeps launch/install/remove and start/stop distinct,
-recognizes small typos, and offers Chromium for “launch Chrome” when Chrome is
-absent. Spoken arithmetic such as “27 plus 90” becomes `27 + 90`; dictation and
-assistant prompts retain the original transcript. Results still require Enter and
-keep their existing confirmations. Ambiguous speech can still need correction.
-
-Both models run locally on CPU. The runtime unloads after two idle minutes, and a
-setup failure leaves ordinary matching available. Use **Retry Smart Match** in the
-Matching settings screen or `bin/keystroke matching` to retry installation. Runtime
-files live under `~/.local/share/keystroke/matching` (or `XDG_DATA_HOME`). More detail
-is in [the matching runtime documentation](matching/README.md).
