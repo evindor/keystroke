@@ -23,11 +23,18 @@ straight from Hugging Face, comparing each against the SHA-256 digest recorded i
 the script; a file cached by an earlier release's `huggingface_hub` layout is reused
 when its digest matches. It then serves the model through the first of:
 
-1. `matching/bin/keystroke-matching`, a prebuilt binary shipped with the plugin.
+1. `matching/bin/keystroke-matching`, the static x86_64 binary shipped with the
+   plugin (1.5 MB, no shared-library dependencies). Its manifest
+   (`keystroke-matching.json`) names the machine architecture and the fingerprint
+   of the engine source it was built from; the binary is used only while both match
+   the running machine and the checked-out source. `bin/keystroke engine`
+   (`matching/engine/build-prebuilt.sh`) rebuilds it after an engine change, and
+   `tests/matching_engine_check.py` fails while it is stale.
 2. `matching/engine`, the Rust source, built once per source revision with `cargo`
    (`--locked`; about ten seconds and a dozen small crates: serde, serde_json,
-   unicode-normalization, unicode_categories) into the data directory. Only the
-   finished binary is kept.
+   unicode-normalization, unicode_categories) into the data directory when the
+   shipped binary does not apply (another architecture, or a modified engine).
+   Only the finished binary is kept.
 3. The Python runtime from `requirements.lock` (`uv`, hash-locked), running
    `helpers/matching-worker.py`. Same protocol, same results.
 

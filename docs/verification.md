@@ -37,6 +37,12 @@ thread (1 ms resolution).
   5 ms, a query in under 0.1 ms. Model files are fetched by URL with pinned
   SHA-256 digests; `huggingface_hub` is no longer needed. The Python path remains
   as the fallback without cargo and serves the same protocol.
+- Shipped binary: `matching/bin/keystroke-matching` is a static-pie x86_64 build
+  (1.5 MB, `ldd`: statically linked) with a manifest naming the machine and the
+  engine-source fingerprint; the start script takes it only while both match. A
+  fresh data directory now needs only the 8 MB model download (1.8 s here) and no
+  cargo; the engine check verifies the manifest, digest and tokenizer parity of
+  the shipped binary as well.
 - Full `bin/keystroke test` except one pre-existing failure: 142 QML tests, all
   integration checks and the new `matching_engine_check.py` (build, protocol,
   parity) pass; `tests/extensions_check.py` fails at "update applied" on the

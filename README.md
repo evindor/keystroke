@@ -21,10 +21,11 @@ That is all. Enabling Keystroke makes it the menu: `Super+Space`, every `omarchy
 From a checkout, `bin/keystroke install` copies the tree into `~/.config/omarchy/plugins/evindor.keystroke` (no symlinks) and enables it; `bin/keystroke uninstall` reverses that.
 
 Smart Match defaults to **Voice and text** with the small **2M** embedding model.
-The first matching query fetches the model (8 MB, pinned digest) and builds the
-small compiled engine with `cargo` (about ten seconds once; 16 MiB resident,
-ready in tens of milliseconds). Without a Rust toolchain, Python 3 with `uv`
-installs the equivalent pinned runtime instead. Ordinary search remains available
+The first matching query fetches the model (8 MB, pinned digest) and starts the
+compiled engine shipped with the plugin (a static x86_64 binary; 16 MiB resident,
+ready in tens of milliseconds). On another architecture `cargo` builds it once from
+the included source, and without a Rust toolchain Python 3 with `uv` installs the
+equivalent pinned runtime instead. Ordinary search remains available
 during setup; checkout installation prepares everything ahead of time. After
 setup, matching works offline.
 

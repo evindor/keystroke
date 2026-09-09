@@ -92,6 +92,18 @@ with tempfile.TemporaryDirectory(prefix='keystroke-engine-') as temp:
     assert proc.wait(timeout=5) == 0
     print('ok protocol: ready, results, catalog replacement, bounded input, IDs-only output')
 
+    # The shipped binary must be current (built from this source) and must run.
+    shipped = root / 'matching/bin/keystroke-matching'
+    manifest = json.loads(shipped.with_suffix('.json').read_text())
+    fingerprint = subprocess.run([sys.executable, str(root / 'helpers/matching-start.py'), '--engine-fingerprint'], capture_output=True, text=True, check=True).stdout.strip()
+    assert manifest['source'] == fingerprint, 'matching/bin/keystroke-matching is stale: run bin/keystroke engine'
+    import hashlib
+    assert manifest['sha256'] == hashlib.sha256(shipped.read_bytes()).hexdigest(), 'shipped engine does not match its manifest'
+    if manifest['machine'] == os.uname().machine:
+        parity(shipped, model, corpus, 'shipped binary')
+    else:
+        print('skip: shipped engine is for', manifest['machine'])
+
     installed = Path(os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local/share'))) / 'keystroke/matching/models/small'
     snapshots = sorted(installed.glob('*/tokenizer.json')) if installed.is_dir() else []
     if snapshots:

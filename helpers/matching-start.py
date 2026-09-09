@@ -2,7 +2,8 @@
 """Prepare the local matching engine and model, then replace this process with the worker.
 
 Preferred: the compiled engine (matching/engine, Rust; ~16 MiB resident, ready in
-tens of milliseconds). A prebuilt binary shipped in matching/bin is used as is;
+tens of milliseconds). The static binary shipped in matching/bin is used when its
+manifest names this machine's architecture and the current engine source;
 otherwise the engine is built once per source revision with cargo into the data
 directory. Without cargo, the pinned Python runtime (uv) from an earlier release
 serves the same protocol. Model files are downloaded once per fixed revision and
@@ -13,6 +14,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import platform
 import shutil
 import signal
 import subprocess
@@ -40,6 +42,7 @@ MODELS = {
     },
 }
 ENGINE_SOURCE = ROOT / 'matching/engine'
+SHIPPED_ENGINE = ROOT / 'matching/bin/keystroke-matching'
 child = None
 
 
@@ -118,13 +121,28 @@ def engine_fingerprint():
     return digest.hexdigest()[:16]
 
 
+def shipped_engine(fingerprint):
+    """The prebuilt binary, when its manifest matches this machine and the source it was built from."""
+    manifest = SHIPPED_ENGINE.with_suffix('.json')
+    if not os.access(SHIPPED_ENGINE, os.X_OK) or not manifest.is_file():
+        return None
+    try:
+        info = json.loads(manifest.read_text())
+    except ValueError:
+        return None
+    if info.get('machine') != platform.machine() or info.get('source') != fingerprint:
+        return None
+    return SHIPPED_ENGINE
+
+
 def prepare_engine(data, env):
-    shipped = ROOT / 'matching/bin/keystroke-matching'
-    if os.access(shipped, os.X_OK):
-        return shipped
     if not ENGINE_SOURCE.is_dir():
         return None
-    built = data / 'engine' / engine_fingerprint() / 'keystroke-matching'
+    fingerprint = engine_fingerprint()
+    shipped = shipped_engine(fingerprint)
+    if shipped is not None:
+        return shipped
+    built = data / 'engine' / fingerprint / 'keystroke-matching'
     if os.access(built, os.X_OK):
         return built
     cargo = shutil.which('cargo')
@@ -167,8 +185,12 @@ def main():
     parser.add_argument('--model', choices=sorted(MODELS), default='small')
     parser.add_argument('--install-only', action='store_true')
     parser.add_argument('--engine', choices=['auto', 'native', 'python'], default='auto', help='auto prefers the compiled engine')
+    parser.add_argument('--engine-fingerprint', action='store_true', help='print the engine source fingerprint and exit')
     parser.add_argument('--data-dir', type=Path, default=Path(os.environ.get('XDG_DATA_HOME', str(Path.home() / '.local/share'))) / 'keystroke/matching')
     args = parser.parse_args()
+    if args.engine_fingerprint:
+        print(engine_fingerprint())
+        return
     data = args.data_dir
     data.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, UV_PYTHON_DOWNLOADS='never', OPENBLAS_NUM_THREADS='1', OMP_NUM_THREADS='1', TOKENIZERS_PARALLELISM='false', HF_HUB_DISABLE_TELEMETRY='1')

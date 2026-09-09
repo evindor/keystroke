@@ -114,8 +114,9 @@ Match highlighting in rows and a permanent publishing id.
 latest queued request. `helpers/matching-start.py` fetches the fixed Model2Vec
 revision (pinned SHA-256 digests, no client library), then execs the compiled engine
 (`matching/engine`, Rust: the BERT WordPiece tokenizer, mean pooling over the
-safetensors embedding table and cosine ranking; built once per source revision with
-`cargo`, or a prebuilt `matching/bin/keystroke-matching`). Without cargo it
+safetensors embedding table and cosine ranking; the shipped static
+`matching/bin/keystroke-matching` when its manifest matches this machine and the
+source, otherwise built once per source revision with `cargo`). Without cargo it
 provisions the hash-locked Python runtime and execs `matching-worker.py`, which
 speaks the same protocol. Off stops the process immediately, a model change replaces
 it, and two minutes of inactivity unloads it (the engine reloads in about 60 ms).

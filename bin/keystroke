@@ -19,7 +19,8 @@ Usage: bin/keystroke <command>
   toggle      Toggle the palette (routes through omarchy.menu)
   open <q>    Open the palette with a query
   validate    omarchy plugin validate on this checkout
-  matching [small|large]  Build the local matching engine and fetch the model (default: small)
+  matching [small|large]  Prepare the local matching engine and fetch the model (default: small)
+  engine      Rebuild the static matching engine shipped in matching/bin (after editing matching/engine)
   test        Run QML, voice lifecycle, time-zone checks, and qmllint
 USAGE
 }
@@ -66,6 +67,7 @@ case "${1:-help}" in
     ;;
   validate) exec omarchy plugin validate "$ROOT" ;;
   matching) exec python3 "$ROOT/helpers/matching-start.py" --model "${2:-small}" --install-only ;;
+  engine) exec "$ROOT/matching/engine/build-prebuilt.sh" ;;
   test)
     (cd "$ROOT/tests" && /usr/lib/qt6/bin/qmltestrunner -silent -input .)
     python3 "$ROOT/tests/applications_check.py"
