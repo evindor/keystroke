@@ -1,5 +1,24 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.2.1 (2026-09-09)
+
+- Hotfix release for Omarchy 4.0.3: the scoped-shell revocation recorded below
+  and the `keepLoaded` restore from `1dc4e48`. Manifest bumped to 1.2.1.
+- Full offscreen suite on the release tree (`QT_QPA_PLATFORM=offscreen`,
+  `QT_QPA_PLATFORMTHEME=generic`, `QT_QUICK_BACKEND=software`): 148 QML tests,
+  the application (now covering revocation), file, catalog, matching session,
+  palette matching, shortcut and motion checks, the matching worker and engine
+  checks, voice, clipboard, Codex, dictation, 48 time-zone cases and the hotkeys
+  check against the live `omarchy-menu-keybindings` passed. `tests/lint.sh`
+  exits 0 with 206 warning lines, the same count on the `v1.2.0` tree.
+  `bin/keystroke validate`, `git diff --check`, `site/check.py` and
+  `node --check site/script.js` pass.
+- `tests/extensions_check.py` stops at the same "update applied" race recorded
+  for 1.2.0; every other step of that check passes.
+- Live desktop check on Omarchy 4.0.3-1: installed from this tree, shell
+  restarted, the Applications screen rendered all 73 rows with icons.
+  See [release notes](releases/v1.2.1.md).
+
 ## Release 1.2.0 (2026-09-09)
 
 - Full offscreen `bin/keystroke test` on the release tree (`QT_QPA_PLATFORM=offscreen`,

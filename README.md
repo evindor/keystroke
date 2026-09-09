@@ -6,7 +6,7 @@ A Raycast-style command palette that **replaces the Omarchy menu**. One native O
 
 **[Explore the feature showcase and installation guide →](https://evindor.github.io/keystroke/)**
 
-[Release notes: 1.2.0](docs/releases/v1.2.0.md) — Smart Match on a compiled engine, fuzzy file search with `~`, `Ctrl+1`…`Ctrl+8`, animation tiers, and a lighter UI thread. Earlier: [1.1.5](docs/releases/v1.1.5.md).
+[Release notes: 1.2.1](docs/releases/v1.2.1.md) — a hotfix for Omarchy 4.0.3: applications are listed again, and the hotkey's second tap starts dictation. Earlier: [1.2.0](docs/releases/v1.2.0.md), [1.1.5](docs/releases/v1.1.5.md).
 
 Screenshots show the real Omarchy interface with public demo data.
 
