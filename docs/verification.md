@@ -1,5 +1,49 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.3.0 (2026-09-10)
+
+- Root cause of "installed extension never appears": omarchy-shell gives a
+  third-party plugin `PluginRegistryApi` (`shell.qml` `pluginRegistryFor`),
+  whose `installedPlugins` holds only the plugin's own manifest, and a
+  `serviceFor` scoped by `pluginOwnsTarget` to the plugin's own id. Confirmed
+  in the journal by the `onPluginsChanged` "no signal of the target matches"
+  warning from `providers/Registry.qml` and `providers/Extensions.qml`: the
+  facade has no such signal, the real `PluginRegistry` does. Keystroke's
+  `clonedFrom: omarchy.menu` inherits no capabilities (`omarchy.menu` declares
+  none) and no capability grants cross-plugin service access.
+- `providers/Registry.qml` now scans the plugin folder (`core/Extensions.js`
+  `scanArgv`/`parseScan`) and creates services with `Qt.createComponent`,
+  injecting `shell`, `manifest`, `omarchyPath`. `providers/Extensions.qml`
+  reads `host.registry.manifests`/`problems`; install drops `--enable`; the
+  shell-side switch and `op("load")` are gone; an installed extension defaults
+  to on. Job protocol fixed: a job ends when its result is read (or both files
+  are confirmed absent), results are finished once per instance, the next
+  wrapper removes the previous result, chained checks are quiet.
+- Measured on Quickshell 0.3.1: `typeof Qt.clearComponentCache` is
+  `undefined`, `Qt.createComponent` returns the cached component after the
+  file changed, and a `?v=` query on the URL reloads the `.qml` but not its JS
+  imports. The update status therefore advises `omarchy-restart-shell`; the
+  trick is not used.
+- Full offscreen `bin/keystroke test` on the release tree: 149 QML tests
+  (`tst_extensions` covers the scan parser, `serviceUrl` escaping,
+  `publicManifest`, the problem rows and the argv without `--enable`), the
+  application, file, catalog, matching session, palette matching, shortcut,
+  motion and dictation checks, the matching worker and engine checks, voice,
+  clipboard, Codex, 48 time-zone cases, `tests/extensions_check.py` end to end
+  (its registry stub now uses the real scan and parser; it asserts the install
+  writes nothing to keystroke.json, that no "loaded" row exists, and the
+  restart advice after an update), the new `tests/palette_extensions_check.py`
+  (real `Keystroke.qml`, fake HOME: working, broken, misnamed and unmarked
+  folders) and the hotkeys check passed. `tests/lint.sh` exits 0 with 206
+  warning lines, the same count as the `v1.2.1` tree. `bin/keystroke validate`,
+  `git diff --check`, `site/check.py` and `node --check site/script.js` pass.
+- Live on Omarchy 4.0.3-1: after `bin/keystroke install` the rescan alone kept
+  running the old code (cache, above); after `omarchy-restart-shell`,
+  `omarchy-shell shell call omarchy.menu inspect '{}'` lists
+  `io.github.evindor.keystroke-timer` among the providers with no problems.
+  The stale `shell.json` `plugins[]` entry was removed with
+  `omarchy plugin disable`. See [release notes](releases/v1.3.0.md).
+
 ## Release 1.2.1 (2026-09-09)
 
 - Hotfix release for Omarchy 4.0.3: the scoped-shell revocation recorded below
