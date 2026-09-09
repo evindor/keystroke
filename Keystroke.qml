@@ -11,10 +11,14 @@ import "voice"
 import "core"
 import "core/Match.js" as Match
 import "core/Frecency.js" as Frecency
+import "core/Files.js" as FileSearch
 import "core/Settings.js" as Settings
 import "core/VoiceBindings.js" as VoiceBindings
 import "core/Intent.js" as Intent
 import "core/Patterns.js" as Patterns
+import "core/SmartMatch.js" as SmartMatch
+import "core/Motion.js" as Motion
+import "matching" as Matching
 
 // Keystroke: an extension-first command palette that replaces the Omarchy
 // menu. Hosted by omarchy-shell as a `menu` plugin (see manifest.json).
@@ -83,9 +87,11 @@ Item {
   function showProviderView(key) {
     var entry = root.registryEntry(key)
     if (!entry || !root.providerEnabled(entry) || !entry.provider.view) { root.errorMessage = "Provider view is unavailable"; return }
+    matchingSession.cancelRequest()
     root.providerViewRawQuery = root.voiceRawText
     root.activeProviderKey = key
     providerView.sourceComponent = entry.provider.view
+    root.slideLevel(1)
   }
   // A view whose provider was removed, unloaded or turned off while it was
   // showing (a community plugin disabled from the CLI, say) must not linger
@@ -99,9 +105,9 @@ Item {
   }
   Connections {
     target: providerRegistry
-    function onEntriesChanged() { root.dropOrphanedView() }
+    function onEntriesChanged() { root.invalidateCatalog(); root.dropOrphanedView() }
   }
-  onConfigChanged: root.dropOrphanedView()
+  onConfigChanged: { root.invalidateCatalog(); root.dropOrphanedView() }
 
   // -------------------------------------------------------------- settings
   property var config: Settings.empty()
@@ -109,9 +115,50 @@ Item {
   readonly property var paletteSchema: [
     { key: "density", type: "enum", label: "Layout density", "default": "compact", options: ["compact", "comfortable"], description: "Compact uses a narrower window and shorter rows" },
     { key: "accent", type: "enum", label: "Accent color", "default": "theme", options: ["theme", "ember", "violet", "mint"], description: "Theme follows the active Omarchy theme" },
-    { key: "showPreview", type: "boolean", label: "Show result previews", "default": true }
+    { key: "showPreview", type: "boolean", label: "Show result previews", "default": true },
+    { key: "animations", type: "enum", label: "Animations", "default": "snappy", options: ["off", "snappy", "fluid"],
+      description: "Off shows every change at once; Snappy ties changes together over a couple of frames; Fluid eases them" },
+    { key: "windowTransition", type: "enum", label: "Window transition", "default": "instant", options: ["instant", "fade", "slide"],
+      optionLabels: { instant: "Instant", fade: "Fade", slide: "Slide up" },
+      description: "Instant maps and unmaps the palette at once; Fade and Slide up follow the animation tier" }
   ]
   property var paletteSettings: Settings.values(config, ["palette"], paletteSchema)
+  readonly property var matchingSchema: SmartMatch.SCHEMA
+  readonly property var matchingSettings: Settings.values(config, ["matching"], matchingSchema)
+  readonly property string matchingStamp: matchingSession.status + "|" + matchingSession.error
+  function matchingModel() { return { schemas: root.matchingSchema, values: root.matchingSettings, status: matchingSession.status, error: matchingSession.error } }
+  Matching.Session {
+    id: matchingSession
+    enabled: root.matchingSettings.mode !== "off"
+    model: root.matchingSettings.model
+    onChanged: if (root.opened && !root.confirmPending) root.requery({ catalog: false })
+  }
+  property var intentDescriptions: ({})
+  property var intentDescriptionKeys: ({})
+  FileView {
+    path: Qt.resolvedUrl("matching/descriptions.json").toString().replace("file://", "")
+    printErrors: false
+    onLoaded: { try { root.intentDescriptions = JSON.parse(text()); root.requery() } catch (_) { } }
+  }
+  FileView {
+    path: Qt.resolvedUrl("matching/description-keys.json").toString().replace("file://", "")
+    printErrors: false
+    onLoaded: { try { root.intentDescriptionKeys = JSON.parse(text()); root.requery() } catch (_) { } }
+  }
+  // The fingerprint hash is memoized per row identity: hashing costs about
+  // 25 µs per row in the QML engine and the catalog is rebuilt as a whole.
+  property var describeCache: ({})
+  function describe(row) {
+    var prefix = row.providerKey === "omarchy" ? "menu:" : row.providerKey === "applications" ? "app:" : row.providerKey === "hotkeys" ? "hotkey:" : ""
+    var id = prefix + row.id
+    if (prefix === "app:" && !root.intentDescriptionKeys[id]) id += ".desktop"
+    var key = root.intentDescriptionKeys[id]
+    if (!key || key.title !== row.title) return row
+    var source = String(row.descriptionKey || ""), hit = root.describeCache[row.uid]
+    if (!hit || hit.source !== source) { hit = { source: source, hash: Qt.md5(source) }; root.describeCache[row.uid] = hit }
+    if (key.key === hit.hash) row.intentDescription = root.intentDescriptions[id] || ""
+    return row
+  }
   function paletteValues() { return root.paletteSettings }
   function settingsFor(entry) { return Settings.values(root.config, ["providers", entry.key], entry.provider.settings || []) }
   function providerEnabled(entry) { return Settings.isEnabled(root.config, ["providers", entry.key], entry.source === "bundled") }
@@ -278,11 +325,18 @@ Item {
   Process { id: stateDir; command: ["mkdir", "-p", root.home + "/.local/state/keystroke"]; running: true }
   function remember(row) {
     if (!row.remember) return
-    root.usage = Frecency.record(root.usage, Frecency.key(row.providerKey, row.id), Date.now() / 1000)
+    var now = Date.now() / 1000
+    var next = Frecency.record(root.usage, Frecency.key(row.providerKey, row.id), now)
+    var queryKey = Frecency.queryKey(row.providerKey, row.id, root.voiceRawText || search.text, root.scope)
+    if (queryKey) next = Frecency.record(next, queryKey, now)
+    root.usage = next
     usageFile.setText(Frecency.serialize(root.usage))
   }
   function bonusFor(row) {
-    return row.remember ? Frecency.bonus(root.usage, Frecency.key(row.providerKey, row.id), Date.now() / 1000) : 0
+    if (!row.remember) return 0
+    var now = Date.now() / 1000
+    return Frecency.bonus(root.usage, Frecency.key(row.providerKey, row.id), now)
+      + Frecency.queryBonus(root.usage, Frecency.queryKey(row.providerKey, row.id, root.voiceRawText || search.text, root.scope), now)
   }
 
   // ----------------------------------------------------------------- state
@@ -303,7 +357,12 @@ Item {
   property var rows: []
   property var uids: []
   property int selected: 0
+  onSelectedChanged: root.syncCurrent()
   property bool selectionTouched: false
+  // While Ctrl is down the first rows show their Ctrl+digit in place of the
+  // icon. Cleared on open: a launch under Ctrl+digit never sees the release.
+  property bool ctrlHeld: false
+  readonly property int shortcutRows: 8
   property int generation: 0
   property bool pending: false
   property bool showLoading: false
@@ -315,6 +374,67 @@ Item {
   readonly property color accent: paletteSettings.accent === "ember" ? "#ee987e" : paletteSettings.accent === "violet" ? "#b5a0ef" : paletteSettings.accent === "mint" ? "#8bceb4" : Color.accent
   readonly property bool clipboardChoice: root.dictationMode || !!(root.current.action && root.current.action.type === "dictation-copy")
   readonly property bool previewVisible: !dmenuActive && paletteSettings.showPreview !== false && !!(current.preview || current.previewImage || current.swatch)
+
+  // ---------------------------------------------------------------- motion
+  // Three tiers (core/Motion.js) drive every transition: the window's
+  // reveal, a menu level entering, the selection gliding and the activated
+  // row's flash. A duration of 0 turns a transition into a plain assignment.
+  readonly property var motion: Motion.profile(paletteSettings.animations)
+  readonly property bool windowSlides: paletteSettings.windowTransition === "slide"
+  // The window transition is chosen apart from the tier: Instant keeps the
+  // rest of the palette animated while the window itself appears at once.
+  readonly property int windowDuration: paletteSettings.windowTransition === "instant" ? 0 : motion.window
+  // 0 hidden … 1 shown; the scrim and the card follow it. The layer stays
+  // mapped, without keyboard focus, while `closing` runs it back down.
+  property real reveal: 0
+  property bool closing: false
+  property double flashUntil: 0             // wall clock at which the activated row's flash peaks
+  signal flashed(string uid)
+  onOpenedChanged: {
+    hideDelay.stop()
+    revealAnim.stop()
+    if (root.opened) {
+      root.closing = false
+      if (root.windowDuration > 0) { revealAnim.to = 1; revealAnim.duration = root.windowDuration; revealAnim.restart() }
+      else root.reveal = 1
+    } else if (root.windowDuration > 0) {
+      // Leaving waits for the flash to peak, so a launch still reads as "that row".
+      root.closing = true
+      hideDelay.interval = Math.max(0, root.flashUntil - Date.now())
+      hideDelay.restart()
+    } else { root.reveal = 0; root.closing = false }
+  }
+  Timer { id: hideDelay; onTriggered: { if (root.opened) return; revealAnim.to = 0; revealAnim.duration = root.windowDuration; revealAnim.restart() } }
+  // Most of the change lands in the first frames: a reveal that ramps up
+  // gently reads as the palette being late, not as motion.
+  NumberAnimation {
+    id: revealAnim; target: root; property: "reveal"; easing.type: Easing.OutExpo
+    onFinished: if (!root.opened && revealAnim.to === 0) root.closing = false
+  }
+  function flash(uid) {
+    if (root.motion.flashRise + root.motion.flashFall <= 0 || !uid) return
+    root.flashUntil = Date.now() + root.motion.flashRise
+    root.flashed(uid)
+  }
+  // A menu level enters from the side it lives on: a deeper screen from the
+  // right, the parent from the left. Only the entering level moves; rows are
+  // reconciled in place, so there is no outgoing copy to slide away.
+  property real levelOpacity: 1
+  Translate { id: levelShift }
+  function slideLevel(direction) {
+    if (root.motion.slide <= 0 || !root.opened) return
+    levelAnim.stop()
+    levelShift.x = Motion.levelOffset(direction, Style.space(Motion.LEVEL_SLIDE_PX))
+    root.levelOpacity = 0
+    levelAnim.duration = root.motion.slide
+    levelAnim.restart()
+  }
+  ParallelAnimation {
+    id: levelAnim
+    property int duration: 0
+    NumberAnimation { target: levelShift; property: "x"; to: 0; duration: levelAnim.duration; easing.type: Easing.OutCubic }
+    NumberAnimation { target: root; property: "levelOpacity"; to: 1; duration: levelAnim.duration; easing.type: Easing.OutQuad }
+  }
 
   // Theme surfaces, same tokens as the stock menu.
   readonly property color background: Color.menu.background
@@ -343,7 +463,7 @@ Item {
 
   onPendingChanged: { if (pending) loadingDelay.restart(); else { loadingDelay.stop(); showLoading = false } }
   Timer { id: loadingDelay; interval: 180; onTriggered: root.showLoading = root.pending }
-  Timer { id: debounce; interval: 16; onTriggered: root.runQuery() }
+  Timer { id: debounce; interval: 25; onTriggered: root.runQuery() }
 
   Registry { id: providerRegistry; host: root }
   readonly property var registry: providerRegistry
@@ -352,8 +472,9 @@ Item {
 
   // ---------------------------------------------------------------- opening
   function resetSelection() {
-    root.selected = 0
     root.selectionTouched = false
+    root.selected = 0
+    root.ctrlHeld = false
     pointerGate.reset()
   }
 
@@ -397,6 +518,7 @@ Item {
   }
 
   function notifyOpened() {
+    root.invalidateCatalog()
     providerRegistry.rebuild()
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var p = providerRegistry.entries[i].provider
@@ -406,6 +528,7 @@ Item {
   }
 
   function openDmenu(payload) {
+    matchingSession.cancelRequest()
     root.closeProviderView()
     clipboardTransfer.cancel()
     if (root.dmenuActive && root.requestActive) root.finishRequest(null)   // a new caller cancels the previous one
@@ -441,6 +564,7 @@ Item {
   }
 
   function cancel(preserveTransfer) {
+    matchingSession.cancelRequest()
     root.closeProviderView()
     if (preserveTransfer !== true) clipboardTransfer.cancel()
     if (root.dmenuActive) root.finishRequest(null)
@@ -460,49 +584,167 @@ Item {
   function setQuery(text) { clipboardTransfer.cancel(); root.voiceCancel(); search.text = String(text || ""); root.edited(); return "ok" }
 
   // Providers call this when asynchronous results land; the selection is kept.
-  function requery() {
-    if (!root.opened) return
-    debounce.stop()
-    root.runQuery()
+  // Their Smart Match catalog is enumerated again unless the caller says it did
+  // not change ({ catalog: false }). Calls landing in one event-loop turn run a
+  // single query, and none cuts short the typing pause: the pending query reads
+  // the latest data when the user pauses.
+  function requery(options) {
+    if (!options || options.catalog !== false) root.invalidateCatalog()
+    else root.invalidateProviders(options.provider)
+    if (!root.opened || debounce.running) return
+    refresh.start()
+  }
+
+  // Provider rows are kept per provider for the current query and scope, so a
+  // refresh caused by one provider (fd finished, a reply landed) re-runs only
+  // that provider. A requery() without a provider key drops every entry.
+  property var providerCache: ({})
+  function invalidateProviders(key) {
+    if (key) delete root.providerCache[String(key)]
+    else root.providerCache = ({})
+  }
+  Timer { id: refresh; interval: 0; onTriggered: if (!debounce.running) root.runQuery() }
+
+  // ------------------------------------------------------ Smart Match catalog
+  // Providers enumerate their catalog only when something may have changed: a
+  // provider reported new data through requery(), the palette opened, the
+  // registry or configuration changed, or the scope differs. Every keystroke
+  // reuses the rows; the documents filtered under one set of intent
+  // constraints are reused by every query sharing those constraints.
+  property var catalogCache: null
+  function invalidateCatalog() {
+    root.catalogCache = null
+    root.invalidateProviders()
+    // The first keystroke should not pay for the enumeration: build it while
+    // the palette sits open with nothing typed.
+    if (root.opened && !root.dmenuActive) prewarm.restart()
+  }
+  Timer {
+    id: prewarm; interval: 0
+    onTriggered: {
+      if (!root.opened || root.dmenuActive || root.providerViewActive || root.catalogCache) return
+      if (!SmartMatch.enabled(root.matchingSettings.mode, !!root.voiceRawText)) return
+      var sc = root.scope, owner = sc.split("/")[0]
+      root.catalogFor(sc, owner, sc.indexOf("/") >= 0 ? sc.slice(owner.length + 1) : "")
+    }
+  }
+  function catalogFor(scope, owner, sub) {
+    var cache = root.catalogCache
+    if (cache && cache.scope === scope) return cache
+    var rows = [], seen = ({}), pend = false, mark = function() { pend = true }
+    for (var i = 0; i < providerRegistry.entries.length; i++) {
+      var entry = providerRegistry.entries[i]
+      if (!root.providerEnabled(entry)) continue
+      if (scope && owner !== entry.key) continue
+      var ctx = { query: "", rawQuery: "", scope: scope, sub: scope ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
+                  patterns: Patterns.evaluate(entry.patterns, ""), pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
+      try {
+        var candidates = []
+        if (typeof entry.provider.catalog === "function") candidates = entry.provider.catalog(ctx) || []
+        else if (!scope && entry.source === "bundled") {
+          // Older providers contribute only navigation rows, never arbitrary
+          // clipboard/file content or executable results from an empty query.
+          candidates = (entry.provider.query(ctx) || []).filter(function(c) { return c.action && c.action.type === "navigate" })
+        }
+        for (var c = 0; c < candidates.length && rows.length < 6000; c++) {
+          var candidate = root.normalize(candidates[c], entry, "", 0)
+          if (!candidate || candidate.disabled || candidate.tier !== "item" || seen[candidate.uid]) continue
+          seen[candidate.uid] = true
+          rows.push(root.describe(candidate))
+        }
+      } catch (e) { console.warn("keystroke: provider", entry.key, "catalog failed:", e) }
+    }
+    cache = { scope: scope, rows: rows, pending: pend, chrome: SmartMatch.hasChrome(rows), documents: ({}), documentKeys: [], lexical: { text: null, scores: null } }
+    root.catalogCache = cache
+    return cache
+  }
+  function documentsFor(cache, req) {
+    var key = SmartMatch.constraintKey(req), hit = cache.documents[key]
+    if (hit) return hit
+    if (cache.documentKeys.length >= 16) { cache.documents = ({}); cache.documentKeys = [] }
+    hit = SmartMatch.documents(cache.rows, req)
+    cache.documents[key] = hit
+    cache.documentKeys.push(key)
+    return hit
   }
 
   function runQuery() {
     if (!root.opened || root.providerViewActive) return
+    debounce.stop(); refresh.stop()
     if (root.dmenuActive) { root.applyRows(root.dmenuRows()); root.pending = false; root.afterRows(); return }
     root.generation++
-    var q = root.voiceRawText && !root.dictationMode ? Intent.normalize(root.voiceRawText) : search.text, sc = root.scope
+    var raw = root.voiceRawText || search.text, sc = root.scope
+    var filePrefix = !root.dictationMode && (!sc || sc === "files") && FileSearch.prefixed(raw)
+    var smart = !root.dictationMode && !filePrefix && SmartMatch.enabled(root.matchingSettings.mode, !!root.voiceRawText)
+    var req = SmartMatch.request(raw)
+    // Provider queries keep case and arguments (paths, units, extension input).
+    // Command rewrites belong to catalog matching; only whole arithmetic is substituted.
+    var q = root.voiceRawText && !root.dictationMode ? Intent.normalize(root.voiceRawText) : search.text
+    if (smart && req.math) q = req.math
     var owner = sc.split("/")[0]
     var sub = sc.indexOf("/") >= 0 ? sc.slice(owner.length + 1) : ""
     var collected = [], errors = [], pend = false, matchedPatterns = ({})
-    var mark = function() { pend = true }
+    var cacheKey = [q, root.voiceRawText || search.text, sc, root.dictationMode ? "d" : ""].join("\u001f")
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var entry = providerRegistry.entries[i]
       if (!root.providerEnabled(entry)) continue
+      if (filePrefix && entry.key !== "files") continue
       if (sc && owner !== entry.key) continue
-      // Declared patterns run before query(): the provider learns which shapes
-      // matched, and the largest boost lifts every row it returns this time.
-      var patterns = Patterns.evaluate(entry.patterns, q)
-      if (patterns.matched.length) matchedPatterns[entry.key] = patterns.matched
-      var ctx = { query: q, rawQuery: root.voiceRawText || search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
-                  patterns: patterns, pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
-      try {
-        var out = entry.provider.query(ctx) || []
-        for (var r = 0; r < out.length && r < 400; r++) {
-          var row = root.normalize(out[r], entry, q, patterns.boost)
-          if (row) collected.push(row)
-        }
-      } catch (e) {
-        errors.push(entry.provider.name + ": " + e)
-        console.warn("keystroke: provider", entry.key, "failed:", e)
+      var cached = root.providerCache[entry.key]
+      if (!cached || cached.key !== cacheKey) {
+        cached = root.queryProvider(entry, q, sc, sub)
+        cached.key = cacheKey
+        root.providerCache[entry.key] = cached
       }
+      for (var r = 0; r < cached.rows.length; r++) collected.push(cached.rows[r])
+      if (cached.pending) pend = true
+      if (cached.patterns) matchedPatterns[entry.key] = cached.patterns
+      if (cached.error) errors.push(cached.error)
     }
     if (root.configError) errors.push(root.configError)
+    if (smart && q) {
+      // A blocked or arithmetic request keeps the catalog out of the merge and
+      // sends nothing to the helper.
+      var catalog = !req.blocked && !req.math ? root.catalogFor(sc, owner, sub) : null
+      var documents = catalog ? root.documentsFor(catalog, req) : { rows: [], signature: "" }
+      var matchKey = JSON.stringify([raw, sc, root.matchingSettings.model, documents.signature])
+      var hasAnswer = collected.some(function(r) { return r.tier === "answer" })
+      if (documents.rows.length && !hasAnswer && raw.length <= 1024) matchingSession.submit(matchKey, raw, documents.rows, documents.signature)
+      else matchingSession.cancelRequest()
+      if (catalog && catalog.pending) pend = true
+      collected = SmartMatch.merge(collected, catalog ? catalog.rows : [], req, matchingSession.resultKey === matchKey ? matchingSession.matches : [],
+                                   catalog ? catalog.chrome : false, catalog ? catalog.lexical : null)
+    } else matchingSession.cancelRequest()
     var ranked = Match.rank(collected, root.bonusFor)
     root.applyRows(ranked.slice(0, 120))
     root.lastPatterns = matchedPatterns
-    root.pending = pend
+    root.pending = pend || (smart && matchingSession.requestedKey !== "" && matchingSession.busy)
+    if (smart && matchingSession.error) errors.push(matchingSession.error)
     root.errorMessage = errors.join(" · ")
     root.afterRows()
+  }
+
+  // One provider's rows for one query: normalized, bounded, with whether it
+  // asked for a later refresh and which declared patterns matched.
+  function queryProvider(entry, q, sc, sub) {
+    var result = { rows: [], pending: false, patterns: null, error: "" }
+    // Declared patterns run before query(): the provider learns which shapes
+    // matched, and the largest boost lifts every row it returns this time.
+    var patterns = Patterns.evaluate(entry.patterns, q)
+    if (patterns.matched.length) result.patterns = patterns.matched
+    var ctx = { query: q, rawQuery: root.voiceRawText || search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
+                patterns: patterns, pending: function() { result.pending = true }, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
+    try {
+      var out = entry.provider.query(ctx) || []
+      for (var r = 0; r < out.length && r < 400; r++) {
+        var row = root.normalize(out[r], entry, q, patterns.boost)
+        if (row) result.rows.push(row)
+      }
+    } catch (e) {
+      result.error = entry.provider.name + ": " + e
+      console.warn("keystroke: provider", entry.key, "failed:", e)
+    }
+    return result
   }
 
   property var lastPatterns: ({})           // provider key → matched pattern ids, for inspect()
@@ -560,6 +802,7 @@ Item {
 
   // Reconcile by uid so delegates update in place while typing.
   function applyRows(next) {
+    var selectedUid = root.selectionTouched && root.current ? root.current.uid : ""
     var wanted = ({})
     for (var n = 0; n < next.length; n++) wanted[next[n].uid] = true
     var order = root.uids.slice()
@@ -580,6 +823,18 @@ Item {
     }
     root.uids = order
     root.rows = next
+    if (selectedUid) {
+      for (var s = 0; s < next.length; s++) if (next[s].uid === selectedUid) { root.selected = s; break }
+    }
+    root.syncCurrent()
+  }
+
+  // The list follows a surviving item when rows above the selection are
+  // removed, so its own index drifts from `selected` while typing; the
+  // highlight reads the list's current item, so re-assert the index after
+  // every reconcile and whenever the selection moves.
+  function syncCurrent() {
+    if (resultList.currentIndex !== root.selected) resultList.currentIndex = root.selected
   }
 
   function afterRows() {
@@ -592,6 +847,7 @@ Item {
       root.selected = 0
       resultList.positionViewAtBeginning()
     }
+    root.syncCurrent()
   }
 
   // ------------------------------------------------------------- navigation
@@ -606,6 +862,7 @@ Item {
     root.applyRows([])
     root.runQuery()
     resultList.positionViewAtBeginning()
+    root.slideLevel(1)
   }
 
   function goBack() {
@@ -619,6 +876,7 @@ Item {
       root.voiceRawText = priorRawQuery
       root.runQuery()
       search.forceActiveFocus()
+      root.slideLevel(-1)
       return true
     }
     if (root.history.length) {
@@ -632,6 +890,7 @@ Item {
     root.applyRows([])
     root.runQuery()
     resultList.positionViewAtBeginning()
+    root.slideLevel(-1)
     return true
   }
 
@@ -651,6 +910,19 @@ Item {
     resultList.positionViewAtIndex(root.selected, ListView.Contain)
   }
 
+  // Ctrl+1…Ctrl+8: select the nth visible row and run it in one stroke.
+  // A number past the end of the list does nothing rather than acting on
+  // whatever happens to be selected.
+  function activateAt(index) {
+    if (root.dictationMode || root.mode === "input") return
+    if (index < 0 || index >= root.rows.length) return
+    root.selectionTouched = true
+    pointerGate.reset()
+    root.selected = index
+    resultList.positionViewAtIndex(root.selected, ListView.Contain)
+    root.activate()
+  }
+
   function selectFromPointer(index, item, mouse) {
     if (!pointerGate.moved(item, mouse)) return
     root.selectionTouched = true
@@ -663,21 +935,28 @@ Item {
   function activate(alternate) {
     if (root.confirmPending) return
     if (root.dictationMode) { root.dictationAccept(alternate); return }
-    if (debounce.running) { debounce.stop(); root.runQuery() }
+    if (debounce.running || refresh.running) root.runQuery()
     if (root.dmenuActive) {
       if (root.mode === "input") { root.applyDmenuSelection(search.text); return }
-      if (root.rows.length) root.applyDmenuSelection(root.current.value)
+      if (root.rows.length) { root.flash(root.current.uid); root.applyDmenuSelection(root.current.value) }
       return
     }
     var row = root.current
     if (!row || !row.uid || row.disabled) return
+    if (row.smartMatch) {
+      var selectedId = row.uid
+      root.runQuery()
+      row = root.rows.filter(function(r) { return r.uid === selectedId })[0]
+      if (!row || row.disabled) return
+    }
     var entry = root.registryEntry(row.providerKey)
-    if (!entry) return
+    if (!entry || !root.providerEnabled(entry)) return
     var effect = alternate && row.altAction ? row.altAction : row.action
     if (typeof entry.provider.activate === "function") {
       try { effect = entry.provider.activate(row, { host: root, settings: root.settingsFor(entry), alternate: alternate === true }) || effect } catch (e) { root.errorMessage = entry.provider.name + ": " + e; return }
     }
     if (!effect) return
+    root.flash(row.uid)
     var run = function() { root.remember(row); root.perform(effect, row) }
     if (row.confirm) root.confirmPending = { message: row.confirm, confirmText: "Confirm", run: run }
     else run()
@@ -698,6 +977,7 @@ Item {
 
   function perform(effect, row) {
     var type = effect.type
+    if (type === "matching-retry") { matchingSession.retry(); root.requery(); return }
     if (type === "noop") return
     if (type === "provider-view") { root.showProviderView(effect.provider); return }
     if (type === "dictate") {
@@ -756,6 +1036,7 @@ Item {
       current: { uid: root.current.uid || "", icon: root.current.icon || "", iconSource: root.current.iconSource || "", badge: root.current.badge || "", tier: root.current.tier || "" },
       modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems,
       applications: { library: !!root.appLibrary, entries: appEntries.length },
+      matching: { mode: root.matchingSettings.mode, model: root.matchingSettings.model, loaded: matchingSession.loaded, status: matchingSession.status, error: matchingSession.error },
       error: root.errorMessage, configError: root.configError, status: root.statusMessage,
       voice: { backend: "voxtype", state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
                command: voice.command, daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length, live: voice.liveText } })
@@ -775,15 +1056,16 @@ Item {
 
   PanelWindow {
     id: panel
-    visible: root.opened
+    visible: root.opened || root.closing
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "omarchy-menu"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    // A launch must find the keyboard free at once, however long the fade-out runs.
+    WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    Rectangle { anchors.fill: parent; color: root.scrim; MouseArea { anchors.fill: parent; onClicked: root.cancel() } }
+    Rectangle { anchors.fill: parent; color: root.scrim; opacity: root.reveal; MouseArea { anchors.fill: parent; onClicked: root.cancel() } }
 
     BorderSurface {
       id: card
@@ -792,7 +1074,9 @@ Item {
         ? Math.min(root.headerHeight + (root.mode === "input" ? Style.space(12) : root.dmenuRowsHeight + Style.space(20)), panel.height - Style.gapsOut * 2)
         : Math.min(Style.space(root.compact ? 540 : 580), panel.height - Style.gapsOut * 2)
       anchors.horizontalCenter: parent.horizontalCenter
-      y: root.dmenuActive ? Math.max(Style.gapsOut, Math.round((panel.height - height) / 2)) : Math.max(Style.gapsOut, Math.round((panel.height - height) * 0.38))
+      y: (root.dmenuActive ? Math.max(Style.gapsOut, Math.round((panel.height - height) / 2)) : Math.max(Style.gapsOut, Math.round((panel.height - height) * 0.38)))
+         + (root.windowSlides ? Math.round((1 - root.reveal) * Style.space(Motion.WINDOW_SLIDE_PX)) : 0)
+      opacity: root.reveal
       radius: Style.cornerRadius
       color: root.background
       borderSpec: root.borderSpec
@@ -820,6 +1104,8 @@ Item {
         id: providerView
         anchors.fill: viewBackdrop
         z: 5
+        transform: levelShift
+        opacity: root.levelOpacity
         onLoaded: { item.host = root; if (typeof item.focusInput === "function") Qt.callLater(item.focusInput) }
       }
 
@@ -899,8 +1185,12 @@ Item {
             // hotkey's own release, and its release bind only fires while the
             // modifier is still down). A tap's release must not end anything.
             if (voice.active && root.voiceTrigger === "hold" && root.isSuperKey(event.key)) { root.voiceStop(); event.accepted = true }
+            if (event.key === Qt.Key_Control) root.ctrlHeld = false
           }
           Keys.onPressed: function(event) {
+            // Ctrl's own press carries no modifier flag yet; a chord pressed
+            // with Ctrl already down (before the palette opened) does.
+            root.ctrlHeld = event.key === Qt.Key_Control || !!(event.modifiers & Qt.ControlModifier)
             if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && event.isAutoRepeat) { event.accepted = true; return }
             if (root.confirmPending) { confirmDialog.handleKey(event); event.accepted = true; return }
             if (voice.active) {
@@ -926,6 +1216,7 @@ Item {
             else if (event.key === Qt.Key_Right && (atEnd || !text) && !root.dmenuActive && root.rows.length) { root.activate(); event.accepted = true }
             else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Backspace) && !text && !preeditText && (root.scope || root.history.length)) { root.goBack(); event.accepted = true }
             else if (event.key === Qt.Key_Delete && !text && root.current.appId) { root.requestUninstall(); event.accepted = true }
+            else if (ctrl && event.key >= Qt.Key_1 && event.key <= Qt.Key_8) { root.activateAt(event.key - Qt.Key_1); event.accepted = true }
             else if (ctrl && event.key === Qt.Key_Comma && !root.dmenuActive) { root.navigate("settings", "Settings"); event.accepted = true }
             else if (ctrl && event.key === Qt.Key_K && !root.dmenuActive) {
               var key = root.current.providerKey && root.current.providerKey !== "settings" ? "settings/" + root.current.providerKey : "settings"
@@ -942,6 +1233,8 @@ Item {
       Row {
         id: crumbs
         visible: !root.dmenuActive
+        transform: levelShift
+        opacity: root.levelOpacity
         x: Style.space(root.compact ? 22 : 26); y: root.headerHeight + Style.space(8)
         height: root.crumbHeight
         spacing: Style.space(10)
@@ -958,6 +1251,8 @@ Item {
       // Results and preview
       Item {
         id: content
+        transform: levelShift
+        opacity: root.levelOpacity
         x: Style.space(12)
         y: root.dmenuActive ? root.headerHeight + Style.space(10) : root.headerHeight + root.crumbHeight + Style.space(10)
         width: parent.width - Style.space(24)
@@ -973,10 +1268,29 @@ Item {
           clip: true
           spacing: root.rowSpacing
           boundsBehavior: Flickable.StopAtBounds
-          currentIndex: root.selected
           cacheBuffer: root.rowHeight * 4
+          // One highlight glides between rows instead of each row painting
+          // its own; its geometry is bound here so it covers the row and not
+          // the delegate's section header.
+          highlightFollowsCurrentItem: false
+          highlight: BorderSurface {
+            readonly property var row: resultList.currentItem
+            z: 0
+            visible: !!row && root.rows.length > 0
+            width: resultList.width
+            height: row ? row.rowHeight : root.rowHeight
+            y: row ? row.y + row.rowY : 0
+            opacity: row && row.disabled ? 0.62 : 1
+            radius: Style.cornerRadius
+            color: root.selectedBackground
+            borderSpec: root.selectedBorderSpec
+            Behavior on y { enabled: root.selectionTouched && root.motion.selection > 0; NumberAnimation { duration: root.motion.selection; easing.type: Easing.OutCubic } }
+          }
           delegate: Column {
             id: delegateRoot
+            z: 1
+            readonly property real rowY: rowItem.y
+            readonly property real rowHeight: rowItem.height
             required property int index
             required property string uid
             required property string title
@@ -1010,16 +1324,21 @@ Item {
               }
             }
             ResultRow {
+              id: rowItem
               width: parent.width
+              paintsSelection: false
+              flashRise: root.motion.flashRise; flashFall: root.motion.flashFall
               title: delegateRoot.title; subtitle: delegateRoot.subtitle; icon: delegateRoot.icon; iconFont: delegateRoot.iconFont
               iconSource: delegateRoot.iconSource; tint: delegateRoot.tint; verb: delegateRoot.verb; accessory: delegateRoot.accessory
               badge: delegateRoot.badge; hint: delegateRoot.hint; disabled: delegateRoot.disabled; answer: delegateRoot.answer
+              shortcut: root.ctrlHeld && !root.dmenuActive && delegateRoot.index < root.shortcutRows ? String(delegateRoot.index + 1) : ""
               compact: root.compact
               selected: root.selected === delegateRoot.index
               accent: root.accent; foreground: root.foreground
               selectedBackground: root.selectedBackground; selectedText: root.selectedText; selectedBorderSpec: root.selectedBorderSpec
               onHovered: function(item, mouse) { root.selectFromPointer(delegateRoot.index, item, mouse) }
               onActivated: { root.selectionTouched = true; root.selected = delegateRoot.index; root.activate() }
+              Connections { target: root; function onFlashed(uid) { if (uid === delegateRoot.uid) rowItem.flash() } }
             }
           }
         }

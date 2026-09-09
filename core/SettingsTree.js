@@ -35,13 +35,15 @@ function schemaNodes(nodes, screens, path, schemas, values, scope, parentParts, 
     var parts = parentParts.concat([schema.label])
     var childScope = scope + "/" + k
     var current = isBool ? (value ? "On" : "Off") : (value === "" || value === undefined ? "—" : String(value))
+    if (schema.optionLabels && schema.optionLabels[value]) current = schema.optionLabels[value]
     nodes.push(node(scope, parts, { id: idPrefix + "/" + k, subtitle: schema.description || "", verb: isBool ? "Toggle" : "Change", order: i,
       accessory: current, keywords: k + (isEnum ? " " + schema.options.join(" ") : ""), description: schema.description || "",
       action: isBool ? settingAction(path, k, !value, schema) : navigate(childScope, schema.label) }))
     if (isEnum) {
       for (var o = 0; o < schema.options.length; o++) {
         var option = schema.options[o]
-        nodes.push(node(childScope, parts.concat([titleCase(option)]), { id: idPrefix + "/" + k + "/" + option, subtitle: option === value ? "Selected" : "",
+        var label = schema.optionLabels && schema.optionLabels[option] ? schema.optionLabels[option] : titleCase(option)
+        nodes.push(node(childScope, parts.concat([label]), { id: idPrefix + "/" + k + "/" + option, subtitle: option === value ? "Selected" : "",
           icon: option === value ? "✓" : "○", section: schema.label, verb: "Select", order: o,
           action: settingAction(path, k, option, schema) }))
       }
@@ -105,10 +107,20 @@ function build(model) {
   nodes.push(node("", rootParts, { id: "settings", subtitle: "Providers, appearance and the config file", order: 7, listScore: 20,
     description: "preferences configuration providers", action: navigate("settings", "Settings") }))
   var appearance = rootParts.concat(["Appearance"])
-  nodes.push(node("settings", appearance, { id: "palette", subtitle: "Density, accent and previews", icon: "󰏘", section: "Keystroke", order: 0, lift: 1,
-    description: "layout density accent preview theme", action: navigate("settings/palette", "Appearance") }))
+  nodes.push(node("settings", appearance, { id: "palette", subtitle: "Density, accent, previews and animations", icon: "󰏘", section: "Keystroke", order: 0, lift: 1,
+    description: "layout density accent preview theme animations motion transitions", action: navigate("settings/palette", "Appearance") }))
   schemaNodes(nodes, screens, ["palette"], model.paletteSchema || [], model.paletteValues || {}, "settings/palette", appearance, "palette")
   voiceNodes(nodes, screens, rootParts, model.voice)
+  if (model.matching) {
+    var matching = rootParts.concat(["Matching"])
+    nodes.push(node("settings", matching, { id: "matching", section: "Keystroke", order: 2, subtitle: "Smart match and model size",
+      keywords: "semantic embeddings search", action: navigate("settings/matching", "Matching") }))
+    schemaNodes(nodes, screens, ["matching"], model.matching.schemas, model.matching.values, "settings/matching", matching, "matching")
+    nodes.push(node("settings/matching", matching.concat([model.matching.error ? "Retry Smart Match" : model.matching.status || "Model unloaded"]), {
+      id: "matching/status", order: 10, listOnly: true, disabled: !model.matching.error,
+      subtitle: model.matching.error || "Models are downloaded once and matched locally", verb: model.matching.error ? "Retry" : "",
+      action: model.matching.error ? { type: "matching-retry" } : { type: "noop" } }))
+  }
   nodes.push(node("settings", rootParts.concat(["Open config file"]), { id: "config", subtitle: String(model.configPath || ""), icon: "", section: "Keystroke",
     verb: "Open file", order: 2, keywords: "json", description: "edit", action: { type: "edit" } }))
   var entries = model.entries || []
@@ -180,6 +192,19 @@ function rows(nodes, scope, query) {
     var s = Match.match(q, n.title, n.keywords, rel.parent ? rel.path : "", n.description)
     if (!s) continue
     out.push(row(n, s + n.lift, rel.parent || n.subtitle, "Settings"))
+  }
+  return out
+}
+
+function catalog(tree, scope) {
+  if (tree.screens[scope]) return []
+  var out = []
+  for (var i = 0; i < tree.nodes.length; i++) {
+    var n = tree.nodes[i]
+    if (n.listOnly || n.disabled || !within(n, scope)) continue
+    var r = row(n, 1, n.parts.slice(0, -1).join(" › ") || n.subtitle, "Settings")
+    r.path = n.path; r.keywords = n.keywords; r.description = n.description
+    out.push(r)
   }
   return out
 }

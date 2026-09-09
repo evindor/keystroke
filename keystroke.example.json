@@ -3,12 +3,18 @@
   "palette": {
     "density": "compact",
     "accent": "theme",
-    "showPreview": true
+    "showPreview": true,
+    "animations": "snappy",
+    "windowTransition": "instant"
   },
   "voice": {
     "enabled": true,
     "secondTap": "voice",
     "keys": "SUPER + SPACE"
+  },
+  "matching": {
+    "mode": "all",
+    "model": "small"
   },
   "providers": {
     "omarchy": {
@@ -39,6 +45,7 @@
     },
     "files": {
       "enabled": true,
+      "searchMode": "fuzzy",
       "files": true,
       "folders": true,
       "hidden": false,

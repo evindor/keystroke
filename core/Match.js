@@ -294,18 +294,24 @@ function tierValue(row) {
 // bonus(row) is the frecency bonus; it only ever reorders within the item
 // tier, so learning can never promote a row above a computed answer or push
 // a fallback above a real match.
+// The frecency bonus is computed once per row, never inside the comparator:
+// a sort asks for O(n log n) comparisons and each bonus is a hash lookup.
 function rank(rows, bonus) {
-  var out = rows.slice()
-  out.sort(function(a, b) {
-    var ta = tierValue(a), tb = tierValue(b)
-    if (ta !== tb) return tb - ta
-    var sa = Number(a.score || 0), sb = Number(b.score || 0)
-    if (ta === TIERS.item && bonus) { sa += bonus(a); sb += bonus(b) }
-    if (sa !== sb) return sb - sa
-    var oa = a.order === undefined ? 50 : a.order, ob = b.order === undefined ? 50 : b.order
-    if (oa !== ob) return oa - ob
-    var na = String(a.title || "").toLowerCase(), nb = String(b.title || "").toLowerCase()
-    return na < nb ? -1 : na > nb ? 1 : 0
+  var items = new Array(rows.length)
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i], tier = tierValue(row), score = Number(row.score || 0)
+    if (tier === TIERS.item && bonus) score += bonus(row)
+    items[i] = { row: row, tier: tier, score: score, order: row.order === undefined ? 50 : row.order, name: null }
+  }
+  items.sort(function(a, b) {
+    if (a.tier !== b.tier) return b.tier - a.tier
+    if (a.score !== b.score) return b.score - a.score
+    if (a.order !== b.order) return a.order - b.order
+    if (a.name === null) a.name = String(a.row.title || "").toLowerCase()
+    if (b.name === null) b.name = String(b.row.title || "").toLowerCase()
+    return a.name < b.name ? -1 : a.name > b.name ? 1 : 0
   })
+  var out = new Array(items.length)
+  for (i = 0; i < items.length; i++) out[i] = items[i].row
   return out
 }

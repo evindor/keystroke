@@ -119,10 +119,11 @@ function comboKey(text) { return String(text || "").toLowerCase().replace(/\s*\+
 // Abbreviations and the combo itself both find a bind: "flcrn" walks Full
 // screen, "super f" lands on its keys, "screenshot" on the command it runs.
 function keywords(bind) {
+  if (bind.searchKeywords !== undefined) return bind.searchKeywords
   var words = []
   for (var i = 0; i < bind.combos.length; i++) words.push(comboKey(bind.combos[i]))
   if (bind.dispatcher === "exec" && bind.arg) words.push(bind.arg.split(/\s+/)[0])
-  return words.join(" ")
+  return (bind.searchKeywords = words.join(" "))
 }
 
 function row(bind, score) {
@@ -150,7 +151,7 @@ function rows(query, binds, settings, inScreen) {
   var needle = q.replace(/(^|\s)\+(?=\s|$)/g, " ").replace(/\s+/g, " ").trim() || q
   var showKeyboardOnly = !settings || settings.keyboardOnly !== false
   var limit = settings && settings.limit > 0 ? settings.limit : 10
-  var out = []
+  var out = [], scored = []
   for (var i = 0; i < binds.length; i++) {
     var bind = binds[i]
     if (!runnable(bind) && !showKeyboardOnly) continue
@@ -159,11 +160,12 @@ function rows(query, binds, settings, inScreen) {
     if (!s) continue
     // The keys spelled out ("super f") name one bind; it outranks the binds that merely contain them.
     for (var c = 0; c < bind.combos.length; c++) if (comboKey(bind.combos[c]) === qk) { s += 25; break }
-    out.push(row(bind, s))
+    if (inScreen) out.push(row(bind, s)); else scored.push({ bind: bind, score: s, order: bind.order })
   }
   if (!inScreen && q) {
-    out.sort(function(a, b) { return b.score - a.score || a.order - b.order })
-    if (out.length > limit) out.length = limit
+    // At the root only `limit` rows survive; build just those.
+    scored.sort(function(a, b) { return b.score - a.score || a.order - b.order })
+    for (i = 0; i < scored.length && i < limit; i++) out.push(row(scored[i].bind, scored[i].score))
   }
   return out
 }

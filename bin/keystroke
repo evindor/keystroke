@@ -19,6 +19,8 @@ Usage: bin/keystroke <command>
   toggle      Toggle the palette (routes through omarchy.menu)
   open <q>    Open the palette with a query
   validate    omarchy plugin validate on this checkout
+  matching [small|large]  Prepare the local matching engine and fetch the model (default: small)
+  engine      Rebuild the static matching engine shipped in matching/bin (after editing matching/engine)
   test        Run QML, voice lifecycle, time-zone checks, and qmllint
 USAGE
 }
@@ -29,7 +31,7 @@ sync_copy() {
   stage="$(mktemp -d "$(dirname "$TARGET")/.keystroke.XXXXXX")"
   # -L dereferences any symlink so the installed tree never contains one.
   rsync -aL --delete --exclude .git --exclude .claude --exclude .agents --exclude .codex --exclude tests --exclude docs --exclude assets --exclude examples --exclude experiments \
-    --exclude '__pycache__' --exclude '*.pyc' "$ROOT/" "$stage/"
+    --exclude '__pycache__' --exclude '*.pyc' --exclude matching/engine/target "$ROOT/" "$stage/"
   if [[ -e $TARGET ]]; then rm -rf "$TARGET"; fi
   mv "$stage" "$TARGET"
 }
@@ -37,6 +39,9 @@ sync_copy() {
 case "${1:-help}" in
   install)
     omarchy plugin validate "$ROOT"
+    if ! python3 "$ROOT/helpers/matching-start.py" --model small --install-only; then
+      echo "Smart Match setup did not finish. Ordinary search remains available; retry in Keystroke Settings." >&2
+    fi
     sync_copy
     omarchy-shell shell rescanPlugins >/dev/null
     for _ in $(seq 1 40); do
@@ -61,9 +66,19 @@ case "${1:-help}" in
     exec omarchy-shell shell summon omarchy.menu "$(jq -nc --arg q "${*:-}" '{query: $q}')"
     ;;
   validate) exec omarchy plugin validate "$ROOT" ;;
+  matching) exec python3 "$ROOT/helpers/matching-start.py" --model "${2:-small}" --install-only ;;
+  engine) exec "$ROOT/matching/engine/build-prebuilt.sh" ;;
   test)
     (cd "$ROOT/tests" && /usr/lib/qt6/bin/qmltestrunner -silent -input .)
     python3 "$ROOT/tests/applications_check.py"
+    python3 "$ROOT/tests/files_check.py"
+    python3 "$ROOT/tests/catalog_check.py"
+    python3 "$ROOT/tests/matching_session_check.py"
+    python3 "$ROOT/tests/palette_matching_check.py"
+    python3 "$ROOT/tests/palette_shortcut_check.py"
+    python3 "$ROOT/tests/palette_motion_check.py"
+    uv run --with-requirements "$ROOT/matching/requirements.lock" python "$ROOT/tests/matching_worker_check.py"
+    uv run --with-requirements "$ROOT/matching/requirements.lock" python "$ROOT/tests/matching_engine_check.py"
     python3 "$ROOT/tests/voice_session_check.py"
     python3 "$ROOT/tests/clipboard_transfer_check.py"
     python3 "$ROOT/tests/codex_session_check.py"

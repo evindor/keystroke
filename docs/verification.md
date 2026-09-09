@@ -1,5 +1,196 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.2.0 (2026-09-09)
+
+- Full offscreen `bin/keystroke test` on the release tree (`QT_QPA_PLATFORM=offscreen`,
+  `QT_QPA_PLATFORMTHEME=generic`, `QT_QUICK_BACKEND=software`, `UV_OFFLINE=1`):
+  148 QML tests, the application, file, catalog, matching session, palette
+  matching, shortcut and motion checks, the matching worker and engine checks
+  (build, protocol, tokenizer parity, shipped-binary digest), voice, clipboard,
+  Codex, dictation and 48 time-zone cases passed. The suite then stopped at
+  `tests/extensions_check.py`, which fails its "update applied" step
+  ("Extensions are up to date" instead of "Updated Probe") on three runs here and
+  identically on the exported 1.1.5 tree (`origin/main` at `4798c4a`): the
+  update job schedules a check job the moment it finishes and the check's status
+  overwrites the update's before the harness reads it, the race recorded under
+  the time-zone entry below. Every other step of that check passes (install,
+  update detection, update job, manifest at the new version, toggles, removal).
+- Run separately after that stop: `tests/hotkeys_check.py` against the live
+  `omarchy-menu-keybindings` on this machine passed; `tests/lint.sh` exits 0
+  with 81 warnings, unchanged from the animation-tiers entry; `bin/keystroke
+  validate`, `git diff --check`, `site/check.py` and `node --check site/script.js`
+  pass.
+- Release scope: the fourteen commits on `dev` after the 1.1.5 release merge,
+  `c7cc2cb` (Smart Match) through `c2213e2` (Instant window transition), plus
+  the release documentation. The installed plugin was not replaced and no live
+  desktop check was run for this release; the manifest was already at 1.2.0.
+  See [release notes](releases/v1.2.0.md).
+
+## Animation tiers (2026-09-09)
+
+Appearance gained **Animations** (Off, Snappy, Fluid; default Snappy) and
+**Window transition** (Instant, Fade, Slide up; default Instant, chosen apart
+from the tier so the window can stay instant while the rest animates).
+`core/Motion.js` holds the one table of durations: Snappy 38 ms for the level
+slide, the selection glide and the window, with a 14 + 34 ms flash (the first
+cut was 32 ms and felt too short, so every Snappy figure grew by 20 %); Fluid
+90 ms with a 20 + 50 ms flash; Off is all zeros and takes every path as a
+plain assignment. Four transitions:
+
+- A menu level (results, breadcrumb, or a provider view) enters from the right
+  after `navigate` and from the left after `goBack`; rows are reconciled in
+  place, so only the entering level moves.
+- The selection is one `ListView` highlight that glides between rows (rows no
+  longer paint their own background); a reset after typing or a level change
+  jumps instead of gliding.
+- The activated row flashes with the selected text color, and a launch waits
+  for the flash to peak before the window starts leaving.
+- The window fades (or slides up 20 px while fading) in and out on an
+  `OutExpo` curve, so most of the change lands in the first frames; a gentler
+  ramp read as the palette being late rather than as motion. The layer stays
+  mapped for the fade-out without keyboard focus, so the launched app gets
+  the keyboard at once.
+
+Fixed after the first live check: the highlight vanished or sat on the wrong
+row after typing. The `ListView` follows the surviving item when rows above the
+selection are removed, so its own `currentIndex` drifted from `selected` while
+the highlight read `currentItem`; reproduced offscreen (selected 0, list index
+1 after the first row went away). The index is now re-asserted from the
+selection after every reconcile instead of being bound to it.
+
+Checked offscreen (`QT_QPA_PLATFORM=offscreen`, software backend):
+
+- `tests/tst_motion.qml` (6 tests): tier ranges, fallback to Snappy, offsets.
+- `tests/palette_motion_check.py` on the real palette with a fixture provider:
+  the reveal starts below 1 and reaches 1; the highlight exists, covers the row
+  and not its section header, glides after `select()` and jumps after a reset;
+  `navigate`/`goBack` enter from the right/left and settle; activation flashes
+  the activated row; closing keeps the window mapped until the fade ends and
+  the slide-up leaves the card lower; reopening while leaving cancels the
+  fade-out; with animations Off the reveal, highlight, level and window change
+  at once and nothing flashes; after typing removes the first row the list
+  index and the highlight follow the selection onto the new first row, and a
+  kept selection is re-indexed when everything above it goes; Instant maps
+  and unmaps at once while the tier stays Snappy; the row's flash overlay
+  brightens then settles and a zero-length flash does nothing.
+- Card renders grabbed mid-glide and mid-flash confirmed the highlight is
+  painted under the row text and the flash reads as a brightening of the row.
+- `qmltestrunner` (148 tests), the shortcut, matching, dictation and catalog
+  checks pass; qmllint warnings unchanged (81).
+
+Not exercised: the live layer-shell window (fade-in timing against surface
+mapping, keyboard focus release during the fade-out) and the exact durations;
+the numbers are the starting points to tune by feel, all in `core/Motion.js`.
+
+## Smart Match performance and compiled engine (2026-09-09)
+
+Profiled offscreen with `tools/profile_palette.py` on the laptop (Core Ultra X7
+358H, 16 threads): the actual providers, this machine's Omarchy menu, 58 apps,
+230 hotkeys and home folder, the installed small model, and 41 typed keystrokes
+across four queries. Milliseconds are wall time of one `runQuery()` on the UI
+thread (1 ms resolution).
+
+| per query on the UI thread | before (`cdcfffe`) | after |
+| --- | --- | --- |
+| total, median / p90 / max | 35 / 148 / 287 | 10 / 16 / 21 |
+| rank (frecency + sort) | 5 / 96 / 245 | 0 / 1 / 1 |
+| providers + catalog enumeration | 23 / 30 / 56 | 8 / 15 / 18 |
+| documents + request key | 2 / 3 / 4 | 0 / 0 / 1 |
+| merge (lexical + semantic) | 4 / 7 / 9 | 1 / 3 / 6 |
+
+- The ranking cost was `Qt.md5` (about 25 µs per call in the engine) run four
+  times per comparison inside the sort; keys are now memoized and the bonus is
+  computed once per row. Learned query keys changed shape to item hash, colon,
+  context hash; previous learned entries decay out of `usage.json` unchanged.
+- The catalog (rows, intent descriptions, fingerprint hashes, filtered documents
+  and their digest) is built once per summon, scope, configuration or provider
+  change and prewarmed while the palette waits for the first keystroke; the
+  first-keystroke enumeration hitch (34 ms) is gone. Refreshes from one provider
+  (`fd` finishing, an embedding reply) re-run only that provider; lexical scores
+  are reused across the refreshes of one keystroke. Files and Hotkeys build rows
+  only for the survivors; menu visibility is memoized until guards change.
+- Engine: `matching/engine` (Rust, 600 KB, no ML framework) replaces the Python
+  runtime when cargo is available. Tokenizer parity with `tokenizers` on 3,771
+  texts (618 descriptions, catalog keys, 2,500 random and unicode strings):
+  identical. Scores agree with the Python worker within 4e-7 and produce the same
+  top-30 order for every checked query. Ready in 18 ms (65 ms submit-to-result
+  through `Session.qml` after an idle unload, versus about 250 ms), 16 MiB
+  resident versus 92 MiB for the live Python worker, 1,500 documents embedded in
+  5 ms, a query in under 0.1 ms. Model files are fetched by URL with pinned
+  SHA-256 digests; `huggingface_hub` is no longer needed. The Python path remains
+  as the fallback without cargo and serves the same protocol.
+- Shipped binary: `matching/bin/keystroke-matching` is a static-pie x86_64 build
+  (1.5 MB, `ldd`: statically linked) with a manifest naming the machine and the
+  engine-source fingerprint; the start script takes it only while both match. A
+  fresh data directory now needs only the 8 MB model download (1.8 s here) and no
+  cargo; the engine check verifies the manifest, digest and tokenizer parity of
+  the shipped binary as well.
+- Full `bin/keystroke test` except one pre-existing failure: 142 QML tests, all
+  integration checks and the new `matching_engine_check.py` (build, protocol,
+  parity) pass; `tests/extensions_check.py` fails at "update applied" on the
+  untouched `cdcfffe` checkout as well. qmllint warning count is unchanged (283).
+  Plugin validation and `git diff --check` pass. The installed plugin was not
+  replaced; the live check is the user's.
+
+## Fuzzy file search and tilde prefix (2026-09-09)
+
+- Fixed candidate generation: `dwnlds` now reaches Downloads. `~` isolates Files
+  and bypasses embeddings; the main palette offers Fuzzy (default), Literal,
+  and Only with ~. Search remains under home and respects ignore rules.
+- Five real-home fd runs per query (`downlo`, `dwnlds`, `rpt`, `zzzxqv`), two
+  threads and 400 candidates: fuzzy medians 12.1–38.6 ms, maxima 12.4–40.7 ms;
+  literal medians 36.2–39.5 ms. This is a warm local-disk measurement, not a
+  latency guarantee. Broad fuzzy `rpt` reached the 400-candidate cap.
+- QML scoring of 400 synthetic report paths measured about 6 ms per query over
+  20 repetitions. No full-tree index or embedding work runs for file search.
+- Full `bin/keystroke test`: 142 QML tests plus integration checks passed.
+  New actual-fd integration covers all modes, bare tilde, directory matches,
+  space/slash path abbreviations, hidden filters, and newline filenames.
+  Palette integration verifies prefix isolation and embedding bypass. Targeted
+  tests also cover bounded input, safe regex/argv, cache keys, and incomplete
+  records after cancellation. Plugin validation and diff checks passed.
+- Large/slow trees can reach the three-second timeout; broad queries can omit
+  better results beyond the 400 candidates. Only with ~ avoids background file
+  walks for ordinary root queries. The installed plugin was not replaced.
+
+## Smart Match (2026-09-09, dev / 1.2.0)
+
+- Full offscreen `bin/keystroke test` exits 0: **139 QML tests**, all prior
+  integration checks, and new worker, session, catalog and palette matching checks.
+  Used `QT_QPA_PLATFORM=offscreen`, `QT_QPA_PLATFORMTHEME=generic`,
+  `QT_QUICK_BACKEND=software`; dependencies were cached and `UV_OFFLINE=1` was set.
+- Pure logic covers spoken arithmetic, ambiguous prose, defaults and enum labels,
+  launch-vs-install filtering, Chromium-only alias, typo distance, negation,
+  recording direction, volume direction, on/off setters, and confirmation-preserving
+  command deduplication. Typed provider arguments keep case and raw input.
+- Real QML process checks cover one-in-flight/latest-queued requests, stale replies,
+  Off unloading, changing size during loading, cancellation, idle unloading without
+  immediately reloading on a status refresh, waking with a fresh index, and no
+  leaked helper processes. Targeted session/palette checks were rerun after the idle
+  lifecycle refinement and passed.
+- Actual palette checks cover Only voice vs typed input, Voice and text, Off,
+  scoped enumeration, removal from a live catalog, raw transcript preservation,
+  ordinary matching fallback and stable selection during result reordering.
+  The same palette harness also passed with the real installed 2M worker offline.
+- Catalog checks execute no menu actions: unresolved/false guards and guarded
+  ancestors are excluded from semantic enumeration; subtree scope and later changes
+  are respected. Worker checks cover input limits, cache reuse/eviction, replacement
+  of catalog IDs and IDs/scores-only replies.
+- The pinned installer was exercised with Python 3.13 and the desktop's Python
+  3.14.7. Small (2M) is installed under the current user's Keystroke data directory;
+  Large (8M) was downloaded and validated only in an isolated `/tmp` directory.
+  The installed small model subsequently served requests with `HF_HUB_OFFLINE=1`.
+- Rendered and inspected Matching, Smart match choices and Matching model choices
+  offscreen: correct labels, selected defaults, existing theme/layout and no clipped
+  setting text. These were temporary screenshots, not new product artwork.
+- `bin/keystroke validate` and `git diff --check` pass. Lint has no new warning
+  messages compared with the untouched dev checkout; existing Quickshell/Qt metadata
+  warnings remain. The 618 descriptions and source fingerprints have full coverage.
+- No live desktop commands were activated, no real microphone recordings were
+  tested, and the running plugin was not replaced. Installation/download performance
+  was not measured on low-end laptops. This is a local suggestions system, not an
+  automatic command executor or a production accuracy claim for arbitrary speech.
+
 ## Release 1.1.5 (2026-09-09)
 
 - Full offscreen `bin/keystroke test`: 119 QML tests, application-library
@@ -249,3 +440,14 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
 - Validation: 119 QML tests, application compatibility and palette integration
   checks passed. Plugin validation and qmllint passed (existing metadata
   warnings only). The live Applications screen rendered all 73 result rows.
+# Query-specific selection learning — 2026-09-09
+
+- Reproduced the `downlo` ranking with actual file scoring and Smart Match merge:
+  the Downloads folder loses to hotkeys before learning and ranks first after
+  one selection, with embeddings enabled or disabled.
+- Verified serialization, query/scope isolation, normalization, decaying/capped
+  weights, and answer/fallback tier boundaries. The actual palette integration
+  test activates a remembered result, reopens, and verifies the learned ranking.
+- Full `bin/keystroke test`: 140 QML tests passed, plus all integration checks;
+  plugin validation and `git diff --check` passed. The installed plugin was not
+  replaced as part of this change.

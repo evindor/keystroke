@@ -2,6 +2,8 @@ import QtQuick
 import QtTest
 import "../core/Match.js" as Match
 import "../core/Frecency.js" as Frecency
+import "../core/Files.js" as Files
+import "../core/SmartMatch.js" as Smart
 
 TestCase {
     name: "MatchAndRank"
@@ -84,6 +86,41 @@ TestCase {
         compare(Frecency.parse("{ broken"), ({}))
         verify(Frecency.bonus(entries, k, now) <= 36)
         compare(Frecency.bonus(entries, "", now), 0)
+    }
+    function test_query_learning_overcomes_file_discount_after_one_selection() {
+        var now = 1800000000, query = "downlo"
+        var folder = {uid:"files/downloads",providerKey:"files",id:"downloads",title:"Downloads",tier:"item",
+                      score:Files.score(query,{rel:"Downloads"}),action:{type:"open"}}
+        var video = {uid:"hotkeys/video",providerKey:"hotkeys",id:"video",title:"Download video from web app",tier:"item",
+                     score:Match.match(query,"Download video from web app"),action:{type:"hotkey",dispatcher:"exec",arg:"download-video"}}
+        var window = {uid:"hotkeys/down",providerKey:"hotkeys",id:"down",title:"Expand window down a lot",tier:"item",
+                      score:Match.match(query,"Expand window down a lot"),action:{type:"hotkey",dispatcher:"resizeactive",arg:"0 300"}}
+        var rows = Smart.merge([video,window,folder],[video,window],Smart.request(query),[{id:window.uid,score:.9}])
+        compare(Match.rank(rows,null)[0].id,"video")
+        var globalKey = Frecency.key(folder.providerKey,folder.id)
+        var learnedKey = Frecency.queryKey(folder.providerKey,folder.id,query,"")
+        var entries = Frecency.record({},globalKey,now)
+        entries = Frecency.record(entries,learnedKey,now)
+        function boost(r) {
+            return Frecency.bonus(entries,Frecency.key(r.providerKey,r.id),now)
+              + Frecency.queryBonus(entries,Frecency.queryKey(r.providerKey,r.id,query,""),now)
+        }
+        compare(Match.rank(rows,boost)[0].id,"downloads")
+        // Also works with embeddings off; the learned preference is the final pass.
+        compare(Match.rank([video,window,folder],boost)[0].id,"downloads")
+        entries = Frecency.parse(Frecency.serialize(entries))
+        compare(Match.rank(rows,boost)[0].id,"downloads")
+        compare(Frecency.queryBonus(entries,Frecency.queryKey("files","downloads","download video",""),now),0)
+        compare(Frecency.queryBonus(entries,Frecency.queryKey("files","downloads",query,"files"),now),0)
+        compare(Frecency.queryKey("files","downloads","  DOWNLO  ",""),learnedKey)
+        compare(Frecency.queryKey("files","downloads","   ",""),"")
+        verify(Frecency.serialize(entries).indexOf(query)<0)
+        verify(Frecency.queryBonus(entries,learnedKey,now+Frecency.HALF_LIFE)<Frecency.queryBonus(entries,learnedKey,now))
+        for(var i=0;i<20;i++) entries=Frecency.record(entries,learnedKey,now)
+        compare(Frecency.queryBonus(entries,learnedKey,now),108)
+        var withAnswer = rows.concat([{id:"answer",tier:"answer",score:1},{id:"fallback",tier:"fallback",score:999}])
+        compare(Match.rank(withAnswer,boost)[0].id,"answer")
+        compare(Match.rank(withAnswer,boost).slice(-1)[0].id,"fallback")
     }
     function test_a_keystroke_over_a_full_menu_stays_fast() {
         var titles = [], paths = []

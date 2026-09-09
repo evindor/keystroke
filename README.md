@@ -1,12 +1,12 @@
 # Keystroke
 
-A Raycast-style command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin in QML and JavaScript, running inside the existing `omarchy-shell` process, themed by whatever Omarchy theme is active. Type, or speak, what you want: apps, the whole Omarchy menu, calculations, conversions, colors, emoji, clipboard history, files, Codex, and anything a community extension adds.
+A Raycast-style command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin in QML and JavaScript, running inside the existing `omarchy-shell` process, themed by whatever Omarchy theme is active. Type, or speak, what you want: apps, the whole Omarchy menu, calculations, conversions, colors, emoji, clipboard history, files, Codex, and anything a community extension adds. Smart Match, a small embedding model running locally, understands what you mean when the words do not match exactly.
 
 <p align="center"><a href="https://evindor.github.io/keystroke/"><img src="site/assets/social-card.png" alt="Keystroke: Raycast-style power for Omarchy" width="960"></a></p>
 
 **[Explore the feature showcase and installation guide →](https://evindor.github.io/keystroke/)**
 
-[Release notes: 1.1.5](docs/releases/v1.1.5.md) — Omarchy 4.0.3 compatibility, time-zone queries, and voice and extension improvements.
+[Release notes: 1.2.0](docs/releases/v1.2.0.md) — Smart Match on a compiled engine, fuzzy file search with `~`, `Ctrl+1`…`Ctrl+8`, animation tiers, and a lighter UI thread. Earlier: [1.1.5](docs/releases/v1.1.5.md).
 
 Screenshots show the real Omarchy interface with public demo data.
 
@@ -19,6 +19,15 @@ omarchy plugin add https://github.com/evindor/keystroke.git --enable
 That is all. Enabling Keystroke makes it the menu: `Super+Space`, every `omarchy-menu` binding, `omarchy menu summon <route>`, and the `omarchy-menu-select`/`omarchy-menu-input` pickers all route to it. Disabling or removing it (`omarchy plugin disable evindor.keystroke`, `omarchy plugin remove evindor.keystroke`) restores the stock menu. This works because the manifest declares `omarchy.clonedFrom: "omarchy.menu"`; Omarchy's plugin registry routes calls for `omarchy.menu` to the enabled replacement and restores the original afterwards. The plugin id `evindor.keystroke` is permanent.
 
 From a checkout, `bin/keystroke install` copies the tree into `~/.config/omarchy/plugins/evindor.keystroke` (no symlinks) and enables it; `bin/keystroke uninstall` reverses that.
+
+Smart Match defaults to **Voice and text** with the small **2M** embedding model.
+The first matching query fetches the model (8 MB, pinned digest) and starts the
+compiled engine shipped with the plugin (a static x86_64 binary; 16 MiB resident,
+ready in tens of milliseconds). On another architecture `cargo` builds it once from
+the included source, and without a Rust toolchain Python 3 with `uv` installs the
+equivalent pinned runtime instead. Ordinary search remains available
+during setup; checkout installation prepares everything ahead of time. After
+setup, matching works offline.
 
 **Bar-widget note (Omarchy 4.0.x).** Keystroke also ships the menu button as a bar widget, so enabling it puts a button in your bar (replacing the stock one in place if you had it). For a third-party plugin, "enabled" means "referenced in shell.json", so removing that button from the bar also disables the menu. If you do not want the button, keep the plugin listed under `plugins[]` in `~/.config/omarchy/shell.json` instead.
 
@@ -40,13 +49,35 @@ Requires Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). Like every Omarchy plugin,
 - **Type anything**: apps, Omarchy commands, `sqrt(144) + 15% of 80`, `2m in feet`, `32 F to C`, `10am pt`, `10 am in London`, `now in tokyo`, `#ff6644`, `:smile`, `readme`, `timer 10m tea`.
 - **Fuzzy everywhere, into submenus.** From the root, `prefp`, `keysepro` and `setaiprv` all land on Keystroke Settings › AI & Web Search › Preferred assistant, `prefcla` on its Claude choice, `sysshut` on System › Shutdown. Letters may skip whole words of the breadcrumb, words can come in any order (`ai prov`), descriptions match by word. Inside a submenu the same search covers everything below it.
 - **Answers first.** Computed results appear as answer rows with a preview; matches next; Google and the assistants last.
-- **Files and folders** under `~` join the results from two characters on, found by `fd` (hidden and gitignored entries are skipped unless you turn hidden entries on). The words of the query are literal substrings: the last one has to be in the name, earlier ones anywhere in the path, so `docs readme` finds README files under a docs folder. `↵` opens a file with its default app and a folder in your file manager; `Ctrl+↵` opens a terminal there. At most ten mix into the root (Settings → Files); the Files screen shows up to sixty.
+- **Files and folders** under `~` join the results from two characters on. Fuzzy abbreviations work: `dwnlds` finds Downloads, and `~dcmnts rpt` searches only files and folders for reports under Documents. `~` always selects fuzzy file search; Settings → Files → **Search in the main palette** offers **Fuzzy** (default), **Literal**, or **Only with ~**. Hidden entries are optional; gitignore rules remain respected. `↵` opens the result; `Ctrl+↵` opens a terminal there. At most ten results mix into the main palette; `~` and the Files screen show up to sixty.
 - **Hotkeys you have not learned yet.** Every Omarchy keybinding is a row at the root, named by what it does, with the keys next to it: `flcrn` shows **Full screen** with `Super + F`, `super f` finds the same bind by its keys, `screenshot` finds the one that runs `omarchy-capture-screenshot`. `↵` runs the bind exactly as pressing it would (the list and the dispatch both come from `omarchy-menu-keybindings`, the script behind `Super+K`); the keys shown are the suggestion for next time, and frecency lifts what you actually use. The **Hotkeys** screen lists all of them in the `Super+K` order. Binds Omarchy cannot run from a menu (Lua closures such as **Close window**) are shown greyed so the keys can still be learned. At most ten mix into the root (Settings → Hotkeys).
 - **Assistant hand-offs** open the target with your prompt already in its composer, nothing goes through the clipboard: Claude desktop via `claude://claude.ai/new?q=…`, the Codex desktop app via `codex://threads/new?prompt=…`, or the browser (`claude.ai/new?q=`, `chatgpt.com/?prompt=`; `?q=` sends immediately when **Send immediately in the browser** is on). CLI mode opens a terminal with `claude` or `codex` and the prompt as a literal argument.
-- **Keys**: `↑`/`↓` or `Ctrl+P`/`Ctrl+N` move, `PageUp`/`PageDown` jump six rows, `↵` or `→` activates, `Ctrl+↵` runs a row's alternate action, `Esc` closes, `Ctrl+U` clears the query, `←`/`Backspace` on an empty query goes back, `Del` on an application offers to uninstall it, `Ctrl+,` opens Settings, `Ctrl+K` opens the selected provider's settings.
+- **Keys**: `↑`/`↓` or `Ctrl+P`/`Ctrl+N` move, `PageUp`/`PageDown` jump six rows, `↵` or `→` activates, `Ctrl+1`…`Ctrl+8` activate the first to eighth result directly (holding `Ctrl` shows each row's number in place of its icon), `Ctrl+↵` runs a row's alternate action, `Esc` closes, `Ctrl+U` clears the query, `←`/`Backspace` on an empty query goes back, `Del` on an application offers to uninstall it, `Ctrl+,` opens Settings, `Ctrl+K` opens the selected provider's settings.
 - **Destructive Omarchy actions** (shutdown, reboot, logout, hibernate, removals, config resets) ask for confirmation; turn this off in Settings → Omarchy.
-- **Frecency.** Selections of apps, Omarchy commands and hotkeys earn a bounded bonus (14-day half-life). State lives in `~/.local/state/keystroke/usage.json` as hashed ids only.
+- **Frecency and learned preferences.** Selections of apps, Omarchy commands and hotkeys earn a bounded bonus (14-day half-life), and choosing a result for a query lifts that result the next time the same query is typed or spoken in the same scope. State lives in `~/.local/state/keystroke/usage.json` as hashed ids only, never as query text.
 - **Every `omarchy menu` route works as before**: submenus open scoped (`omarchy menu toggle system`), leaf aliases run immediately (`omarchy menu summon reminder-set`), `apps` opens the Applications provider. Pickers honor `width`/`maxHeight`; a new picker request cancels a pending one.
+
+## Smart Match
+
+**Keystroke Settings > Matching** contains:
+
+- **Smart match** — “Match queries using an embedding model”: **Off** (model
+  unloaded), **Only voice**, or **Voice and text** (default).
+- **Matching model** — **Small (2M)** (default) or **Large (8M)**. Large downloads
+  once when first used; switching Off releases the model but keeps its files.
+
+Smart Match supplements exact and fuzzy search with action descriptions and local
+semantic suggestions. It keeps launch/install/remove and start/stop distinct,
+recognizes small typos, and offers Chromium for “launch Chrome” when Chrome is
+absent. Spoken arithmetic such as “27 plus 90” becomes `27 + 90`; dictation and
+assistant prompts retain the original transcript. Results still require Enter and
+keep their existing confirmations. Ambiguous speech can still need correction.
+
+Both models run locally on CPU. The runtime unloads after two idle minutes, and a
+setup failure leaves ordinary matching available. Use **Retry Smart Match** in the
+Matching settings screen or `bin/keystroke matching` to retry installation. Runtime
+files live under `~/.local/share/keystroke/matching` (or `XDG_DATA_HOME`). More detail
+is in [the matching runtime documentation](matching/README.md).
 
 ## Extensions
 
@@ -99,7 +130,7 @@ Type or speak, then select **Ask Codex here**, or type `? ` before your question
 
 <p align="center"><img src="site/assets/screenshots/settings.png" alt="Keystroke Settings" width="720"></p>
 
-One file, hand-editable and hot-reloaded: `~/.config/omarchy/keystroke.json` (see [keystroke.example.json](keystroke.example.json)). Settings screens are generated from each provider's schema; writes are atomic, preserve unknown fields, and are refused while the file fails to parse. Every screen, setting and choice is searchable from the palette root through its breadcrumb. Appearance: density (compact/comfortable), accent (theme accent or ember/violet/mint), previews on/off. Colors, fonts, radius and spacing follow the active Omarchy theme.
+One file, hand-editable and hot-reloaded: `~/.config/omarchy/keystroke.json` (see [keystroke.example.json](keystroke.example.json)). Settings screens are generated from each provider's schema; writes are atomic, preserve unknown fields, and are refused while the file fails to parse. Every screen, setting and choice is searchable from the palette root through its breadcrumb. Appearance: density (compact/comfortable), accent (theme accent or ember/violet/mint), previews on/off, animations (off, snappy or fluid) and the window transition (instant, fade or slide up). Colors, fonts, radius and spacing follow the active Omarchy theme.
 
 ## Verify
 
