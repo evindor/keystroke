@@ -67,7 +67,7 @@ Item {
       watchdog.stop()
       root.inflight = ""
       root.superseded = false
-      if (root.host) root.host.requery()
+      if (root.host) root.host.requery({ catalog: false, provider: root.provider.id })
     }
   }
 

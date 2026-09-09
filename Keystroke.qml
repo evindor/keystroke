@@ -103,9 +103,9 @@ Item {
   }
   Connections {
     target: providerRegistry
-    function onEntriesChanged() { root.dropOrphanedView() }
+    function onEntriesChanged() { root.invalidateCatalog(); root.dropOrphanedView() }
   }
-  onConfigChanged: root.dropOrphanedView()
+  onConfigChanged: { root.invalidateCatalog(); root.dropOrphanedView() }
 
   // -------------------------------------------------------------- settings
   property var config: Settings.empty()
@@ -124,7 +124,7 @@ Item {
     id: matchingSession
     enabled: root.matchingSettings.mode !== "off"
     model: root.matchingSettings.model
-    onChanged: if (root.opened && !root.confirmPending) root.requery()
+    onChanged: if (root.opened && !root.confirmPending) root.requery({ catalog: false })
   }
   property var intentDescriptions: ({})
   property var intentDescriptionKeys: ({})
@@ -138,12 +138,18 @@ Item {
     printErrors: false
     onLoaded: { try { root.intentDescriptionKeys = JSON.parse(text()); root.requery() } catch (_) { } }
   }
+  // The fingerprint hash is memoized per row identity: hashing costs about
+  // 25 µs per row in the QML engine and the catalog is rebuilt as a whole.
+  property var describeCache: ({})
   function describe(row) {
     var prefix = row.providerKey === "omarchy" ? "menu:" : row.providerKey === "applications" ? "app:" : row.providerKey === "hotkeys" ? "hotkey:" : ""
     var id = prefix + row.id
     if (prefix === "app:" && !root.intentDescriptionKeys[id]) id += ".desktop"
     var key = root.intentDescriptionKeys[id]
-    if (key && key.title === row.title && key.key === Qt.md5(String(row.descriptionKey || ""))) row.intentDescription = root.intentDescriptions[id] || ""
+    if (!key || key.title !== row.title) return row
+    var source = String(row.descriptionKey || ""), hit = root.describeCache[row.uid]
+    if (!hit || hit.source !== source) { hit = { source: source, hash: Qt.md5(source) }; root.describeCache[row.uid] = hit }
+    if (key.key === hit.hash) row.intentDescription = root.intentDescriptions[id] || ""
     return row
   }
   function paletteValues() { return root.paletteSettings }
@@ -438,6 +444,7 @@ Item {
   }
 
   function notifyOpened() {
+    root.invalidateCatalog()
     providerRegistry.rebuild()
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var p = providerRegistry.entries[i].provider
@@ -503,17 +510,93 @@ Item {
   function setQuery(text) { clipboardTransfer.cancel(); root.voiceCancel(); search.text = String(text || ""); root.edited(); return "ok" }
 
   // Providers call this when asynchronous results land; the selection is kept.
-  function requery() {
-    if (!root.opened) return
-    // Async providers and embedding replies must not cut short the typing pause.
-    // The pending query will read their latest data when the user pauses.
-    if (debounce.running) return
-    root.runQuery()
+  // Their Smart Match catalog is enumerated again unless the caller says it did
+  // not change ({ catalog: false }). Calls landing in one event-loop turn run a
+  // single query, and none cuts short the typing pause: the pending query reads
+  // the latest data when the user pauses.
+  function requery(options) {
+    if (!options || options.catalog !== false) root.invalidateCatalog()
+    else root.invalidateProviders(options.provider)
+    if (!root.opened || debounce.running) return
+    refresh.start()
+  }
+
+  // Provider rows are kept per provider for the current query and scope, so a
+  // refresh caused by one provider (fd finished, a reply landed) re-runs only
+  // that provider. A requery() without a provider key drops every entry.
+  property var providerCache: ({})
+  function invalidateProviders(key) {
+    if (key) delete root.providerCache[String(key)]
+    else root.providerCache = ({})
+  }
+  Timer { id: refresh; interval: 0; onTriggered: if (!debounce.running) root.runQuery() }
+
+  // ------------------------------------------------------ Smart Match catalog
+  // Providers enumerate their catalog only when something may have changed: a
+  // provider reported new data through requery(), the palette opened, the
+  // registry or configuration changed, or the scope differs. Every keystroke
+  // reuses the rows; the documents filtered under one set of intent
+  // constraints are reused by every query sharing those constraints.
+  property var catalogCache: null
+  function invalidateCatalog() {
+    root.catalogCache = null
+    root.invalidateProviders()
+    // The first keystroke should not pay for the enumeration: build it while
+    // the palette sits open with nothing typed.
+    if (root.opened && !root.dmenuActive) prewarm.restart()
+  }
+  Timer {
+    id: prewarm; interval: 0
+    onTriggered: {
+      if (!root.opened || root.dmenuActive || root.providerViewActive || root.catalogCache) return
+      if (!SmartMatch.enabled(root.matchingSettings.mode, !!root.voiceRawText)) return
+      var sc = root.scope, owner = sc.split("/")[0]
+      root.catalogFor(sc, owner, sc.indexOf("/") >= 0 ? sc.slice(owner.length + 1) : "")
+    }
+  }
+  function catalogFor(scope, owner, sub) {
+    var cache = root.catalogCache
+    if (cache && cache.scope === scope) return cache
+    var rows = [], seen = ({}), pend = false, mark = function() { pend = true }
+    for (var i = 0; i < providerRegistry.entries.length; i++) {
+      var entry = providerRegistry.entries[i]
+      if (!root.providerEnabled(entry)) continue
+      if (scope && owner !== entry.key) continue
+      var ctx = { query: "", rawQuery: "", scope: scope, sub: scope ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
+                  patterns: Patterns.evaluate(entry.patterns, ""), pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
+      try {
+        var candidates = []
+        if (typeof entry.provider.catalog === "function") candidates = entry.provider.catalog(ctx) || []
+        else if (!scope && entry.source === "bundled") {
+          // Older providers contribute only navigation rows, never arbitrary
+          // clipboard/file content or executable results from an empty query.
+          candidates = (entry.provider.query(ctx) || []).filter(function(c) { return c.action && c.action.type === "navigate" })
+        }
+        for (var c = 0; c < candidates.length && rows.length < 6000; c++) {
+          var candidate = root.normalize(candidates[c], entry, "", 0)
+          if (!candidate || candidate.disabled || candidate.tier !== "item" || seen[candidate.uid]) continue
+          seen[candidate.uid] = true
+          rows.push(root.describe(candidate))
+        }
+      } catch (e) { console.warn("keystroke: provider", entry.key, "catalog failed:", e) }
+    }
+    cache = { scope: scope, rows: rows, pending: pend, chrome: SmartMatch.hasChrome(rows), documents: ({}), documentKeys: [], lexical: { text: null, scores: null } }
+    root.catalogCache = cache
+    return cache
+  }
+  function documentsFor(cache, req) {
+    var key = SmartMatch.constraintKey(req), hit = cache.documents[key]
+    if (hit) return hit
+    if (cache.documentKeys.length >= 16) { cache.documents = ({}); cache.documentKeys = [] }
+    hit = SmartMatch.documents(cache.rows, req)
+    cache.documents[key] = hit
+    cache.documentKeys.push(key)
+    return hit
   }
 
   function runQuery() {
     if (!root.opened || root.providerViewActive) return
-    debounce.stop()
+    debounce.stop(); refresh.stop()
     if (root.dmenuActive) { root.applyRows(root.dmenuRows()); root.pending = false; root.afterRows(); return }
     root.generation++
     var raw = root.voiceRawText || search.text, sc = root.scope
@@ -526,59 +609,37 @@ Item {
     if (smart && req.math) q = req.math
     var owner = sc.split("/")[0]
     var sub = sc.indexOf("/") >= 0 ? sc.slice(owner.length + 1) : ""
-    var collected = [], catalog = [], errors = [], pend = false, matchedPatterns = ({})
-    var mark = function() { pend = true }
+    var collected = [], errors = [], pend = false, matchedPatterns = ({})
+    var cacheKey = [q, root.voiceRawText || search.text, sc, root.dictationMode ? "d" : ""].join("\u001f")
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var entry = providerRegistry.entries[i]
       if (!root.providerEnabled(entry)) continue
       if (filePrefix && entry.key !== "files") continue
       if (sc && owner !== entry.key) continue
-      // Declared patterns run before query(): the provider learns which shapes
-      // matched, and the largest boost lifts every row it returns this time.
-      var patterns = Patterns.evaluate(entry.patterns, q)
-      if (patterns.matched.length) matchedPatterns[entry.key] = patterns.matched
-      var ctx = { query: q, rawQuery: root.voiceRawText || search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
-                  patterns: patterns, pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
-      try {
-        var out = entry.provider.query(ctx) || []
-        for (var r = 0; r < out.length && r < 400; r++) {
-          var row = root.normalize(out[r], entry, q, patterns.boost)
-          if (row) collected.push(row)
-        }
-        if (smart && q && !req.blocked && !req.math) {
-          var candidates = []
-          if (typeof entry.provider.catalog === "function") candidates = entry.provider.catalog(ctx) || []
-          else if (!sc && entry.source === "bundled") {
-            // Older providers contribute only navigation rows, never arbitrary
-            // clipboard/file content or executable results from an empty query.
-            var emptyCtx = Object.assign({}, ctx, { query: "", rawQuery: "" })
-            candidates = (entry.provider.query(emptyCtx) || []).filter(function(c) { return c.action && c.action.type === "navigate" })
-          }
-          for (var c = 0; c < candidates.length && catalog.length < 6000; c++) {
-            var candidate = root.normalize(candidates[c], entry, "", 0)
-            if (candidate && !candidate.disabled && candidate.tier === "item") catalog.push(root.describe(candidate))
-          }
-        }
-      } catch (e) {
-        errors.push(entry.provider.name + ": " + e)
-        console.warn("keystroke: provider", entry.key, "failed:", e)
+      var cached = root.providerCache[entry.key]
+      if (!cached || cached.key !== cacheKey) {
+        cached = root.queryProvider(entry, q, sc, sub)
+        cached.key = cacheKey
+        root.providerCache[entry.key] = cached
       }
+      for (var r = 0; r < cached.rows.length; r++) collected.push(cached.rows[r])
+      if (cached.pending) pend = true
+      if (cached.patterns) matchedPatterns[entry.key] = cached.patterns
+      if (cached.error) errors.push(cached.error)
     }
     if (root.configError) errors.push(root.configError)
     if (smart && q) {
-      var documents = [], seen = ({}), documentSize = 0
-      catalog = catalog.filter(function(c) { if (seen[c.uid]) return false; seen[c.uid] = true; return true })
-      for (var d = 0; d < catalog.length; d++) if (SmartMatch.allowed(req, catalog[d], true)) {
-        var document = { id: catalog[d].uid, text: SmartMatch.document(catalog[d]) }
-        documentSize += JSON.stringify(document).length
-        if (documentSize > 3 * 1024 * 1024) break
-        documents.push(document)
-      }
-      var matchKey = JSON.stringify([raw, sc, root.matchingSettings.model, documents])
+      // A blocked or arithmetic request keeps the catalog out of the merge and
+      // sends nothing to the helper.
+      var catalog = !req.blocked && !req.math ? root.catalogFor(sc, owner, sub) : null
+      var documents = catalog ? root.documentsFor(catalog, req) : { rows: [], signature: "" }
+      var matchKey = JSON.stringify([raw, sc, root.matchingSettings.model, documents.signature])
       var hasAnswer = collected.some(function(r) { return r.tier === "answer" })
-      if (documents.length && !req.math && !req.blocked && !hasAnswer && raw.length <= 1024) matchingSession.submit(matchKey, raw, documents)
+      if (documents.rows.length && !hasAnswer && raw.length <= 1024) matchingSession.submit(matchKey, raw, documents.rows, documents.signature)
       else matchingSession.cancelRequest()
-      collected = SmartMatch.merge(collected, catalog, req, matchingSession.resultKey === matchKey ? matchingSession.matches : [])
+      if (catalog && catalog.pending) pend = true
+      collected = SmartMatch.merge(collected, catalog ? catalog.rows : [], req, matchingSession.resultKey === matchKey ? matchingSession.matches : [],
+                                   catalog ? catalog.chrome : false, catalog ? catalog.lexical : null)
     } else matchingSession.cancelRequest()
     var ranked = Match.rank(collected, root.bonusFor)
     root.applyRows(ranked.slice(0, 120))
@@ -587,6 +648,29 @@ Item {
     if (smart && matchingSession.error) errors.push(matchingSession.error)
     root.errorMessage = errors.join(" · ")
     root.afterRows()
+  }
+
+  // One provider's rows for one query: normalized, bounded, with whether it
+  // asked for a later refresh and which declared patterns matched.
+  function queryProvider(entry, q, sc, sub) {
+    var result = { rows: [], pending: false, patterns: null, error: "" }
+    // Declared patterns run before query(): the provider learns which shapes
+    // matched, and the largest boost lifts every row it returns this time.
+    var patterns = Patterns.evaluate(entry.patterns, q)
+    if (patterns.matched.length) result.patterns = patterns.matched
+    var ctx = { query: q, rawQuery: root.voiceRawText || search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
+                patterns: patterns, pending: function() { result.pending = true }, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
+    try {
+      var out = entry.provider.query(ctx) || []
+      for (var r = 0; r < out.length && r < 400; r++) {
+        var row = root.normalize(out[r], entry, q, patterns.boost)
+        if (row) result.rows.push(row)
+      }
+    } catch (e) {
+      result.error = entry.provider.name + ": " + e
+      console.warn("keystroke: provider", entry.key, "failed:", e)
+    }
+    return result
   }
 
   property var lastPatterns: ({})           // provider key → matched pattern ids, for inspect()
@@ -751,7 +835,7 @@ Item {
   function activate(alternate) {
     if (root.confirmPending) return
     if (root.dictationMode) { root.dictationAccept(alternate); return }
-    if (debounce.running) { debounce.stop(); root.runQuery() }
+    if (debounce.running || refresh.running) root.runQuery()
     if (root.dmenuActive) {
       if (root.mode === "input") { root.applyDmenuSelection(search.text); return }
       if (root.rows.length) root.applyDmenuSelection(root.current.value)

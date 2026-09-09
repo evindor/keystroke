@@ -66,7 +66,7 @@ data remains valid; query preferences start with selections made after this upda
 Query case and repeated whitespace are normalized; different prefixes and scopes
 learn independently. No embedding model or retraining is required for learning.
 
-Keystrokes debounce 25 ms; asynchronous refreshes respect that pending pause, while Enter flushes it immediately. Then the host calls `query(ctx)` on every enabled provider (root) or the owning provider (scoped). Before each call the host tests the provider's declared `patterns` (`core/Patterns.js`, compiled once per registry rebuild in `providers/Registry.qml`) against the query: the matched ids reach the provider as `ctx.patterns`, and the largest boost is added in `normalize()` to every row the provider returns that already has a positive score. Providers return rows synchronously. Anything slow (guards, dynamic menu providers, the time-zone helper) returns what it has, calls `ctx.pending()`, and later calls `host.requery()`; the host re-runs the query and keeps the selection. Rows are normalized, ranked by host-owned tiers (`answer > item > fallback`), scored within a tier, and reconciled into a fixed-role `ListModel` by uid so delegates update in place while typing. Previews are read from the selected row's JS object, never copied into the model.
+Keystrokes debounce 25 ms; asynchronous refreshes respect that pending pause, while Enter flushes it immediately. A refresh (`host.requery(options)`) is coalesced per event-loop turn; when it names its provider (`{ provider, catalog: false }`) only that provider is queried again and the other providers' rows for the unchanged query are reused. Then the host calls `query(ctx)` on every enabled provider (root) or the owning provider (scoped). Before each call the host tests the provider's declared `patterns` (`core/Patterns.js`, compiled once per registry rebuild in `providers/Registry.qml`) against the query: the matched ids reach the provider as `ctx.patterns`, and the largest boost is added in `normalize()` to every row the provider returns that already has a positive score. Providers return rows synchronously. Anything slow (guards, dynamic menu providers, the time-zone helper) returns what it has, calls `ctx.pending()`, and later calls `host.requery()`; the host re-runs the query and keeps the selection. Rows are normalized, ranked by host-owned tiers (`answer > item > fallback`), scored within a tier, and reconciled into a fixed-role `ListModel` by uid so delegates update in place while typing. Previews are read from the selected row's JS object, never copied into the model.
 
 ## Omarchy menu parity
 
@@ -111,12 +111,25 @@ Match highlighting in rows and a permanent publishing id.
 ## Smart Match
 
 `matching/Session.qml` manages one CPU helper, at most one in-flight request and one
-latest queued request. `helpers/matching-start.py` provisions a hash-locked per-user
-runtime and then execs `matching-worker.py`; fixed Model2Vec revisions are downloaded
-once and subsequently loaded locally. Off stops the process immediately, a model
-change replaces it, and two minutes of inactivity unloads it. Errors retain lexical
-search and expose a retry in Settings > Matching. See `matching/README.md` for
-storage, installation, protocol and model details.
+latest queued request. `helpers/matching-start.py` fetches the fixed Model2Vec
+revision (pinned SHA-256 digests, no client library), then execs the compiled engine
+(`matching/engine`, Rust: the BERT WordPiece tokenizer, mean pooling over the
+safetensors embedding table and cosine ranking; built once per source revision with
+`cargo`, or a prebuilt `matching/bin/keystroke-matching`). Without cargo it
+provisions the hash-locked Python runtime and execs `matching-worker.py`, which
+speaks the same protocol. Off stops the process immediately, a model change replaces
+it, and two minutes of inactivity unloads it (the engine reloads in about 60 ms).
+Errors retain lexical search and expose a retry in Settings > Matching. See
+`matching/README.md` for storage, installation, protocol and model details.
+
+Per keystroke the host does no catalog work: catalogs are enumerated once per summon,
+scope or configuration change and after a provider's `requery()`, kept with their
+intent descriptions, memoized lexical words/families and, per set of intent
+constraints, the filtered documents and a digest identifying them. The digest keys
+the request so an unchanged catalog is never serialized or re-sent. Frecency keys
+are memoized hashes (item hash, colon, query-context hash) computed once per row
+and once per query, never inside the sort. `tools/profile_palette.py` measures each
+phase offscreen against this machine's real providers.
 
 The host gathers available catalog rows from opted-in providers and root navigation
 rows from remaining bundled providers, applies intent/scope constraints, and sends

@@ -12,7 +12,7 @@ Item {
 
   onLibraryChanged: {
     root.searchCache = ({})
-    if (root.host) root.host.requery()
+    if (root.host) root.host.requery({ provider: root.provider.id })
   }
 
   readonly property var provider: ({
@@ -30,7 +30,7 @@ Item {
 
   Connections {
     target: root.library
-    function onAppsChanged() { root.searchCache = ({}); if (root.host) root.host.requery() }
+    function onAppsChanged() { root.searchCache = ({}); if (root.host) root.host.requery({ provider: root.provider.id }) }
   }
 
   // The name is fuzzy-matched; GenericName, Keywords and Comment are words

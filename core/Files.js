@@ -151,12 +151,12 @@ function terminalEffect(entry) {
   return { type: "exec", argv: ["setsid", "uwsm-app", "--", "xdg-terminal-exec", "--dir=" + dir] }
 }
 
-function row(query, entry, order) {
+function row(query, entry, order, known) {
   var name = baseName(entry.rel), kind = kindOf(entry)
   var parent = tilde(parentOf(entry.rel))
   return {
     id: entry.rel, title: name, subtitle: parent + (entry.dir ? " · Folder" : ""), icon: ICONS[kind], section: "Files",
-    verb: entry.dir ? "Open folder" : "Open", tier: "item", score: score(query, entry), order: order, remember: true,
+    verb: entry.dir ? "Open folder" : "Open", tier: "item", score: known === undefined ? score(query, entry) : known, order: order, remember: true,
     hint: "ctrl ↵ terminal", action: openEffect(entry), altAction: terminalEffect(entry),
     preview: tilde(entry.rel), previewLabel: entry.dir ? "FOLDER" : "FILE", previewImage: kind === "image" ? entry.path : "",
     previewDetail: entry.dir ? "↵ opens in your file manager · Ctrl+↵ opens a terminal here"
@@ -165,17 +165,20 @@ function row(query, entry, order) {
 }
 
 // The best `limit` rows out of fd's candidates. Scoring happens here, on a
-// few hundred entries at most, never on the whole tree.
+// few hundred entries at most, never on the whole tree; only the survivors
+// become full rows.
 function rows(query, entries, settings, scoped) {
   var ws = words(query), limit = scoped ? SCOPED_LIMIT : settings.limit
   if (!ws.length) return []
-  var out = []
+  var scored = []
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i]
     if (e.dir ? !settings.folders : !settings.files) continue
     if (!matchesRelative(e, ws, settings.fuzzy)) continue
-    out.push(row(query, e, i))
+    scored.push({ entry: e, score: score(query, e), order: i })
   }
-  out.sort(function(a, b) { return b.score - a.score || a.order - b.order })
-  return out.slice(0, limit)
+  scored.sort(function(a, b) { return b.score - a.score || a.order - b.order })
+  var out = []
+  for (i = 0; i < scored.length && i < limit; i++) out.push(row(query, scored[i].entry, scored[i].order, scored[i].score))
+  return out
 }

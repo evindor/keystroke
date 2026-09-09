@@ -46,6 +46,8 @@ Bundled providers also carry `id`; community providers are keyed by their plugin
 
 `query` (string), `rawQuery` (full original text before spoken-command normalization), `scope` (`""` at root, or `<key>` / `<key>/<sub>`), `sub`, `generation`, `settings` (validated values for your schema), `patterns` (`{ matched: [ids], boost }` for your declared patterns against this query; `{ matched: [], boost: 0 }` when none matched or none are declared), `pending()` (call when more rows will arrive later), `host` (`host.requery()` re-runs the current query; `host.appLibrary`, `host.omarchyPath`, `host.shell`), `shell`, `appLibrary`, `omarchyPath`.
 
+`host.requery(options)` accepts `{ catalog: false }` when only your `query` rows changed (the Smart Match catalog is kept) and `provider: "<your id>"` so only your rows are queried again; the other providers' rows for the current query are reused. Calls landing in one event-loop turn run a single query, and none interrupts the typing pause.
+
 ### Patterns
 
 A provider that answers a recognisable shape of text (a unit conversion, a variable assignment, a currency amount, a date expression) declares it, so the host can rank its offer without the provider computing scores against every other provider's:
@@ -148,7 +150,9 @@ current available command/navigation rows for the requested scope, independently
 of query wording. Use the normal stable IDs, actions, confirmations, and display
 metadata, plus `path`, `keywords`, `description`, and optionally a single-sentence
 `intentDescription` stating the outcome. Return quickly from cached state and call
-`ctx.pending()` / `host.requery()` when asynchronous catalog state changes. Filter
+`ctx.pending()` / `host.requery()` when asynchronous catalog state changes: the host
+enumerates catalogs once per summon, scope or configuration change and after such
+a call, never per keystroke. Filter
 unavailable actions and other scopes before returning them. Do not enumerate
 clipboard contents, file contents, recent conversations, or unbounded data.
 

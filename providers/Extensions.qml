@@ -87,7 +87,7 @@ Item {
     if (!doc || typeof doc !== "object") return
     if (kind === "index") { root.indexEntries = Extensions.parseIndex(doc.body || ""); root.indexFetched = Number(doc.fetchedAt || 0) }
     else { root.catalogEntries = Extensions.parseCatalog(doc.body || ""); root.catalogFetched = Number(doc.fetchedAt || 0) }
-    if (root.host) root.host.requery()
+    if (root.host) root.host.requery({ catalog: false, provider: root.provider.id })
   }
   function writeCache(view, body) {
     view.setText(JSON.stringify({ fetchedAt: Date.now(), body: body }))
@@ -113,13 +113,13 @@ Item {
       if (code !== 0) root.fetchError = "Could not fetch the " + fetcher.kind + " (curl exit " + code + ")"
       var next = fetcher.kind === "index" ? "catalog" : ""
       root.fetching = ""
-      if (next) root.fetch(next); else if (root.host) root.host.requery()
+      if (next) root.fetch(next); else if (root.host) root.host.requery({ catalog: false, provider: root.provider.id })
     }
   }
   function fetch(kind) {
     if (fetcher.running) return
     var url = kind === "index" ? String(root.settings().indexUrl || Extensions.INDEX_URL) : Extensions.CATALOG_URL
-    if (kind === "catalog" && !root.settings().marketplace) { root.fetching = ""; if (root.host) root.host.requery(); return }
+    if (kind === "catalog" && !root.settings().marketplace) { root.fetching = ""; if (root.host) root.host.requery({ catalog: false, provider: root.provider.id }); return }
     if (url.indexOf("https://") !== 0 && url.indexOf("file://") !== 0) { root.fetchError = "Index URL must be https"; return }
     root.fetching = kind
     root.fetchError = ""
@@ -183,14 +183,14 @@ Item {
     } else if (root.host) {
       root.host.errorMessage = (j.label + ": " + (tail || "exit " + code)).slice(0, 300)
     }
-    if (root.host) root.host.requery()
+    if (root.host) root.host.requery({ catalog: false, provider: root.provider.id })
   }
   function run(job, argv) {
     if (root.job) { if (root.host) root.host.errorMessage = "Another extension job is still running"; return false }
     job.startedAt = Date.now()
     root.job = job
     Quickshell.execDetached(Extensions.jobArgv(root.jobDir, job, root.omarchyPath, argv))
-    if (root.host) root.host.requery()
+    if (root.host) root.host.requery({ catalog: false, provider: root.provider.id })
     return true
   }
   function check(ids) {

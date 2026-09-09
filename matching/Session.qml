@@ -53,12 +53,14 @@ Item {
     root.requestedKey = ""; root.queued = null; root.resultKey = ""; root.matches = []
     delay.stop()
   }
-  function submit(key, query, rows) {
+  // catalogKey identifies the rows; the host computes it once per catalog so
+  // an unchanged catalog is never serialized again just to be compared.
+  function submit(key, query, rows, catalogKey) {
     if (!root.enabled || root.failed) return
     if (root.requestedKey === key) return
     idle.restart()
     root.requestedKey = key; root.resultKey = ""; root.matches = []
-    root.queued = { key: key, query: query, rows: rows }
+    root.queued = { key: key, query: query, rows: rows, catalogKey: catalogKey === undefined ? JSON.stringify(rows) : String(catalogKey) }
     delay.restart()
   }
   function unloadIdle() {
@@ -76,9 +78,8 @@ Item {
     if (!root.ready || root.inFlight) return
     var job = root.queued; root.queued = null
     var id = ++root.serial
-    var catalog = JSON.stringify(job.rows)
     var message = { id: id, query: job.query }
-    if (catalog !== root.sentCatalog) { message.rows = job.rows; root.sentCatalog = catalog }
+    if (job.catalogKey !== root.sentCatalog) { message.rows = job.rows; root.sentCatalog = job.catalogKey }
     root.inFlight = id
     root.flightKey = job.key
     proc.write(JSON.stringify(message) + "\n")
@@ -119,7 +120,9 @@ Item {
       if (expected && root.queued && root.enabled) Qt.callLater(root.sendLatest)
     }
   }
-  Timer { id: delay; interval: 90; onTriggered: root.sendLatest() }
+  // The host already debounces keystrokes; this only folds a burst of
+  // refreshes into one request. The helper answers in a few milliseconds.
+  Timer { id: delay; interval: 10; onTriggered: root.sendLatest() }
   Timer { id: startup; interval: 300000; onTriggered: root.fail("Matching setup timed out; check your connection and retry") }
   Timer { id: response; interval: 5000; onTriggered: root.fail("Smart Match timed out; ordinary search is still available") }
   Timer { id: idle; interval: 120000; onTriggered: { if (root.busy) restart(); else root.unloadIdle() } }

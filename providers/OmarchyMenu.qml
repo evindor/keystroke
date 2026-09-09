@@ -76,7 +76,7 @@ Item {
     root.rowsLoaded = true
     root.lastEnteredMenu = ""
     root.evaluateGuards()
-    if (root.host) root.host.requery()
+    if (root.host) root.host.requery({ provider: root.provider.id })
   }
 
   function reload() {
@@ -142,7 +142,7 @@ Item {
       }
       root.whenResults = nextWhen
       root.checkedResults = nextChecked
-      if (root.host) root.host.requery()
+      if (root.host) root.host.requery({ provider: root.provider.id })
       if (root.guardsPending) Qt.callLater(function() { root.evaluateGuards() })
     }
   }
@@ -242,7 +242,7 @@ Item {
     onExited: {
       if (providerProc.revision === root.providerRevision) {
         root.mergeProviderRows(providerProc.collected, providerProc.menuId, providerProc.providerKey)
-        if (root.host) root.host.requery()
+        if (root.host) root.host.requery({ provider: root.provider.id })
       }
       root.startNextProvider()
     }
@@ -262,7 +262,18 @@ Item {
     return { kind: "menu", id: entry ? id : "root", label: entry ? (entry.title || entry.label) : "" }
   }
 
-  function isVisible(entry) { return MenuModel.isVisible(root.items, root.itemOrder, root.whenResults, entry) }
+  // A menu is visible when any descendant is: that walk is quadratic over the
+  // model, so the answer is kept until the items or the guard results change.
+  property var visibleCache: ({})
+  onItemsChanged: root.visibleCache = ({})
+  onItemOrderChanged: root.visibleCache = ({})
+  onWhenResultsChanged: root.visibleCache = ({})
+  function isVisible(entry) {
+    if (!entry) return false
+    var hit = root.visibleCache[entry.id]
+    if (hit !== undefined) return hit
+    return (root.visibleCache[entry.id] = MenuModel.isVisible(root.items, root.itemOrder, root.whenResults, entry))
+  }
 
   function isDestructive(id) {
     return root.destructiveIds[id] === true || id.indexOf("remove.") === 0 || id.indexOf("update.config.") === 0

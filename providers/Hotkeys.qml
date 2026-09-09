@@ -57,7 +57,7 @@ Item {
     onExited: {
       root.loaded = true
       root.loadedAt = Date.now()
-      if (root.host) root.host.requery()
+      if (root.host) root.host.requery({ provider: root.provider.id })
     }
   }
 

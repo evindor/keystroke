@@ -67,7 +67,9 @@ ShellRoot {
      test.check(palette.rows[0].uid==="fixture/target" && palette.rows[0].smartMatch,"voice semantic result merged")
      test.check(test.rawSeen==="show everything","raw transcript reaches provider unchanged")
      test.targetVisible=false; palette.runQuery()
-     test.check(palette.rows.length===0,"removed catalog entry disappears immediately")
+     test.check(palette.rows.length===1,"catalog is reused until a provider reports a change")
+     palette.requery(); palette.runQuery()
+     test.check(palette.rows.length===0,"removed catalog entry disappears once the provider requeries")
      test.targetVisible=true; test.configure("all")
      palette.setQuery("show everything"); palette.runQuery(); test.stage=3
    } else if(test.stage===3 && palette.rows.length) {
