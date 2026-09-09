@@ -325,6 +325,20 @@ Item {
   readonly property color hairline: Util.alpha(foreground, 0.12)
   readonly property color muted: Util.alpha(foreground, 0.55)
 
+  // Type scale for provider views. A view covers the whole card, so it has to
+  // carry the palette's own sizes -- including the density bump -- or it reads
+  // a step smaller than the results it replaced. Ladder: fontInput is the
+  // search field, fontTitle a row title, fontBody a preview body, fontLabel a
+  // row subtitle or footer, fontCaption a keycap or the breadcrumb brand.
+  readonly property int fontInput: compact ? Style.font.heading : Style.font.heading + 2
+  readonly property int fontTitle: compact ? Style.font.title : Style.font.title + 1
+  readonly property int fontBody: Style.font.body
+  readonly property int fontLabel: Style.font.bodySmall
+  readonly property int fontCaption: Style.font.caption
+  // Tells a provider view it need not paint its own backdrop; an older
+  // host leaves this undefined, so a view can still fall back.
+  readonly property bool paintsViewBackdrop: true
+
   onPendingChanged: { if (pending) loadingDelay.restart(); else { loadingDelay.stop(); showLoading = false } }
   Timer { id: loadingDelay; interval: 180; onTriggered: root.showLoading = root.pending }
   Timer { id: debounce; interval: 16; onTriggered: root.runQuery() }
@@ -775,9 +789,24 @@ Item {
       Accessible.name: "Keystroke command palette"
       MouseArea { anchors.fill: parent; onClicked: {} }
 
+      // A provider view covers the palette, so the host paints the backdrop
+      // it needs and keeps both inside the card's border. Filling the card
+      // outright would paint over the border ring, which BorderSurface draws
+      // as the surface itself (or as an overlay child below this z).
+      Rectangle {
+        id: viewBackdrop
+        visible: !!providerView.item
+        z: 4
+        anchors.fill: parent
+        anchors.topMargin: card.borderTop; anchors.rightMargin: card.borderRight
+        anchors.bottomMargin: card.borderBottom; anchors.leftMargin: card.borderLeft
+        radius: Math.max(0, card.radius - Math.max(card.borderTop, card.borderLeft))
+        color: root.background
+      }
+
       Loader {
         id: providerView
-        anchors.fill: parent
+        anchors.fill: viewBackdrop
         z: 5
         onLoaded: { item.host = root; if (typeof item.focusInput === "function") Qt.callLater(item.focusInput) }
       }
@@ -836,7 +865,7 @@ Item {
           selectionColor: Util.alpha(root.accent, 0.45)
           selectedTextColor: root.foreground
           font.family: root.fontFamily
-          font.pixelSize: root.compact ? Style.font.heading : Style.font.heading + 2
+          font.pixelSize: root.fontInput
           selectByMouse: true
           clip: true
           focus: true

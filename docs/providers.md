@@ -111,6 +111,8 @@ The palette is the view's theme and its keyboard context. These members are part
 | Member | Meaning |
 | --- | --- |
 | `background`, `foreground`, `accent`, `muted`, `hairline` (colors), `fontFamily` (string), `compact` (bool) | The palette's theme, already resolved against the active Omarchy theme and Keystroke's appearance settings. Use them instead of `Color.menu.*` so the accent choice applies to you too. |
+| `fontInput`, `fontTitle`, `fontBody`, `fontLabel`, `fontCaption` (ints) | The palette's own type scale, density bump included. Use these instead of `Style.font.*` so a view reads at the size of the results it replaced -- see below. |
+| `paintsViewBackdrop` (bool) | True on a host that paints the backdrop behind your view. Undefined on older builds, which is the only case where a view should paint its own. |
 | `cancel()` | Close the palette (what `Esc` does). |
 | `goBack()` | Leave the view and return to the results, restoring the query. What `←` and `Backspace` on an empty composer do in the bundled views. |
 | `requery()` | Re-run the palette's query; relevant when your rows changed while the view was shown. |
@@ -120,6 +122,20 @@ The palette is the view's theme and its keyboard context. These members are part
 | `home`, `omarchyPath`, `shell`, `appLibrary`, `config` (read-only) | The same values `ctx` carries. |
 
 The view runs inside `omarchy-shell`, so `import qs.Commons` and `import qs.Ui` work: `Style.space`, `Style.font.*`, `Style.cornerRadius`, `Util.alpha`, `Ui.Button`, `Ui.BorderSurface` and `Ui.TextField` are the kit the bundled views are made of.
+
+### Styling a view
+
+The host loads the view *inside* the card's border and paints the themed backdrop behind it, so a view must not fill its whole area with an opaque rectangle: that covers the border the active theme draws, and the submenu stops looking like the menu it came from. A view that also has to run against older Keystroke builds can keep its own backdrop behind `visible: !(host && host.paintsViewBackdrop)`.
+
+Sizes are the other half of that. The palette sets its rows in `title` and its search field in `heading`, and shifts both up a step in the comfortable density; a view that reaches for `Style.font.body` directly reads smaller than the results it replaced and ignores the density setting. Take sizes from the host instead:
+
+| token | palette role | size |
+| --- | --- | --- |
+| `host.fontInput` | the search field; a view's own editor | `heading`, +2 when comfortable |
+| `host.fontTitle` | a result row's title; a view's primary content | `title`, +1 when comfortable |
+| `host.fontBody` | a preview body; long secondary text | `body` |
+| `host.fontLabel` | a row subtitle, the status line, the footer | `bodySmall` |
+| `host.fontCaption` | keycaps, the breadcrumb brand | `caption` |
 
 ## Installing from a local checkout
 
