@@ -11,6 +11,7 @@
     "menu",
     "bar-widget"
   ],
+  "keepLoaded": true,
   "entryPoints": {
     "menu": "Keystroke.qml",
     "barWidget": "BarWidget.qml"

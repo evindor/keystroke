@@ -8,6 +8,12 @@ import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
+# The hotkey's second tap reaches the palette as the shell's hide(): it calls
+# close() and then drops the plugin from its open set, and the panel Loader
+# unloads any plugin outside that set unless its manifest is keepLoaded. Without
+# the flag the tap starts dictation and the window is destroyed a tick later.
+manifest = json.loads((root/'manifest.json').read_text())
+assert manifest.get('keepLoaded') is True, 'manifest.json must set "keepLoaded": true; tap-to-dictate depends on it'
 with tempfile.TemporaryDirectory(prefix='keystroke-palette-') as temp:
     work = Path(temp)
     project = work/'project'
