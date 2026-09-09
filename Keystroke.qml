@@ -383,7 +383,7 @@ Item {
 
   onPendingChanged: { if (pending) loadingDelay.restart(); else { loadingDelay.stop(); showLoading = false } }
   Timer { id: loadingDelay; interval: 180; onTriggered: root.showLoading = root.pending }
-  Timer { id: debounce; interval: 16; onTriggered: root.runQuery() }
+  Timer { id: debounce; interval: 25; onTriggered: root.runQuery() }
 
   Registry { id: providerRegistry; host: root }
   readonly property var registry: providerRegistry
@@ -504,12 +504,15 @@ Item {
   // Providers call this when asynchronous results land; the selection is kept.
   function requery() {
     if (!root.opened) return
-    debounce.stop()
+    // Async providers and embedding replies must not cut short the typing pause.
+    // The pending query will read their latest data when the user pauses.
+    if (debounce.running) return
     root.runQuery()
   }
 
   function runQuery() {
     if (!root.opened || root.providerViewActive) return
+    debounce.stop()
     if (root.dmenuActive) { root.applyRows(root.dmenuRows()); root.pending = false; root.afterRows(); return }
     root.generation++
     var raw = root.voiceRawText || search.text, sc = root.scope

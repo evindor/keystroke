@@ -50,30 +50,35 @@ ShellRoot {
    palette.testMatching.command=["python3",%s]
    test.configure("voice")
    palette.open('{}'); test.fixture()
+   var before=palette.generation
+   palette.setQuery("show everythings"); palette.requery()
    palette.setQuery("show everything"); palette.requery()
-   test.check(!palette.testMatching.starting && !palette.testMatching.queued && palette.rows.length===0,"voice-only excludes typed input")
+   test.check(palette.generation===before,"typing and async refreshes respect debounce")
+   test.check(!palette.testMatching.starting && !palette.testMatching.queued,"voice-only excludes typed input")
    test.stage=1
  } }
  Timer { interval:50; repeat:true; running:true; onTriggered:{
    if(test.stage===1 && ++test.ticks>4) {
+     test.check(test.querySeen==="show everything","debounce eventually processes the latest edit")
+     test.check(palette.rows.length===0,"debounced typed query has no semantic results in voice-only mode")
      test.check(!palette.testMatching.loaded,"typed input never loads voice-only model")
-     palette.voiceRawText="show everything"; palette.requery(); test.stage=2
+     palette.voiceRawText="show everything"; palette.runQuery(); test.stage=2
    } else if(test.stage===2 && palette.rows.length) {
      test.check(palette.rows[0].uid==="fixture/target" && palette.rows[0].smartMatch,"voice semantic result merged")
      test.check(test.rawSeen==="show everything","raw transcript reaches provider unchanged")
-     test.targetVisible=false; palette.requery()
+     test.targetVisible=false; palette.runQuery()
      test.check(palette.rows.length===0,"removed catalog entry disappears immediately")
      test.targetVisible=true; test.configure("all")
-     palette.setQuery("show everything"); palette.requery(); test.stage=3
+     palette.setQuery("show everything"); palette.runQuery(); test.stage=3
    } else if(test.stage===3 && palette.rows.length) {
      test.check(palette.rows[0].smartMatch,"default all mode matches typed input")
-     palette.setQuery("MiXeD/path.PDF"); palette.requery()
+     palette.setQuery("MiXeD/path.PDF"); palette.runQuery()
      test.check(test.querySeen==="MiXeD/path.PDF","smart matching preserves typed provider arguments and case")
-     palette.scope="unrelated"; palette.requery()
+     palette.scope="unrelated"; palette.runQuery()
      test.check(palette.rows.length===0,"scope excludes other providers")
-     palette.scope=""; test.configure("off"); palette.requery()
+     palette.scope=""; test.configure("off"); palette.runQuery()
      test.check(!palette.testMatching.loaded && !palette.testMatching.queued && palette.rows.length===0,"off unloads and removes semantic rows")
-     palette.setQuery("literal"); palette.requery()
+     palette.setQuery("literal"); palette.runQuery()
      test.check(palette.rows.length===1 && palette.rows[0].id==="exact","off preserves ordinary matching")
      palette.selectionTouched=true; palette.selected=0
      var chosen=palette.rows[0]
@@ -86,16 +91,19 @@ ShellRoot {
          {id:"downloads",title:"Downloads",score:55,remember:true,action:{type:"noop"}}
        ] }
      }}]
-     palette.setQuery("downlo"); palette.requery()
+     palette.setQuery("downlo"); palette.runQuery()
      test.check(palette.rows[0].id==="video","unlearned provider scores establish order")
      var learningFixture=palette.registry.entries
      palette.selected=1; palette.activate(false)
-     palette.open('{}'); palette.registry.entries=learningFixture; palette.setQuery("downlo"); palette.requery()
+     palette.open('{}'); palette.registry.entries=learningFixture; palette.setQuery("downlo"); palette.runQuery()
      test.check(palette.rows[0].id==="downloads","one activation teaches the host query preference")
-     test.configure("all"); palette.requery()
+     test.configure("all"); palette.runQuery()
      test.check(palette.rows[0].id==="downloads","smart merge preserves learned ranking")
-     palette.setQuery("download video"); palette.requery()
+     palette.setQuery("download video"); palette.runQuery()
      test.check(palette.rows[0].id==="video","learning is local to the chosen query")
+     var usageBefore=JSON.stringify(palette.usage)
+     palette.setQuery("downlo"); palette.activate(false)
+     test.check(palette.rows[0].id==="downloads" && JSON.stringify(palette.usage)!==usageBefore,"Enter flushes pending query before activation")
      palette.cancel()
      console.log("PASS palette matching modes, scope, catalog invalidation, raw text, exact fallback and selection")
      Qt.quit(); test.stage=4
