@@ -823,6 +823,19 @@ Item {
     resultList.positionViewAtIndex(root.selected, ListView.Contain)
   }
 
+  // Ctrl+1…Ctrl+8: select the nth visible row and run it in one stroke.
+  // A number past the end of the list does nothing rather than acting on
+  // whatever happens to be selected.
+  function activateAt(index) {
+    if (root.dictationMode || root.mode === "input") return
+    if (index < 0 || index >= root.rows.length) return
+    root.selectionTouched = true
+    pointerGate.reset()
+    root.selected = index
+    resultList.positionViewAtIndex(root.selected, ListView.Contain)
+    root.activate()
+  }
+
   function selectFromPointer(index, item, mouse) {
     if (!pointerGate.moved(item, mouse)) return
     root.selectionTouched = true
@@ -1106,6 +1119,7 @@ Item {
             else if (event.key === Qt.Key_Right && (atEnd || !text) && !root.dmenuActive && root.rows.length) { root.activate(); event.accepted = true }
             else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Backspace) && !text && !preeditText && (root.scope || root.history.length)) { root.goBack(); event.accepted = true }
             else if (event.key === Qt.Key_Delete && !text && root.current.appId) { root.requestUninstall(); event.accepted = true }
+            else if (ctrl && event.key >= Qt.Key_1 && event.key <= Qt.Key_8) { root.activateAt(event.key - Qt.Key_1); event.accepted = true }
             else if (ctrl && event.key === Qt.Key_Comma && !root.dmenuActive) { root.navigate("settings", "Settings"); event.accepted = true }
             else if (ctrl && event.key === Qt.Key_K && !root.dmenuActive) {
               var key = root.current.providerKey && root.current.providerKey !== "settings" ? "settings/" + root.current.providerKey : "settings"
