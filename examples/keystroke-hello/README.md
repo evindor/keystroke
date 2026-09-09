@@ -9,4 +9,4 @@ cp -r examples/keystroke-hello ~/.config/omarchy/plugins/example.keystroke-hello
 omarchy-shell shell rescanPlugins && omarchy plugin enable example.keystroke-hello
 ```
 
-Then turn it on under Extensions → Hello → Enabled (community providers installed by hand start off) and type `hello world`. Remove it with `omarchy plugin remove example.keystroke-hello`. See [docs/providers.md](../../docs/providers.md) for the contract and [CONTRIBUTING.md](../../CONTRIBUTING.md) for the guide.
+Then turn it on under Extensions → Hello → Enabled (community providers installed by hand start off) and type `hello world` (or `hey there`: the provider declares a greeting *pattern*, which is also how Keystroke knows to rank its row). Remove it with `omarchy plugin remove example.keystroke-hello`. See [docs/providers.md](../../docs/providers.md) for the contract and [CONTRIBUTING.md](../../CONTRIBUTING.md) for the guide.

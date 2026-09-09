@@ -15,6 +15,12 @@ Item {
   readonly property color foreground: host ? host.foreground : "white"
   readonly property color muted: host ? host.muted : "#aaa"
   readonly property color accent: host ? host.accent : "#cba6f7"
+  readonly property string fontFamily: host && host.fontFamily ? host.fontFamily : Style.font.menuFamily
+  readonly property int fontInput: host ? host.fontInput : Style.font.heading
+  readonly property int fontTitle: host ? host.fontTitle : Style.font.title
+  readonly property int fontBody: host ? host.fontBody : Style.font.body
+  readonly property int fontLabel: host ? host.fontLabel : Style.font.bodySmall
+  readonly property int fontCaption: host ? host.fontCaption : Style.font.caption
   readonly property var approval: session && session.approvals.length ? session.approvals[0] : null
   function focusInput() { composer.forceActiveFocus(); composer.cursorPosition = composer.text.length }
   function beginVoice() { voicePrefix = session.draft ? session.draft.replace(/\s*$/, " ") : "" }
@@ -45,7 +51,7 @@ Item {
   Keys.onPressed: function(event) {
     if (event.key === Qt.Key_Escape) { host.cancel(); event.accepted = true }
   }
-  Rectangle { anchors.fill: parent; color: host ? host.background : "#222" }
+  // The host paints the backdrop behind this view, inside the card border.
   // Use the same theme-controlled kit as the surrounding Omarchy shell.
   component ActionButton: Ui.Button {
     id: control
@@ -57,8 +63,8 @@ Item {
     opacity: enabled ? 1 : 0.4
     foreground: root.foreground
     accent: root.accent
-    fontFamily: Style.font.menuFamily
-    fontSize: Style.font.bodySmall
+    fontFamily: root.fontFamily
+    fontSize: root.fontLabel
     width: implicitWidth; height: implicitHeight
     onClicked: triggered()
     Keys.onReturnPressed: event => { if (!event.isAutoRepeat) triggered(); event.accepted = true }
@@ -75,15 +81,15 @@ Item {
     ActionButton { id: back; objectName: "conversationBack"; label: "←"; tooltipText: "Back to results"; onTriggered: host.goBack() }
     Row {
       anchors.left: back.right; anchors.leftMargin: Style.space(10); y: Style.space(8); spacing: Style.space(10)
-      Text { text: "OMARCHY"; color: root.accent; font.family: Style.font.menuFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 2; font.weight: Font.Bold }
-      Text { text: "›"; color: root.muted; font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall }
-      Text { text: "Codex"; color: root.muted; font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall }
+      Text { text: "OMARCHY"; color: root.accent; font.family: root.fontFamily; font.pixelSize: root.fontCaption; font.letterSpacing: 2; font.weight: Font.Bold }
+      Text { text: "›"; color: root.muted; font.family: root.fontFamily; font.pixelSize: root.fontLabel }
+      Text { text: "Codex"; color: root.muted; font.family: root.fontFamily; font.pixelSize: root.fontLabel }
     }
     Keycap { anchors.right: parent.right; y: Style.space(5); label: "esc"; foreground: root.foreground }
     Text {
       y: Style.space(43); width: parent.width - external.width - Style.space(12); elide: Text.ElideMiddle
       text: session.mode === "agent" ? session.cwd : "Quick question · " + (session.settings.model || "gpt-5.6-luna") + (session.settings.fast === false ? " · Standard" : " · Fast")
-      color: root.muted; font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall
+      color: root.muted; font.family: root.fontFamily; font.pixelSize: root.fontLabel
     }
     ActionButton { id: external; anchors.right: parent.right; y: Style.space(33); label: session.busy ? "Stop & continue ↗" : "Continue in Codex ↗"; available: !!session.threadId; onTriggered: session.requestHandoff() }
   }
@@ -101,24 +107,24 @@ Item {
       required property string role
       required property string text
       width: history.width; height: label.height + body.height + Style.space(6)
-      Text { id: label; text: parent.role === "user" ? "You" : parent.role === "activity" ? "Activity" : "Codex"; color: parent.role === "user" ? root.muted : root.accent; font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall }
+      Text { id: label; text: parent.role === "user" ? "You" : parent.role === "activity" ? "Activity" : "Codex"; color: parent.role === "user" ? root.muted : root.accent; font.family: root.fontFamily; font.pixelSize: root.fontLabel }
       TextEdit {
         id: body; y: label.height + Style.space(6); width: parent.width; height: contentHeight
         text: root.markdown(parent.text); textFormat: TextEdit.MarkdownText; wrapMode: TextEdit.Wrap
         readOnly: true; selectByMouse: true; color: root.foreground
         selectionColor: Style.selectionFillFor(root.foreground, root.accent)
-        font.family: Style.font.menuFamily; font.pixelSize: parent.role === "activity" ? Style.font.bodySmall : Style.font.body
+        font.family: root.fontFamily; font.pixelSize: parent.role === "activity" ? root.fontLabel : root.fontTitle
         onLinkActivated: function(link) { if (/^https?:\/\//.test(link)) Qt.openUrlExternally(link) }
       }
     }
-    Text { visible: !history.count; anchors.centerIn: parent; width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; text: session.busy ? "Connecting to Codex…" : "Ask a question. Keep the conversation here.\nType or use your voice hotkey."; color: root.muted; font.family: Style.font.menuFamily; font.pixelSize: Style.font.body }
+    Text { visible: !history.count; anchors.centerIn: parent; width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; text: session.busy ? "Connecting to Codex…" : "Ask a question. Keep the conversation here.\nType or use your voice hotkey."; color: root.muted; font.family: root.fontFamily; font.pixelSize: root.fontTitle }
   }
   Text {
     id: status
     x: Style.space(22); y: inputBox.y - height - Style.space(10); width: parent.width - x * 2
     text: host && host.voice.active ? (host.voice.phase === "transcribing" ? "Finishing transcript…" : "Listening…") : session.error || root.localStatus || session.activity
     color: session.error ? Color.urgent : root.muted; elide: Text.ElideRight
-    font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall
+    font.family: root.fontFamily; font.pixelSize: root.fontLabel
   }
   Ui.BorderSurface {
     id: inputBox
@@ -146,7 +152,7 @@ Item {
       text: session.draft; wrapMode: TextEdit.Wrap; clip: true; selectByMouse: true
       onCursorRectangleChanged: editorScroll.revealCursor()
       color: root.foreground; selectionColor: Style.selectionFillFor(root.foreground, root.accent)
-      font.family: Style.font.menuFamily; font.pixelSize: Style.font.body
+      font.family: root.fontFamily; font.pixelSize: root.fontInput
       onTextChanged: if (activeFocus && text !== session.draft) session.draft = text
       Keys.priority: Keys.BeforeItem
       Keys.onReleased: function(event) { if (host.voice.active && host.voiceTrigger === "hold" && host.isSuperKey(event.key)) { host.voiceStop(); event.accepted = true } }
@@ -193,8 +199,8 @@ Item {
     Column {
       id: approvalContent
       width: parent.width; spacing: Style.space(16)
-      Text { text: "Codex needs your input"; color: root.foreground; font.family: Style.font.menuFamily; font.pixelSize: Style.font.title }
-      TextEdit { width: parent.width; height: contentHeight; readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap; color: root.foreground; font.family: Style.font.menuFamily; font.pixelSize: Style.font.body;
+      Text { text: "Codex needs your input"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: root.fontInput }
+      TextEdit { width: parent.width; height: contentHeight; readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap; color: root.foreground; font.family: root.fontFamily; font.pixelSize: root.fontBody;
         text: session.approvalDetail(root.approval) }
 
       Repeater {
@@ -202,10 +208,10 @@ Item {
         Column {
           required property var modelData
           width: parent.width; spacing: Style.space(8)
-          Text { width: parent.width; wrapMode: Text.Wrap; text: modelData.question + ((modelData.options || []).length ? "\n" + modelData.options.map(x => x.label).join(" · ") : ""); color: root.foreground; font.family: Style.font.menuFamily; font.pixelSize: Style.font.body }
+          Text { width: parent.width; wrapMode: Text.Wrap; text: modelData.question + ((modelData.options || []).length ? "\n" + modelData.options.map(x => x.label).join(" · ") : ""); color: root.foreground; font.family: root.fontFamily; font.pixelSize: root.fontTitle }
           Ui.TextField {
             width: parent.width; foreground: root.foreground; accent: root.accent
-            font.family: Style.font.menuFamily; font.pixelSize: Style.font.body
+            font.family: root.fontFamily; font.pixelSize: root.fontTitle
             onTextEdited: { var a = Object.assign({}, root.answers); a[modelData.id] = text; root.answers = a }
           }
         }

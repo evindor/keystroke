@@ -28,6 +28,8 @@ function gitUrl(text) {
   var t = safeString(text, 512)
   if (!t || t.charAt(0) === "-" || /\s/.test(t)) return ""
   if (/^https:\/\/[A-Za-z0-9.-]+\/[^\s]+$/.test(t)) return t
+  // A local repository, for developing an extension: file:///absolute/path (omarchy-git-url-check clones the file transport).
+  if (/^file:\/\/\/[^\s]+$/.test(t) && t.indexOf("/../") < 0 && !/\/\.\.$/.test(t)) return t
   if (/^git@[A-Za-z0-9.-]+:[^\s]+$/.test(t)) return t
   if (/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+$/.test(t)) return "https://github.com/" + t.replace(/\.git$/, "") + ".git"
   return ""
@@ -121,6 +123,20 @@ function installed(installedPlugins, isEnabled, enabledIn, git) {
   return out
 }
 
+// Fields a loaded provider adds to its installed entry: its own glyph, image
+// icon and accent replace the generic extension icon on every row about it,
+// and the examples of its declared patterns become a line of the About section.
+function decorate(e, provider, examples) {
+  if (!provider || typeof provider !== "object") return e
+  e.icon = safeString(provider.icon, 8)
+  e.iconFont = safeString(provider.iconFont, 80)
+  e.iconSource = safeString(provider.iconSource, 1024)
+  e.tint = safeString(provider.color, 32)
+  e.examples = Array.isArray(examples) ? examples.slice(0, 6) : []
+  return e
+}
+function iconOf(e) { return { icon: e.icon || ICON, iconFont: e.iconFont || "", iconSource: e.iconSource || "", tint: e.tint || "" } }
+
 // ------------------------------------------------------------------ commands
 
 function pluginsDir(home) { return home + "/.config/omarchy/plugins" }
@@ -201,7 +217,9 @@ function stateText(e) {
 function installedRow(e, scoped) {
   var state = e.updateAvailable ? "Update available" : stateText(e)
   var sub = (e.version ? "v" + e.version + " · " : "") + (e.loaded ? (e.enabled ? "Enabled" : "Installed, off in Keystroke") : "Installed, not loaded in omarchy-shell") + " · " + e.id
-  return { id: "installed/" + e.id, title: e.name, subtitle: sub, icon: ICON, section: "Installed", verb: "Open", tier: "item", order: 0,
+  var ic = iconOf(e)
+  return { id: "installed/" + e.id, title: e.name, subtitle: sub, icon: ic.icon, iconFont: ic.iconFont, iconSource: ic.iconSource, tint: ic.tint,
+           section: "Installed", verb: "Open", tier: "item", order: 0,
            accessory: state, keywords: e.id, description: e.description, badge: "plugin", path: scoped ? "" : "Extensions › " + e.name,
            action: navigate(KEY + "/" + e.id, e.name), altAction: e.enabled ? op("enable", { id: e.id, name: e.name, value: false }) : op("enable", { id: e.id, name: e.name, value: true }),
            hint: e.enabled ? "ctrl ↵ turn off" : "ctrl ↵ turn on" }
@@ -284,8 +302,13 @@ function detailRows(query, e, state) {
   rows.push({ id: e.id + "/remove", title: "Remove", subtitle: "Unloads the plugin and deletes " + e.id + " from ~/.config/omarchy/plugins", icon: "󰆴", section: e.name,
               verb: "Remove", tier: "item", order: 9, keywords: "remove uninstall delete",
               confirm: "Remove " + e.name + "? Its Keystroke settings stay in keystroke.json.", action: op("remove", { id: e.id, name: e.name }) })
-  rows.push({ id: e.id + "/about", title: e.name + (e.version ? " v" + e.version : ""), subtitle: [e.author, e.description].filter(Boolean).join(" · ") || e.id, icon: ICON,
+  var ic = iconOf(e)
+  rows.push({ id: e.id + "/about", title: e.name + (e.version ? " v" + e.version : ""), subtitle: [e.author, e.description].filter(Boolean).join(" · ") || e.id,
+              icon: ic.icon, iconFont: ic.iconFont, iconSource: ic.iconSource, tint: ic.tint,
               section: "About", verb: "", tier: "item", order: 20, disabled: true, badge: "plugin", action: { type: "noop" } })
+  if (e.examples && e.examples.length)
+    rows.push({ id: e.id + "/patterns", title: "Answers queries like " + e.examples.join(" · "), subtitle: "Declared patterns lift this extension's results when a query matches",
+                icon: "", section: "About", verb: "", tier: "item", order: 21, disabled: true, keywords: "patterns examples", action: { type: "noop" } })
   var q = String(query || "").trim()
   if (!q) for (var i = 0; i < rows.length; i++) if (rows[i].score === undefined) rows[i].score = 1
   return rows

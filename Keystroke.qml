@@ -8,11 +8,13 @@ import qs.Ui
 import "ui"
 import "providers"
 import "voice"
+import "core"
 import "core/Match.js" as Match
 import "core/Frecency.js" as Frecency
 import "core/Settings.js" as Settings
 import "core/VoiceBindings.js" as VoiceBindings
 import "core/Intent.js" as Intent
+import "core/Patterns.js" as Patterns
 
 // Keystroke: an extension-first command palette that replaces the Omarchy
 // menu. Hosted by omarchy-shell as a `menu` plugin (see manifest.json).
@@ -25,7 +27,8 @@ Item {
   property var manifest: null
   property var pluginRegistry: null
   property var barWidgetRegistry: null
-  readonly property var appLibrary: shell ? shell.appLibrary : null
+  readonly property var appLibrary: applicationLibrary.library
+  ApplicationLibrary { id: applicationLibrary; hostShell: root.shell; omarchyPath: root.omarchyPath }
   readonly property string home: Quickshell.env("HOME")
   readonly property string configPath: home + "/.config/omarchy/keystroke.json"
   readonly property string usagePath: home + "/.local/state/keystroke/usage.json"
@@ -84,6 +87,21 @@ Item {
     root.activeProviderKey = key
     providerView.sourceComponent = entry.provider.view
   }
+  // A view whose provider was removed, unloaded or turned off while it was
+  // showing (a community plugin disabled from the CLI, say) must not linger
+  // over the palette with a destroyed context behind it.
+  function dropOrphanedView() {
+    if (!root.providerViewActive) return
+    var entry = root.registryEntry(root.activeProviderKey)
+    if (entry && root.providerEnabled(entry)) return
+    root.closeProviderView()
+    if (root.opened) { root.runQuery(); search.forceActiveFocus() }
+  }
+  Connections {
+    target: providerRegistry
+    function onEntriesChanged() { root.dropOrphanedView() }
+  }
+  onConfigChanged: root.dropOrphanedView()
 
   // -------------------------------------------------------------- settings
   property var config: Settings.empty()
@@ -309,6 +327,20 @@ Item {
   readonly property color hairline: Util.alpha(foreground, 0.12)
   readonly property color muted: Util.alpha(foreground, 0.55)
 
+  // Type scale for provider views. A view covers the whole card, so it has to
+  // carry the palette's own sizes -- including the density bump -- or it reads
+  // a step smaller than the results it replaced. Ladder: fontInput is the
+  // search field, fontTitle a row title, fontBody a preview body, fontLabel a
+  // row subtitle or footer, fontCaption a keycap or the breadcrumb brand.
+  readonly property int fontInput: compact ? Style.font.heading : Style.font.heading + 2
+  readonly property int fontTitle: compact ? Style.font.title : Style.font.title + 1
+  readonly property int fontBody: Style.font.body
+  readonly property int fontLabel: Style.font.bodySmall
+  readonly property int fontCaption: Style.font.caption
+  // Tells a provider view it need not paint its own backdrop; an older
+  // host leaves this undefined, so a view can still fall back.
+  readonly property bool paintsViewBackdrop: true
+
   onPendingChanged: { if (pending) loadingDelay.restart(); else { loadingDelay.stop(); showLoading = false } }
   Timer { id: loadingDelay; interval: 180; onTriggered: root.showLoading = root.pending }
   Timer { id: debounce; interval: 16; onTriggered: root.runQuery() }
@@ -441,18 +473,22 @@ Item {
     var q = root.voiceRawText && !root.dictationMode ? Intent.normalize(root.voiceRawText) : search.text, sc = root.scope
     var owner = sc.split("/")[0]
     var sub = sc.indexOf("/") >= 0 ? sc.slice(owner.length + 1) : ""
-    var collected = [], errors = [], pend = false
+    var collected = [], errors = [], pend = false, matchedPatterns = ({})
     var mark = function() { pend = true }
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var entry = providerRegistry.entries[i]
       if (!root.providerEnabled(entry)) continue
       if (sc && owner !== entry.key) continue
+      // Declared patterns run before query(): the provider learns which shapes
+      // matched, and the largest boost lifts every row it returns this time.
+      var patterns = Patterns.evaluate(entry.patterns, q)
+      if (patterns.matched.length) matchedPatterns[entry.key] = patterns.matched
       var ctx = { query: q, rawQuery: root.voiceRawText || search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
-                  pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
+                  patterns: patterns, pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
       try {
         var out = entry.provider.query(ctx) || []
         for (var r = 0; r < out.length && r < 400; r++) {
-          var row = root.normalize(out[r], entry, q)
+          var row = root.normalize(out[r], entry, q, patterns.boost)
           if (row) collected.push(row)
         }
       } catch (e) {
@@ -463,12 +499,14 @@ Item {
     if (root.configError) errors.push(root.configError)
     var ranked = Match.rank(collected, root.bonusFor)
     root.applyRows(ranked.slice(0, 120))
+    root.lastPatterns = matchedPatterns
     root.pending = pend
     root.errorMessage = errors.join(" · ")
     root.afterRows()
   }
 
-  function normalize(row, entry, q) {
+  property var lastPatterns: ({})           // provider key → matched pattern ids, for inspect()
+  function normalize(row, entry, q, boost) {
     if (!row || typeof row !== "object" || typeof row.title !== "string") return null
     var out = {}
     for (var k in row) out[k] = row[k]
@@ -485,14 +523,16 @@ Item {
     out.section = String(row.section || entry.provider.name)
     out.verb = String(row.verb || (row.action && row.action.type === "navigate" ? "Open" : "Run"))
     out.tier = row.tier === "answer" || row.tier === "fallback" ? row.tier : "item"
-    out.score = typeof row.score === "number" ? row.score : Match.match(q, row.title, row.keywords || "", row.path || "", row.description || "")
+    var base = typeof row.score === "number" ? row.score : Match.match(q, row.title, row.keywords || "", row.path || "", row.description || "")
+    // A matched provider pattern lifts rows that already match; it never revives a row the matcher dropped.
+    out.score = q && base > 0 && boost > 0 ? base + boost : base
     out.accessory = String(row.accessory || "")
     out.badge = String(row.badge || (entry.source === "community" ? "plugin" : ""))
     out.hint = String(row.hint || "")
     out.disabled = row.disabled === true
     out.remember = row.remember === true
     out.confirm = String(row.confirm || "")
-    if (q && !(out.score > 0)) return null
+    if (q && !(base > 0)) return null
     return out
   }
 
@@ -701,10 +741,21 @@ Item {
     var c = providerRegistry.bundled.find(x => x.provider.id === "codex").session
     return JSON.stringify({ threadId: c.threadId, phase: c.phase, ready: c.server.ready, error: c.error, activity: c.activity, messages: c.messages, draft: c.draft, firstTextMs: c.firstTextMs, lastMs: c.lastMs })
   }
+  function inspectApplications() {
+    var entries = root.appLibrary ? root.appLibrary.sortedEntries("") : []
+    return JSON.stringify({ shell: !!root.shell, shellPluginId: root.shell ? root.shell.pluginId : "",
+      manifestId: root.manifest ? root.manifest.id : "", manifestKinds: root.manifest ? root.manifest.kinds : [],
+      library: !!root.appLibrary, sharedLibrary: !!applicationLibrary.sharedLibrary, entries: entries.length,
+      providerLibrary: !!providerRegistry.bundled[1].library,
+      providerEntries: providerRegistry.bundled[1].library ? providerRegistry.bundled[1].library.sortedEntries("").length : -1 })
+  }
   function inspect() {
+    var appEntries = root.appLibrary ? root.appLibrary.sortedEntries("") : []
     return JSON.stringify({ opened: root.opened, mode: root.mode, view: root.activeProviderKey, scope: root.scope, query: search.text, count: root.rows.length,
-      titles: root.rows.map(function(r) { return r.title }), selected: root.selected, pending: root.pending,
+      titles: root.rows.map(function(r) { return r.title }), selected: root.selected, pending: root.pending, patterns: root.lastPatterns,
+      current: { uid: root.current.uid || "", icon: root.current.icon || "", iconSource: root.current.iconSource || "", badge: root.current.badge || "", tier: root.current.tier || "" },
       modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems,
+      applications: { library: !!root.appLibrary, entries: appEntries.length },
       error: root.errorMessage, configError: root.configError, status: root.statusMessage,
       voice: { backend: "voxtype", state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
                command: voice.command, daemon: voice.daemonState, bindings: root.voiceBindingsStatus, frames: voice.history.length, live: voice.liveText } })
@@ -750,9 +801,24 @@ Item {
       Accessible.name: "Keystroke command palette"
       MouseArea { anchors.fill: parent; onClicked: {} }
 
+      // A provider view covers the palette, so the host paints the backdrop
+      // it needs and keeps both inside the card's border. Filling the card
+      // outright would paint over the border ring, which BorderSurface draws
+      // as the surface itself (or as an overlay child below this z).
+      Rectangle {
+        id: viewBackdrop
+        visible: !!providerView.item
+        z: 4
+        anchors.fill: parent
+        anchors.topMargin: card.borderTop; anchors.rightMargin: card.borderRight
+        anchors.bottomMargin: card.borderBottom; anchors.leftMargin: card.borderLeft
+        radius: Math.max(0, card.radius - Math.max(card.borderTop, card.borderLeft))
+        color: root.background
+      }
+
       Loader {
         id: providerView
-        anchors.fill: parent
+        anchors.fill: viewBackdrop
         z: 5
         onLoaded: { item.host = root; if (typeof item.focusInput === "function") Qt.callLater(item.focusInput) }
       }
@@ -811,7 +877,7 @@ Item {
           selectionColor: Util.alpha(root.accent, 0.45)
           selectedTextColor: root.foreground
           font.family: root.fontFamily
-          font.pixelSize: root.compact ? Style.font.heading : Style.font.heading + 2
+          font.pixelSize: root.fontInput
           selectByMouse: true
           clip: true
           focus: true

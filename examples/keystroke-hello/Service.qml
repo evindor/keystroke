@@ -15,15 +15,21 @@ QtObject {
     icon: "✳",
     description: "Says hello from a separately installed plugin",
     prefix: "hello",
+    // Optional: shapes of text this provider answers. A match lifts the rows
+    // it returns by `boost` and arrives as ctx.patterns.matched.
+    patterns: [
+      { id: "greeting", regex: "^\\s*(hello|hi|hey)\\b", flags: "i", boost: 20, example: "hello Omarchy" }
+    ],
     settings: [
       { key: "greeting", type: "string", label: "Greeting", "default": "Hello" }
     ],
-    // ctx: { query, scope, sub, settings, pending(), host, shell, appLibrary, omarchyPath }
+    // ctx: { query, scope, sub, settings, patterns, pending(), host, shell, appLibrary, omarchyPath }
     query: function(ctx) {
       if (ctx.scope) return []
       var q = ctx.query.trim()
-      if (q.toLowerCase().indexOf("hello") !== 0) return []
-      var name = q.slice(5).trim() || "Omarchy"
+      var matched = ctx.patterns && ctx.patterns.matched.length > 0   // absent on hosts older than September 2026
+      if (!matched && q.toLowerCase().indexOf("hello") !== 0) return []
+      var name = q.replace(/^\s*(hello|hi|hey)\b/i, "").trim() || "Omarchy"
       var text = (ctx.settings.greeting || "Hello") + ", " + name + "!"
       return [{
         id: "hello", title: text, subtitle: "Copy this greeting", icon: "✳", tier: "item", score: 100,

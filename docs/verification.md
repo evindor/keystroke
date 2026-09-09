@@ -1,5 +1,44 @@
-> Historical checkpoints below include retired local-model implementations. Current build: [Codex integration verification](codex-integration-verification.md).
+> Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.1.5 (2026-09-09)
+
+- Full offscreen `bin/keystroke test`: 119 QML tests, application-library
+  compatibility, voice lifecycle, clipboard, Codex, palette, 48 time-zone cases,
+  extension lifecycle and qmllint passed. The sandbox skipped the live hotkey
+  check because it cannot reach Hyprland; the host run passed with 205 bindings.
+- Updated the live hotkey check to derive Close window availability from its
+  current binding record. This host uses a runnable `hl.dsp.window.close()`
+  action instead of the reference machine's keyboard-only closure. Fixed
+  closure behavior remains covered by the QML unit tests.
+- `site/check.py`, `node --check site/script.js`, plugin validation and
+  `git diff --check` passed. Existing QML metadata warnings remain. The earlier
+  live application check on Omarchy 4.0.3-1 returned and rendered 73 rows.
+- Release scope: the five commits from the 1.1.4 marketplace snapshot
+  `4e7409b` through `b1cfbb9`, plus release documentation and the host-aware
+  integration-test correction. See [release notes](releases/v1.1.5.md).
+
+## Non-intrusive Voxtype integration (2026-09-09)
+
+- Retired the pinned Voxtype fork, build helper, bundled patch, systemd drop-in writer and TOML rewriting. Keystroke now resolves only the user's ordinary `voxtype` from `PATH`; the absent-Voxtype row still launches Omarchy's installer only when the user explicitly selects it. Keystroke passes `--file` and `--no-osd` for its own recording and otherwise leaves the user's daemon and preferences alone.
+- Kept the runtime live-transcript reader as an optional, read-only capability. On Voxtype versions without the mirror, the path remains absent and the completed `record stop --wait --json` transcript fills the query. A future upstream implementation can provide partials without another Keystroke installer or configuration migration.
+- `tests/voice_session_check.py` now puts both a stale Keystroke-owned binary and a normal `PATH` binary in a temporary home, verifies the `PATH` binary wins, exercises stop/cancel/auto-stop, and confirms a sentinel `~/.config/voxtype/config.toml` remains byte-identical. Focused voice check, site check, plugin validation and `git diff --check`: pass. Full offscreen `bin/keystroke test`: 119 QML tests and all integration checks pass; hotkeys skipped without a Hyprland session; qmllint emitted only the existing metadata warnings. A first full-suite attempt without the documented offscreen Qt environment aborted before loading tests because the sandbox could not connect to Wayland or X11; the core stack was entirely in Qt platform initialization and the offscreen rerun passed.
+- Not exercised: a real microphone recording or a daemon that publishes live partials. No installed Voxtype config, service or binary was changed during this work.
+
+
+## Provider patterns, image icons, view host surface; Calpad as the second extension (2026-09-09)
+
+- API 1 gains three optional pieces, driven by [keystroke-calpad](https://github.com/evindor/keystroke-calpad) (source in the Calpad repository under `keystroke/`): `provider.patterns` (regular expressions with a boost, compiled once per registry rebuild in `providers/Registry.qml` by `core/Patterns.js`, evaluated in `runQuery()` before `query(ctx)`, the largest matched boost added in `normalize()` to rows that already score, the matched ids passed as `ctx.patterns`, examples shown on the extension's screen), `provider.iconSource` (an image that replaces the glyph on the Extensions and Settings rows about the provider), and a documented list of host members a provider view may rely on. `Extensions.gitUrl` accepts `file:///absolute/path` for local development installs. The host also drops a provider view whose provider is removed, unloaded or turned off while it is showing, and `inspect()` reports the matched patterns and the selected row's icon fields.
+- `qmltestrunner -input tests`: **119 passed, 0 failed** (Qt 6.11.2, offscreen). New `tst_patterns.qml`: compile (invalid regex, bad flags, missing regex, non-objects, boost clamping, list and length caps, RegExp objects), evaluate (matched ids, largest boost, empty query, no patterns), examples. `tst_extensions.qml`: `file://` acceptance and refusal (relative, `..`, plain path), a loaded provider's icon and examples on the installed row, the About row and the new patterns row. `tests/extensions_check.py` PASS; `bin/keystroke test` otherwise unchanged; `tests/lint.sh` warning count unchanged from `dev` (206, all known metadata noise).
+- Live, on this machine after `bin/keystroke install` and `omarchy-restart-shell`: a bare repository split from Calpad's `keystroke/` folder, typed as `file:///home/evindor/Work/keystroke-calpad.git` on the Extensions screen, produced the install row; the row's exact argv (`omarchy-plugin-add <url> --yes --enable`) installed and enabled the plugin; the palette listed the provider with no problems, its screen showed the About row with Calpad's icon and "Answers queries like price = 10 · Rent: $1,800 · …"; activating **Enabled** wrote `providers.io.github.evindor.keystroke-calpad.enabled` to keystroke.json. `summon {"query":"price = 10"}` then `inspect`: `patterns: {"io.github.evindor.keystroke-calpad": ["assignment"]}`, **Quick Calpad session** first under *Continue with* above Ask Codex (fallback tier, the image icon in `iconSource`, subtitle `price = 10  →  10`, preview `10`); `activate` opened the provider view (`view: io.github.evindor.keystroke-calpad`), which showed the note with its result aligned on the right and the footer keys. A second split pushed to the bare repository and `omarchy-plugin-update … --yes` fast-forwarded the installed copy. Screenshots taken over IPC with `grim` and reviewed; the ones in Calpad's README and the extension's `preview.png` come from this session.
+- Calpad side (`calpad-gtk --note <id> --content <text>`): a first call created the note in the user's notes.json, a second call reached the running instance and updated the same note (one process); the test note was removed afterwards and notes.json restored. The extension's own `keystroke/bin/test` (unit tests, `omarchy plugin validate`, qmllint, offscreen service and view check against the real CLI: pattern gating, `=` prefix, async results, Enter copies, Shift/Ctrl+Enter, Ctrl+O argv, persistence, resume, Left, Esc) passes.
+- Not exercised live: pressing keys in the session view on the desktop (covered by the offscreen check), the update row on the Extensions screen (the same script ran from the CLI), voice dictation into the view, the marketplace listing (the repository is not published yet: `keystroke/bin/publish` in the Calpad repository does that once `evindor/keystroke-calpad` exists on GitHub).
+
+## Time-zone grammar: abbreviations, bare zones, now, dates (2026-09-09)
+
+- `10am pt` used to fall through both the JS gate and the helper (the grammar was `<time> in|from <zone> [to <zone>] [on YYYY-MM-DD]`). `helpers/timezone.py` now owns the grammar: `<time> [in|from|at] <zone> [to|in <zone>] [on <date>]`, `<time> to <zone>` (local time shown elsewhere), `now|time|what time is it in <zone>`, `<zone> time`, and a date before or after (`tomorrow 9am est`, `10am pt on friday`, `10pm pt on tuesday to tokyo`). Times: `10am`, `10:30pm`, `10.30`, `1530`, `15:00`, `noon`, `midnight`, `10 a.m.`; a bare hour still needs `in`/`from`/`at`. Zones: an abbreviation table (`pt`, `pst`, `est`, `cet`, `eet`, `ist`, `jst`, `aest`, `nzt`, ...; ambiguous ones take the common reading and the detail line says which IANA zone was used, e.g. `pt = America/Los_Angeles`), region words (`pacific`, `eastern`), cities and countries that are not IANA names (`sf`, `nyc`, `india`, `germany`), IANA names with `/` or `_`, offsets (`utc+2`, `gmt-5`, `+05:30`), and `here`/`local`/`my time`. Names that span several zones (`australia`, `usa`) and IANA last-segment collisions come back as a hint the palette shows as a disabled row; half-typed queries stay silent.
+- `core/Units.js` `isTimeQuery` is now a loose time-shaped gate (time token at the start after an optional date, `10 in <zone>`, `now in <zone>`, `<zone> time`) so the helper decides; decimals such as `128 * 1.24` and `10 amsterdam` do not pass it. `providers/Converter.qml` shows hint errors as a row, marks `live` answers and re-runs them every 30 s while on screen.
+- `tests/tz_helper_check.py`: 48/48 with the clock fixed at 2026-09-09 12:00 UTC (the helper takes an optional ISO instant as its third argument). `tests/tst_units.qml` gate: 14 positive, 7 negative forms. `bin/keystroke test`: 110 QML tests, the voice, clipboard, Codex and dictation checks and the time-zone check pass; `bin/keystroke validate` passes; qmllint unchanged. `tests/extensions_check.py` fails its `update applied` step ("Extensions are up to date" instead of "Updated Probe") on this tree and identically on pristine `main` (three runs each): the update job schedules a check job the moment it finishes and the check's status overwrites the update's before the harness reads it. Pre-existing timing race in the check, not touched here.
+- Not exercised live in the shell this round: the palette journey for `10am pt` and the 30 s refresh of `now in london` (same code paths as the unit-tested gate and helper; the QML changes are the hint row and the refresh timer).
 
 ## No agent-instruction files in the plugin tree (2026-09-08)
 
@@ -185,3 +224,28 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
   The live HTTPS index and all 23 assets matched local SHA-256 hashes. The
   preflight script, site notes, and capture tooling returned 404 from Pages.
   Repository homepage now points to <https://evindor.github.io/keystroke/>.
+
+## Omarchy 4.0.2 / 4.0.3 application compatibility (2026-09-09)
+
+- The stock menu manifests and `shell/services/AppLibrary.qml` are identical
+  between upstream tags `v4.0.2` and `v4.0.3`. The change is in `shell.qml`:
+  4.0.3 gives third-party plugins a scoped shell, and gates `appLibrary` on
+  `manifestHasKind(manifest, "menu")` using `Array.isArray(manifest.kinds)`.
+  The panel Instantiator converts the nested array into a QML sequence for which
+  that check is false, even though `indexOf("menu")` returns zero. The stock
+  first-party menu bypasses this scoped-shell path; cloning does not bypass it.
+- Reproduced on the live 4.0.3-1 host: the injected shell and manifest were
+  present, but both the palette and provider had no app library and zero apps.
+- Keystroke now prefers the injected library and, if absent, loads the installed
+  Omarchy AppLibrary component. This retains native filtering, icons, launch
+  feedback and removal without copying its implementation or changing system
+  files. The fallback is unloaded if a shared library becomes available.
+- `tests/applications_check.py` reproduces the manifest conversion and checks
+  both injection paths, hidden/NoDisplay and configured hides, root keyword
+  search, refresh delegation, app-change notifications and fallback lifetime.
+  Live 4.0.3 verification returned 73 applications after the fix. Compatibility
+  with 4.0.2 is checked through its shared-library contract and the identical
+  upstream library source; a separate 4.0.2 desktop was not available.
+- Validation: 119 QML tests, application compatibility and palette integration
+  checks passed. Plugin validation and qmllint passed (existing metadata
+  warnings only). The live Applications screen rendered all 73 result rows.

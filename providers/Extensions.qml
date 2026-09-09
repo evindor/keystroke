@@ -4,6 +4,7 @@ import Quickshell.Io
 import "../core/Match.js" as Match
 import "../core/Settings.js" as Settings
 import "../core/Extensions.js" as Extensions
+import "../core/Patterns.js" as Patterns
 
 // Community providers as installable Omarchy plugins, managed from inside the
 // palette: discover them from the Keystroke index and the Omarchy marketplace,
@@ -58,8 +59,14 @@ Item {
     var reg = registry()
     if (!reg || !reg.installedPlugins) return []
     var cfg = root.host ? root.host.config : null
-    return Extensions.installed(reg.installedPlugins, function(id) { return reg.isEnabled(id) },
-                                function(id) { return Settings.isEnabled(cfg, ["providers", id], false) }, root.gitState)
+    var list = Extensions.installed(reg.installedPlugins, function(id) { return reg.isEnabled(id) },
+                                    function(id) { return Settings.isEnabled(cfg, ["providers", id], false) }, root.gitState)
+    // A loaded provider decorates its own rows: icon, image icon, accent and the query shapes it declares.
+    for (var i = 0; i < list.length; i++) {
+      var entry = root.host ? root.host.registryEntry(list[i].id) : null
+      if (entry) Extensions.decorate(list[i], entry.provider, Patterns.examples(entry.patterns))
+    }
+    return list
   }
   function find(id) {
     var list = installedList()

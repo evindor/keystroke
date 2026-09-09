@@ -6,6 +6,8 @@ A Raycast-style command palette that **replaces the Omarchy menu**. One native O
 
 **[Explore the feature showcase and installation guide →](https://evindor.github.io/keystroke/)**
 
+[Release notes: 1.1.5](docs/releases/v1.1.5.md) — Omarchy 4.0.3 compatibility, time-zone queries, and voice and extension improvements.
+
 Screenshots show the real Omarchy interface with public demo data.
 
 ## Install
@@ -35,7 +37,7 @@ Requires Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). Like every Omarchy plugin,
 </tr>
 </table>
 
-- **Type anything**: apps, Omarchy commands, `sqrt(144) + 15% of 80`, `2m in feet`, `32 F to C`, `10 am in London`, `#ff6644`, `:smile`, `readme`, `timer 10m tea`.
+- **Type anything**: apps, Omarchy commands, `sqrt(144) + 15% of 80`, `2m in feet`, `32 F to C`, `10am pt`, `10 am in London`, `now in tokyo`, `#ff6644`, `:smile`, `readme`, `timer 10m tea`.
 - **Fuzzy everywhere, into submenus.** From the root, `prefp`, `keysepro` and `setaiprv` all land on Keystroke Settings › AI & Web Search › Preferred assistant, `prefcla` on its Claude choice, `sysshut` on System › Shutdown. Letters may skip whole words of the breadcrumb, words can come in any order (`ai prov`), descriptions match by word. Inside a submenu the same search covers everything below it.
 - **Answers first.** Computed results appear as answer rows with a preview; matches next; Google and the assistants last.
 - **Files and folders** under `~` join the results from two characters on, found by `fd` (hidden and gitignored entries are skipped unless you turn hidden entries on). The words of the query are literal substrings: the last one has to be in the name, earlier ones anywhere in the path, so `docs readme` finds README files under a docs folder. `↵` opens a file with its default app and a folder in your file manager; `Ctrl+↵` opens a terminal there. At most ten mix into the root (Settings → Files); the Files screen shows up to sixty.
@@ -56,18 +58,18 @@ Type `ext` and open **Extensions**:
 
 - **Installed** lists every extension, on or off, with its version. `↵` opens its screen: **Enabled** (Keystroke's switch, which also loads the plugin into the shell when needed), **Loaded in omarchy-shell** (Omarchy's switch), **Settings**, **Check for updates** / **Update now**, **Open repository**, **Remove**. `Ctrl+↵` on the list row toggles it.
 - **Discover** merges two sources: the curated [Keystroke index](extensions/index.json) and the [Omarchy plugin marketplace](https://plugins.omarchy.org), where an extension is recognised by naming Keystroke in its id, name, description or tags. Both are cached for an hour under `~/.cache/keystroke`; **Refresh catalog** fetches them again.
-- **Any git URL** or `owner/repo` shorthand typed on the Extensions screen offers an install row.
+- **Any git URL**, `owner/repo` shorthand or `file:///path/to/local.git` typed on the Extensions screen offers an install row.
 - **Check for updates** fetches every git-managed extension without merging; **Update all** appears when something is behind.
 
 Every install and removal asks for confirmation and states that the code runs unsandboxed in your shell. The work is done by Omarchy's own scripts (`omarchy plugin add --yes --enable`, `omarchy plugin update --yes`, `omarchy plugin remove --yes`), which refuse git transport helpers, validate the manifest and reject symlinks, so the palette and the CLI never disagree. Because the shell reloads all plugins after an install or removal, the palette closes for a moment and a notification confirms the outcome. Extensions installed from the palette are enabled at once; extensions installed with `omarchy plugin add` start off until you turn them on.
 
-**Write one.** An extension is an Omarchy plugin of kind `service` whose manifest carries `"x-keystroke": { "apiVersion": 1 }` and whose `Service.qml` exposes a `provider` object with `query(ctx)`. The published reference is [keystroke-timer](https://github.com/evindor/keystroke-timer) (a GitHub template: countdown timers with settings, a scoped screen, a service that outlives the palette and unit tests); the minimal one is [examples/keystroke-hello](examples/keystroke-hello/). The contract is [docs/providers.md](docs/providers.md); the step-by-step guide for people and coding agents, including publishing to the marketplace and to the index, is [CONTRIBUTING.md](CONTRIBUTING.md).
+**Write one.** An extension is an Omarchy plugin of kind `service` whose manifest carries `"x-keystroke": { "apiVersion": 1 }` and whose `Service.qml` exposes a `provider` object with `query(ctx)`. It can declare the shapes of text it answers as **patterns** (regular expressions with a boost: `price = 10` lifts Calpad's offer above the assistant hand-offs without Calpad knowing about them), carry its own **image icon** on every row about it, and ship a **view** of its own over the palette card. The published references are [keystroke-timer](https://github.com/evindor/keystroke-timer) (a GitHub template: countdown timers with settings, a scoped screen, a service that outlives the palette and unit tests) and [keystroke-calpad](https://github.com/evindor/keystroke-calpad) (patterns, icon, a multi-line calculator session with live results, hand-off to a desktop app); the minimal one is [examples/keystroke-hello](examples/keystroke-hello/). The contract is [docs/providers.md](docs/providers.md); the step-by-step guide for people and coding agents, including publishing to the marketplace and to the index, is [CONTRIBUTING.md](CONTRIBUTING.md).
 
 <p align="center"><img src="site/assets/screenshots/timer.png" alt="The Timer extension answering timer 25m focus" width="720"></p>
 
 ## Voice
 
-Keystroke dictates through [voxtype](https://voxtype.io), the dictation daemon Omarchy installs from Install › AI › Dictation. Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the PATH, and offers Omarchy's installer when it is not. `bin/keystroke voice-setup` (no root) installs a voxtype build with live words and whole-request revision, compiled from Keystroke's fork of voxtype at one fixed commit (`FORK_COMMIT` in `helpers/voice-setup.sh`, checked out detached and verified before anything is built), never from a moving branch.
+Keystroke dictates through [voxtype](https://voxtype.io), the optional dictation daemon Omarchy installs from Install › AI › Dictation. Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the `PATH`, and offers Omarchy's installer when it is not. Keystroke uses that ordinary installation as-is: it does not install a fork, replace the user service, or edit `~/.config/voxtype/config.toml`. Model, language, audio, VAD and output preferences remain entirely under `voxtype configure`.
 
 Two ways in, both while the palette is open:
 
@@ -81,11 +83,11 @@ Two ways in, both while the palette is open:
   -- <<< keystroke voice
   ```
 
-While listening, live words fill the query field and a small waveform sits to the right; matches update as you speak. Releasing the hotkey, tapping it again, or pressing `↵` finishes the recording, and a fresh `↵` after transcription runs the visible selection. Typing or navigating cancels the recording. Voxtype's overlay stays hidden, the transcript never goes through the clipboard or a virtual keyboard, and temporary transcript files are removed afterwards. Trailing punctuation, a leading launcher verb ("open", "go to") and filler are dropped before matching, so "Launch Chrome." is searched as `Chrome`.
+While listening, a small waveform sits to the right. Releasing the hotkey, tapping it again, or pressing `↵` finishes the recording; the completed transcript then fills the query and a fresh `↵` runs the visible selection. Typing or navigating cancels the recording. Voxtype's overlay is hidden for Keystroke's one recording only, the transcript never goes through the clipboard or a virtual keyboard, and temporary transcript files are removed afterwards. If a future Voxtype release publishes live partials for file-output integrations, Keystroke already watches its runtime mirror and will update matches as the words arrive. Trailing punctuation, a leading launcher verb ("open", "go to") and filler are dropped before matching, so "Launch Chrome." is searched as `Chrome`.
 
 **Copy to Clipboard** appears under **Continue with** after any spoken or typed query: `↵` copies the original text and closes, `Ctrl+↵` copies, closes and pastes into the previous window. The separate **Dictate to Clipboard** launcher (`bin/keystroke dictate`) starts a prose-only recording with the same keys.
 
-Model, language and VAD are voxtype's settings (`voxtype configure`). Whisper on the GPU is what makes live words keep up: `voxtype setup gpu --enable` (Vulkan). With the daemon stopped the palette says so instead of listening.
+Keystroke passes only per-recording `--file` and `--no-osd` overrides. With the daemon stopped the palette says so instead of listening.
 
 ## Codex inside Keystroke
 

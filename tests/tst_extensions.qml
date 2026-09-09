@@ -36,6 +36,10 @@ TestCase {
         compare(Extensions.gitUrl("https://codeberg.org/x/y"), "https://codeberg.org/x/y")
         compare(Extensions.gitUrl("git@github.com:evindor/keystroke-timer.git"), "git@github.com:evindor/keystroke-timer.git")
         compare(Extensions.gitUrl("evindor/keystroke-timer"), "https://github.com/evindor/keystroke-timer.git")
+        compare(Extensions.gitUrl("file:///home/me/keystroke-calpad.git"), "file:///home/me/keystroke-calpad.git")
+        compare(Extensions.gitUrl("file://relative/path"), "")
+        compare(Extensions.gitUrl("file:///home/me/../etc"), "")
+        compare(Extensions.gitUrl("/home/me/keystroke-calpad.git"), "")
         compare(Extensions.gitUrl("  evindor/keystroke-timer.git "), "https://github.com/evindor/keystroke-timer.git")
         compare(Extensions.gitUrl("--upload-pack=touch /tmp/x"), "")
         compare(Extensions.gitUrl("-oProxyCommand=x"), "")
@@ -209,5 +213,29 @@ TestCase {
         compare(Extensions.scopeId("extensions"), "")
         compare(Extensions.scopeId("extensions/a.b"), "a.b")
         compare(Extensions.scopeId("settings/a"), null)
+    }
+
+    function test_loaded_provider_decorates_its_rows_with_its_own_icon_and_examples() {
+        var e = installed()[1]
+        compare(e.name, "Timer")
+        var plain = Extensions.installedRow(e, true)
+        compare(plain.icon, Extensions.ICON)
+        compare(plain.iconSource, "")
+        Extensions.decorate(e, { icon: "C", iconSource: "file:///plugins/calpad/assets/calpad.svg", color: "#26a269" }, ["price = 10", "$120 - 30%"])
+        var row = Extensions.installedRow(e, true)
+        compare(row.icon, "C")
+        compare(row.iconSource, "file:///plugins/calpad/assets/calpad.svg")
+        compare(row.tint, "#26a269")
+        var detail = Extensions.detailRows("", e, null)
+        var about = detail.filter(function(r) { return r.id === timerId + "/about" })[0]
+        compare(about.iconSource, "file:///plugins/calpad/assets/calpad.svg")
+        var patterns = detail.filter(function(r) { return r.id === timerId + "/patterns" })[0]
+        verify(patterns && patterns.disabled)
+        compare(patterns.title, "Answers queries like price = 10 · $120 - 30%")
+        // Nothing declared: no examples row, generic icon kept for the glyph.
+        var bare = installed()[0]
+        Extensions.decorate(bare, { icon: "" }, [])
+        compare(Extensions.installedRow(bare, true).icon, Extensions.ICON)
+        compare(Extensions.detailRows("", bare, null).filter(function(r) { return r.id.indexOf("/patterns") > 0 }).length, 0)
     }
 }

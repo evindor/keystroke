@@ -23,7 +23,7 @@ There is no build step. The shell loads the QML files as they are.
 | `docs/` | Contract, architecture, verification log. |
 | `examples/keystroke-hello/` | The smallest possible extension. |
 | `extensions/index.json` | The curated index of known extensions the Extensions screen fetches. |
-| `bin/keystroke` | Developer commands: `install`, `uninstall`, `validate`, `test`, `open <query>`, `voice-setup`. |
+| `bin/keystroke` | Developer commands: `install`, `uninstall`, `validate`, `test`, `open <query>`. |
 
 ## Conventions
 
@@ -75,19 +75,27 @@ Manifest rules (enforced by `omarchy plugin validate` and the marketplace): `sch
 ```js
 readonly property var provider: ({
   apiVersion: 1,
-  name: "Thing", icon: "󰀻", color: "#8bceb4", description: "One line for Settings and the Extensions screen",
+  name: "Thing", icon: "󰀻", iconSource: String(Qt.resolvedUrl("assets/thing.svg")), color: "#8bceb4",
+  description: "One line for Settings and the Extensions screen",
+  patterns: [ { id: "amount", regex: "^\\s*[$€]\\s*\\d", boost: 12, example: "$120 - 30%" } ],   // optional
   settings: [ { key: "limit", type: "number", label: "Results", "default": 10, min: 1, max: 50, integer: true } ],
-  query: function(ctx) { return Model.rows(ctx.query, ctx.scope, ctx.settings, state) },
+  query: function(ctx) { return Model.rows(ctx.query, ctx.scope, ctx.settings, ctx.patterns, state) },
   activate: function(row, ctx) { /* do work, then */ return row.action },   // optional
   opened: function() { }                                                     // optional: every summon
 })
 ```
 
-`ctx` carries `query`, `rawQuery`, `scope` (`""` at the root, your plugin id inside your own screen, `<id>/<sub>` deeper), `settings` (validated against your schema), `pending()`, `host`, `shell`, `appLibrary`, `omarchyPath`. Your scope key is your plugin id: return `{type:"navigate", scope: manifest.id, title: "Thing"}` to open your screen, and answer only when `ctx.scope` is empty or yours.
+`ctx` carries `query`, `rawQuery`, `scope` (`""` at the root, your plugin id inside your own screen, `<id>/<sub>` deeper), `settings` (validated against your schema), `patterns` (`{ matched: [ids], boost }` for the patterns you declared), `pending()`, `host`, `shell`, `appLibrary`, `omarchyPath`. Your scope key is your plugin id: return `{type:"navigate", scope: manifest.id, title: "Thing"}` to open your screen, and answer only when `ctx.scope` is empty or yours.
 
-Rows: `{ id, title, subtitle, icon, section, verb, tier: "answer"|"item"|"fallback", score, order, keywords, description, accessory, hint, confirm, preview, previewLabel, previewDetail, action, altAction }`. Omit `score` for non-empty queries to use the fuzzy matcher over `title`, `keywords` (identifiers) and `description` (prose, word-prefix only); give an explicit `score` for listings with an empty query. Answers (`tier: "answer"`) sort above items; use them only for computed results of an explicit request.
+**Patterns** are how an extension gets ranked for the shapes of text it understands without knowing about every other provider: declare each shape as a regular expression with a `boost`, and when one matches the query the host adds the largest boost to the score of every row you return and tells you which ids matched (`ctx.patterns.matched`). Use them to offer a `fallback` row (the *Continue with* section, where the assistant hand-offs sit at scores 2 to 5) only when a shape matched, with a base score of 1: matched, your row lands above the hand-offs; unmatched, return nothing. Give each pattern an `example`; the Extensions screen shows them.
 
-Effects: `navigate`, `exec` (argv), `shell` (trusted string), `copy`, `url`, `app`, `notify`, `setting`, `compound`, `close`, `noop`. Anything that launches closes the palette first. `noop` keeps it open; call `host.requery()` when your rows changed. Private action types are fine if `activate` translates them into one of these.
+**Icon.** `icon` is a glyph from Omarchy's icon font and is always needed; `iconSource` is an optional image (SVG or PNG next to your QML, resolved with `Qt.resolvedUrl`) that replaces the glyph on your rows in Extensions and Settings. Put the same `iconSource` on the rows you return so your results carry your icon too.
+
+Rows: `{ id, title, subtitle, icon, iconSource, tint, section, verb, tier: "answer"|"item"|"fallback", score, order, keywords, description, accessory, hint, confirm, preview, previewLabel, previewDetail, action, altAction }`. Omit `score` for non-empty queries to use the fuzzy matcher over `title`, `keywords` (identifiers) and `description` (prose, word-prefix only); give an explicit `score` for listings with an empty query. Answers (`tier: "answer"`) sort above items; use them only for computed results of an explicit request.
+
+Effects: `navigate`, `exec` (argv), `shell` (trusted string), `copy`, `url`, `app`, `notify`, `setting`, `compound`, `close`, `noop`, and `provider-view` for an extension that ships its own screen (see below). Anything that launches closes the palette first. `noop` keeps it open; call `host.requery()` when your rows changed. Private action types are fine if `activate` translates them into one of these.
+
+**A view of your own.** An extension that needs more than rows (a conversation, a multi-line editor) exposes `view: Component { MyView { service: root } }` on the provider and returns `{type: "provider-view", provider: manifest.id}` from `activate`. The host loads the component over the palette card and injects `host`; the view draws with `host.background`, `host.foreground`, `host.accent`, `host.muted`, `host.hairline` and `host.fontFamily`, closes with `host.cancel()`, returns to the results with `host.goBack()`, and forwards voice through `host.voice`. The contract, with the full list of host members a view may rely on, is in [docs/providers.md](docs/providers.md) under *Optional provider views*; [keystroke-calpad](https://github.com/evindor/keystroke-calpad) is a complete community example (patterns, image icon, a session view and an offscreen check of all three).
 
 A service outlives the palette: timers, sockets and caches you keep on the root object survive the window closing and are destroyed only when the plugin is disabled, removed or the shell restarts. Stop what you own when that happens (`Component.onDestruction`).
 
@@ -95,7 +103,7 @@ A service outlives the palette: timers, sockets and caches you keep on the root 
 
 - Unit-test `core/*.js` with qmltestrunner (`bin/test`). Cover parsing edge cases, argv construction (no injection), rows for the root and for your scope.
 - Validate: `omarchy plugin validate .` must pass; lint: `qmllint -I /usr/lib/qt6/qml Service.qml`.
-- Try it in the shell: copy the folder to `~/.config/omarchy/plugins/<id>` (copy, not symlink), `omarchy-shell shell rescanPlugins`, `omarchy plugin enable <id>`, then in Keystroke open **Extensions → <name>** and turn **Enabled** on. `omarchy plugin list` shows the plugin; `journalctl --user -u omarchy-shell -f` (or `qs log`) shows QML errors.
+- Try it in the shell: copy the folder to `~/.config/omarchy/plugins/<id>` (copy, not symlink), `omarchy-shell shell rescanPlugins`, `omarchy plugin enable <id>`, then in Keystroke open **Extensions → <name>** and turn **Enabled** on. `omarchy plugin list` shows the plugin; `journalctl --user -u omarchy-shell -f` (or `qs log`) shows QML errors. To go through the palette's own installer instead, `git clone --bare <your checkout> /tmp/<id>.git` and type `file:///tmp/<id>.git` on the Extensions screen: the install, update and remove rows then behave exactly as they will for the published repository.
 - Check the palette's view of it: `omarchy-shell shell summon omarchy.menu '{"query":"thing"}'` then `omarchy-shell shell call omarchy.menu inspect '{}'`.
 
 ### 4. Publish it

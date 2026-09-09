@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Patterns.js" as Patterns
 
 // Instantiates the bundled providers and discovers community ones. A
 // community provider is an Omarchy plugin of kind "service" whose manifest
@@ -29,10 +30,18 @@ Item {
 
   readonly property var bundled: [omarchyMenu, applications, calculator, converter, colors, emoji, clipboard, dictation, files, hotkeys, codex, aiWeb, extensions, settingsProvider]
 
+  // Declared patterns are compiled here, once per rebuild, never per keystroke.
+  // A pattern that does not compile is reported and skipped; the provider loads.
+  function entry(key, provider, source, pluginId, name, issues) {
+    var compiled = Patterns.compile(provider.patterns)
+    for (var e = 0; e < compiled.errors.length; e++) issues.push({ pluginId: pluginId || key, message: "Pattern " + compiled.errors[e] })
+    return { key: key, provider: provider, source: source, pluginId: pluginId, name: name, patterns: compiled.patterns }
+  }
+
   function rebuild() {
     var out = [], issues = []
     for (var b = 0; b < bundled.length; b++)
-      out.push({ key: bundled[b].provider.id, provider: bundled[b].provider, source: "bundled", pluginId: "", name: bundled[b].provider.name })
+      out.push(entry(bundled[b].provider.id, bundled[b].provider, "bundled", "", bundled[b].provider.name, issues))
 
     var shell = host ? host.shell : null
     var registry = host ? host.pluginRegistry : null
@@ -49,7 +58,7 @@ Item {
         if (!p || typeof p !== "object") { issues.push({ pluginId: id, message: "Service.qml does not expose a provider object" }); continue }
         if (p.apiVersion !== 1) { issues.push({ pluginId: id, message: "Needs Keystroke provider API 1, plugin declares " + p.apiVersion }); continue }
         if (typeof p.query !== "function" || !p.name) { issues.push({ pluginId: id, message: "Provider must define name and query(ctx)" }); continue }
-        out.push({ key: id, provider: p, source: "community", pluginId: id, name: manifest.name || id })
+        out.push(entry(id, p, "community", id, manifest.name || id, issues))
       }
     }
     root.entries = out

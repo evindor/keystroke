@@ -6,7 +6,8 @@ import "../core/Units.js" as Units
 
 // Units and temperatures in JS. Time zones go through helpers/timezone.py,
 // started once per distinct query after the regex gate matches, never per
-// keystroke for anything else.
+// keystroke for anything else. Answers that move with the clock ("now in
+// london") are refreshed every half minute while they are on screen.
 Item {
   id: root
   property var host: null
@@ -14,6 +15,8 @@ Item {
   property var timeCache: ({})
   property string inflight: ""
   property string queued: ""
+  property bool liveShown: false
+  readonly property int liveMaxAge: 30000
   readonly property string helperPath: decodeURIComponent(Qt.resolvedUrl("../helpers/timezone.py").toString().replace(/^file:\/\//, ""))
 
   readonly property var provider: ({
@@ -43,6 +46,7 @@ Item {
       onStreamFinished: {
         var result
         try { result = JSON.parse(text) } catch (e) { result = { error: "Time-zone helper failed" } }
+        result.cachedAt = Date.now()
         var cache = ({})
         for (var k in root.timeCache) cache[k] = root.timeCache[k]
         cache[helper.forQuery + "\n" + helper.forZone] = result
@@ -57,6 +61,7 @@ Item {
   }
 
   Timer { id: helperTimeout; interval: 1000; onTriggered: if (helper.running) helper.signal(9) }
+  Timer { id: liveRefresh; interval: root.liveMaxAge; repeat: true; running: root.liveShown && root.host !== null; onTriggered: root.host.requery() }
 
   function startHelper(q, zone) {
     var key = q + "\n" + zone
@@ -93,21 +98,26 @@ Item {
       rows.unshift(root.answer(Units.formatValue(c.value) + " " + c.unit, Units.detailFor(c.unit), q))
       return rows
     } catch (e) { }
+    root.liveShown = false
     if (!Units.isTimeQuery(q)) return rows
     var zone = ctx.settings.timezone || root.systemZone || "UTC"
     var key = q.toLowerCase() + "\n" + zone
     var cached = root.timeCache[key]
-    if (!cached) {
+    var stale = !!cached && !!cached.live && Date.now() - cached.cachedAt > root.liveMaxAge
+    if (!cached || stale) {
       if (root.inflight !== key && root.queued !== key) root.startHelper(q.toLowerCase(), zone)
-      ctx.pending()
-      return rows
+      if (!cached) { ctx.pending(); return rows }
     }
     if (cached.error) {
-      if (cached.error.indexOf("daylight-saving") >= 0)
-        rows.unshift({ id: "dst", title: "Ambiguous local time", subtitle: cached.error, icon: "◷", section: "Converter", verb: "",
-                       tier: "answer", score: 180, disabled: true, action: { type: "noop" } })
+      // Only messages the user can act on become rows; anything else is a
+      // half-typed query and stays silent.
+      if (cached.hint)
+        rows.unshift({ id: "time-hint", title: cached.error.indexOf("daylight-saving") >= 0 ? "Ambiguous local time" : "Which time zone?",
+                       subtitle: cached.error, icon: "◷", section: "Converter", verb: "", tier: "answer", score: 180, disabled: true,
+                       action: { type: "noop" } })
       return rows
     }
+    root.liveShown = !!cached.live
     rows.unshift(root.answer(cached.result, cached.detail, q))
     return rows
   }

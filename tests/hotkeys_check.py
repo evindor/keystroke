@@ -84,8 +84,13 @@ ShellRoot {
       query("hotkeys", "")
       check(rows.length === hotkeys.binds.length, "the screen lists every bind: " + rows.length)
       check(rows[0].title === "Keybindings" && rows[0].accessory === "Super + K", "menu order kept, Keybindings first: " + rows[0].title)
-      var closeWin = find("Close window (tab in Chromium)")
-      check(closeWin !== null && closeWin.disabled === true && closeWin.accessory === "Super + W", "a Lua-closure bind is shown but greyed")
+      // Close window was a keyboard-only closure on the reference host;
+      // current bindings expose it as a runnable Lua dispatcher. Follow the
+      // actual record, keeping fixed closure coverage in tst_hotkeys.qml.
+      var closeBind = hotkeys.binds.find(function(bind) { return bind.combos.indexOf("SUPER + W") !== -1 })
+      var closeWin = closeBind ? row(closeBind.id) : null
+      check(closeWin !== null && closeWin.disabled === !closeBind.dispatcher && closeWin.accessory.indexOf("Super + W") !== -1,
+            "Close window availability follows the host binding")
       query("hotkeys", "screenshot")
       check(rows.length > 0 && rows[0].title === "Screenshot", "search inside the screen: " + titles())
       query("other", "x")
