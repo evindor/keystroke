@@ -1,5 +1,24 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.2.1 (2026-09-09)
+
+- Hotfix release for Omarchy 4.0.3: the scoped-shell revocation recorded below
+  and the `keepLoaded` restore from `1dc4e48`. Manifest bumped to 1.2.1.
+- Full offscreen suite on the release tree (`QT_QPA_PLATFORM=offscreen`,
+  `QT_QPA_PLATFORMTHEME=generic`, `QT_QUICK_BACKEND=software`): 148 QML tests,
+  the application (now covering revocation), file, catalog, matching session,
+  palette matching, shortcut and motion checks, the matching worker and engine
+  checks, voice, clipboard, Codex, dictation, 48 time-zone cases and the hotkeys
+  check against the live `omarchy-menu-keybindings` passed. `tests/lint.sh`
+  exits 0 with 206 warning lines, the same count on the `v1.2.0` tree.
+  `bin/keystroke validate`, `git diff --check`, `site/check.py` and
+  `node --check site/script.js` pass.
+- `tests/extensions_check.py` stops at the same "update applied" race recorded
+  for 1.2.0; every other step of that check passes.
+- Live desktop check on Omarchy 4.0.3-1: installed from this tree, shell
+  restarted, the Applications screen rendered all 73 rows with icons.
+  See [release notes](releases/v1.2.1.md).
+
 ## Release 1.2.0 (2026-09-09)
 
 - Full offscreen `bin/keystroke test` on the release tree (`QT_QPA_PLATFORM=offscreen`,
@@ -451,3 +470,32 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
 - Full `bin/keystroke test`: 140 QML tests passed, plus all integration checks;
   plugin validation and `git diff --check` passed. The installed plugin was not
   replaced as part of this change.
+
+## Omarchy 4.0.3 scoped-shell revocation (2026-09-09)
+
+- Applications disappeared again after 1dc4e48 restored `keepLoaded`. The
+  4.0.3 manifest conversion has a second consequence beyond the null
+  `appLibrary`: `createScopedPluginShell` stamps the API with a capability
+  profile computed from the converted manifest (`…|no-menu`), and
+  `prunePluginApis` recomputes the expected profile from the registry manifest,
+  whose `kinds` is a real array (`…|menu`). The mismatch revokes and destroys
+  the API, so the panel's injected `shell` becomes null — the shell assigns it
+  once in `Loader.onLoaded`, so it never comes back.
+- Without `keepLoaded` the panel is destroyed and recreated on every open, so a
+  fresh `shell` was injected each time and the fallback stayed active. With
+  `keepLoaded` the single long-lived instance loses `shell` on the first prune,
+  which deactivated the fallback Loader and left zero applications.
+- `core/ApplicationLibrary.qml` now latches `hostSeen` on the first injection
+  and keeps the fallback active while no shared library is present, so the
+  library survives revocation. Verified live on 4.0.3-1: `hostShell` drops to
+  false a second after startup and the palette still reports 73 applications
+  (93 before the configured-hides file loads).
+- `tests/applications_check.py` covers the revocation: it drops `hostShell` back
+  to null after a shared library and asserts the fallback keeps serving rows.
+  The check fails against the pre-fix component.
+- Still lost after revocation: everything else the injected `shell` provides —
+  `serviceFor`/`ensureService` for extension-provided services, and the `shell`
+  handed to extension contexts. This needs an upstream fix in
+  `manifestHasKind`, which should accept a QML sequence, not only a JS array.
+- Validation: 148 QML tests, application compatibility and palette dictation
+  checks passed; plugin validation clean.

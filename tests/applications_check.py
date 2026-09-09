@@ -84,9 +84,14 @@ ShellRoot {
       test.check(provider.query({scope:"applications", query:""}).length === 0, "configured hides respected")
       adapter.hostShell = sharedShell
       test.check(adapter.library === shared, "shared capability replaces fallback")
+      // 4.0.3 revokes the scoped shell when prunePluginApis() recomputes the
+      // capability profile from the registry manifest. A keepLoaded panel keeps
+      // running with shell === null, and must keep listing applications.
       adapter.hostShell = null
-      test.check(!adapter.library, "fallback released with host")
-      console.log("PASS applications: shared/scoped libraries, filtering, search, updates, lifecycle")
+      test.check(!!adapter.library && adapter.library !== shared, "fallback survives a revoked shell")
+      var after = provider.query({scope:"applications", query:""})
+      test.check(after.length === 1 && after[0].id === "keystroke-test-visible", "revoked shell keeps serving applications")
+      console.log("PASS applications: shared/scoped libraries, filtering, search, updates, revocation")
       Qt.quit()
       test.stage = 2
     }
@@ -106,4 +111,4 @@ ShellRoot {
     output = result.stdout + result.stderr
     assert result.returncode == 0 and 'PASS applications:' in output and 'FAIL' not in output, output
     assert 'TypeError' not in output and 'ReferenceError' not in output, output
-    print('PASS applications: shared/scoped libraries, filtering, search, updates, lifecycle')
+    print('PASS applications: shared/scoped libraries, filtering, search, updates, revocation')
