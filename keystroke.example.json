@@ -5,7 +5,7 @@
     "accent": "theme",
     "showPreview": true,
     "animations": "snappy",
-    "windowTransition": "fade"
+    "windowTransition": "instant"
   },
   "voice": {
     "enabled": true,

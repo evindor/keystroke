@@ -3,10 +3,13 @@
 ## Animation tiers (2026-09-09)
 
 Appearance gained **Animations** (Off, Snappy, Fluid; default Snappy) and
-**Window transition** (Fade, Slide up; default Fade). `core/Motion.js` holds the
-one table of durations: Snappy 32 ms for the level slide, the selection glide
-and the window, with a 12 + 28 ms flash; Fluid 90 ms with a 20 + 50 ms flash;
-Off is all zeros and takes every path as a plain assignment. Four transitions:
+**Window transition** (Instant, Fade, Slide up; default Instant, chosen apart
+from the tier so the window can stay instant while the rest animates).
+`core/Motion.js` holds the one table of durations: Snappy 38 ms for the level
+slide, the selection glide and the window, with a 14 + 34 ms flash (the first
+cut was 32 ms and felt too short, so every Snappy figure grew by 20 %); Fluid
+90 ms with a 20 + 50 ms flash; Off is all zeros and takes every path as a
+plain assignment. Four transitions:
 
 - A menu level (results, breadcrumb, or a provider view) enters from the right
   after `navigate` and from the left after `goBack`; rows are reconciled in
@@ -16,9 +19,18 @@ Off is all zeros and takes every path as a plain assignment. Four transitions:
   jumps instead of gliding.
 - The activated row flashes with the selected text color, and a launch waits
   for the flash to peak before the window starts leaving.
-- The window fades (or slides up 20 px while fading) in and out; the layer
-  stays mapped for the fade-out without keyboard focus, so the launched app
-  gets the keyboard at once.
+- The window fades (or slides up 20 px while fading) in and out on an
+  `OutExpo` curve, so most of the change lands in the first frames; a gentler
+  ramp read as the palette being late rather than as motion. The layer stays
+  mapped for the fade-out without keyboard focus, so the launched app gets
+  the keyboard at once.
+
+Fixed after the first live check: the highlight vanished or sat on the wrong
+row after typing. The `ListView` follows the surviving item when rows above the
+selection are removed, so its own `currentIndex` drifted from `selected` while
+the highlight read `currentItem`; reproduced offscreen (selected 0, list index
+1 after the first row went away). The index is now re-asserted from the
+selection after every reconcile instead of being bound to it.
 
 Checked offscreen (`QT_QPA_PLATFORM=offscreen`, software backend):
 
@@ -30,8 +42,11 @@ Checked offscreen (`QT_QPA_PLATFORM=offscreen`, software backend):
   the activated row; closing keeps the window mapped until the fade ends and
   the slide-up leaves the card lower; reopening while leaving cancels the
   fade-out; with animations Off the reveal, highlight, level and window change
-  at once and nothing flashes; the row's flash overlay brightens then settles
-  and a zero-length flash does nothing.
+  at once and nothing flashes; after typing removes the first row the list
+  index and the highlight follow the selection onto the new first row, and a
+  kept selection is re-indexed when everything above it goes; Instant maps
+  and unmaps at once while the tier stays Snappy; the row's flash overlay
+  brightens then settles and a zero-length flash does nothing.
 - Card renders grabbed mid-glide and mid-flash confirmed the highlight is
   painted under the row text and the flash reads as a brightening of the row.
 - `qmltestrunner` (148 tests), the shortcut, matching, dictation and catalog

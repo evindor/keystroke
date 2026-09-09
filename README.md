@@ -108,7 +108,7 @@ Type or speak, then select **Ask Codex here**, or type `? ` before your question
 
 <p align="center"><img src="site/assets/screenshots/settings.png" alt="Keystroke Settings" width="720"></p>
 
-One file, hand-editable and hot-reloaded: `~/.config/omarchy/keystroke.json` (see [keystroke.example.json](keystroke.example.json)). Settings screens are generated from each provider's schema; writes are atomic, preserve unknown fields, and are refused while the file fails to parse. Every screen, setting and choice is searchable from the palette root through its breadcrumb. Appearance: density (compact/comfortable), accent (theme accent or ember/violet/mint), previews on/off, animations (off, snappy or fluid) and the window transition (fade or slide up). Colors, fonts, radius and spacing follow the active Omarchy theme.
+One file, hand-editable and hot-reloaded: `~/.config/omarchy/keystroke.json` (see [keystroke.example.json](keystroke.example.json)). Settings screens are generated from each provider's schema; writes are atomic, preserve unknown fields, and are refused while the file fails to parse. Every screen, setting and choice is searchable from the palette root through its breadcrumb. Appearance: density (compact/comfortable), accent (theme accent or ember/violet/mint), previews on/off, animations (off, snappy or fluid) and the window transition (instant, fade or slide up). Colors, fonts, radius and spacing follow the active Omarchy theme.
 
 ## Verify
 

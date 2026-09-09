@@ -8,10 +8,11 @@
 //   selection  the highlight gliding to the newly selected row
 //   flashRise  the activated row brightening; the window starts leaving at its peak
 //   flashFall  the brightening fading back out
-//   window     the palette appearing and leaving (fade, or slide up)
+//   window     the palette appearing and leaving, when the window transition
+//              is Fade or Slide up (Instant ignores the tier for the window)
 var TIERS = {
   off:    { level: 0, slide: 0,  selection: 0,  flashRise: 0,  flashFall: 0,  window: 0 },
-  snappy: { level: 1, slide: 32, selection: 32, flashRise: 12, flashFall: 28, window: 32 },
+  snappy: { level: 1, slide: 38, selection: 38, flashRise: 14, flashFall: 34, window: 38 },
   fluid:  { level: 2, slide: 90, selection: 90, flashRise: 20, flashFall: 50, window: 90 }
 }
 var DEFAULT_TIER = "snappy"

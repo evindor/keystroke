@@ -118,8 +118,9 @@ Item {
     { key: "showPreview", type: "boolean", label: "Show result previews", "default": true },
     { key: "animations", type: "enum", label: "Animations", "default": "snappy", options: ["off", "snappy", "fluid"],
       description: "Off shows every change at once; Snappy ties changes together over a couple of frames; Fluid eases them" },
-    { key: "windowTransition", type: "enum", label: "Window transition", "default": "fade", options: ["fade", "slide"], optionLabels: { fade: "Fade", slide: "Slide up" },
-      description: "How the palette appears and leaves while animations are on" }
+    { key: "windowTransition", type: "enum", label: "Window transition", "default": "instant", options: ["instant", "fade", "slide"],
+      optionLabels: { instant: "Instant", fade: "Fade", slide: "Slide up" },
+      description: "Instant maps and unmaps the palette at once; Fade and Slide up follow the animation tier" }
   ]
   property var paletteSettings: Settings.values(config, ["palette"], paletteSchema)
   readonly property var matchingSchema: SmartMatch.SCHEMA
@@ -356,6 +357,7 @@ Item {
   property var rows: []
   property var uids: []
   property int selected: 0
+  onSelectedChanged: root.syncCurrent()
   property bool selectionTouched: false
   // While Ctrl is down the first rows show their Ctrl+digit in place of the
   // icon. Cleared on open: a launch under Ctrl+digit never sees the release.
@@ -379,6 +381,9 @@ Item {
   // row's flash. A duration of 0 turns a transition into a plain assignment.
   readonly property var motion: Motion.profile(paletteSettings.animations)
   readonly property bool windowSlides: paletteSettings.windowTransition === "slide"
+  // The window transition is chosen apart from the tier: Instant keeps the
+  // rest of the palette animated while the window itself appears at once.
+  readonly property int windowDuration: paletteSettings.windowTransition === "instant" ? 0 : motion.window
   // 0 hidden … 1 shown; the scrim and the card follow it. The layer stays
   // mapped, without keyboard focus, while `closing` runs it back down.
   property real reveal: 0
@@ -390,18 +395,20 @@ Item {
     revealAnim.stop()
     if (root.opened) {
       root.closing = false
-      if (root.motion.window > 0) { revealAnim.to = 1; revealAnim.duration = root.motion.window; revealAnim.restart() }
+      if (root.windowDuration > 0) { revealAnim.to = 1; revealAnim.duration = root.windowDuration; revealAnim.restart() }
       else root.reveal = 1
-    } else if (root.motion.window > 0) {
+    } else if (root.windowDuration > 0) {
       // Leaving waits for the flash to peak, so a launch still reads as "that row".
       root.closing = true
       hideDelay.interval = Math.max(0, root.flashUntil - Date.now())
       hideDelay.restart()
     } else { root.reveal = 0; root.closing = false }
   }
-  Timer { id: hideDelay; onTriggered: { if (root.opened) return; revealAnim.to = 0; revealAnim.duration = root.motion.window; revealAnim.restart() } }
+  Timer { id: hideDelay; onTriggered: { if (root.opened) return; revealAnim.to = 0; revealAnim.duration = root.windowDuration; revealAnim.restart() } }
+  // Most of the change lands in the first frames: a reveal that ramps up
+  // gently reads as the palette being late, not as motion.
   NumberAnimation {
-    id: revealAnim; target: root; property: "reveal"; easing.type: Easing.OutQuad
+    id: revealAnim; target: root; property: "reveal"; easing.type: Easing.OutExpo
     onFinished: if (!root.opened && revealAnim.to === 0) root.closing = false
   }
   function flash(uid) {
@@ -819,6 +826,15 @@ Item {
     if (selectedUid) {
       for (var s = 0; s < next.length; s++) if (next[s].uid === selectedUid) { root.selected = s; break }
     }
+    root.syncCurrent()
+  }
+
+  // The list follows a surviving item when rows above the selection are
+  // removed, so its own index drifts from `selected` while typing; the
+  // highlight reads the list's current item, so re-assert the index after
+  // every reconcile and whenever the selection moves.
+  function syncCurrent() {
+    if (resultList.currentIndex !== root.selected) resultList.currentIndex = root.selected
   }
 
   function afterRows() {
@@ -831,6 +847,7 @@ Item {
       root.selected = 0
       resultList.positionViewAtBeginning()
     }
+    root.syncCurrent()
   }
 
   // ------------------------------------------------------------- navigation
@@ -1251,7 +1268,6 @@ Item {
           clip: true
           spacing: root.rowSpacing
           boundsBehavior: Flickable.StopAtBounds
-          currentIndex: root.selected
           cacheBuffer: root.rowHeight * 4
           // One highlight glides between rows instead of each row painting
           // its own; its geometry is bound here so it covers the row and not

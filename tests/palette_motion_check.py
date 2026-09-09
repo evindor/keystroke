@@ -27,6 +27,7 @@ import "project/ui"
 ShellRoot {
  id: test
  property var flashes: []
+ property var rootRows: ["a","b","c","d"]
  property var steps: []
  property int step: 0
  function check(ok,msg) { if(!ok) { console.log("FAIL",msg); Qt.quit(); throw Error(msg) } }
@@ -40,7 +41,7 @@ ShellRoot {
    return [{key:"fixture",source:"bundled",patterns:[],provider:{name:"Fixture",settings:[],
      query:function(ctx) {
        if (ctx.scope === "deeper") return [{id:"d1",title:"Deep 1",score:100,action:{type:"noop"}}]
-       return ["a","b","c","d"].map(function(id, i) { return {id:id,title:"Row "+id,score:100-i,action: id === "d" ? {type:"close"} : {type:"navigate",scope:"deeper",title:"Deeper"}} })
+       return test.rootRows.map(function(id, i) { return {id:id,title:"Row "+id,score:100-i,action: id === "d" ? {type:"close"} : {type:"navigate",scope:"deeper",title:"Deeper"}} })
      }}}]
  }
  function highlightTarget() { var c = palette.testList.currentItem; return c.y + c.rowY }
@@ -126,6 +127,34 @@ ShellRoot {
      palette.cancel()
      test.check(!palette.opened && !palette.closing && !palette.testPanel.visible && palette.reveal === 0, "off: the window unmaps at once")
    })
+   // ---- Rows change under the selection while typing: the highlight must follow root.selected, not the list's drifting index
+   test.after(10, function() {
+     test.configure("snappy", "instant")
+     test.rootRows = ["a","b","c","d"]
+     palette.open('{}'); palette.registry.entries = test.fixture(); palette.runQuery()
+   })
+   test.after(100, function() {
+     test.rootRows = ["x","b","y","d"]     // the first row goes away, the list would follow "b"
+     palette.setQuery("q")
+   })
+   test.after(200, function() {
+     var h = palette.testList.highlightItem, c = palette.testList.currentItem
+     test.check(palette.selected === 0 && palette.testList.currentIndex === 0, "the list index follows the selection after rows change: " + palette.testList.currentIndex)
+     test.check(!!c && c.uid === "fixture/x" && h.visible && h.y === test.highlightTarget(), "the highlight sits on the new first row: " + (c ? c.uid : "none") + " " + h.y)
+     palette.select(1)
+     test.rootRows = ["b"]                  // everything above the kept selection goes away
+     palette.applyRows(palette.rows.filter(function(r) { return r.uid === "fixture/b" }))
+     test.check(palette.selected === 0 && palette.testList.currentIndex === 0, "a kept selection is re-indexed: " + palette.selected + " " + palette.testList.currentIndex)
+   })
+   // ---- Instant window transition with an animated tier
+   test.after(100, function() {
+     palette.cancel()
+     test.check(!palette.closing && !palette.testPanel.visible && palette.reveal === 0, "instant: the window unmaps at once")
+     test.rootRows = ["a","b","c","d"]
+     palette.open('{}'); palette.registry.entries = test.fixture(); palette.runQuery()
+     test.check(palette.reveal === 1 && palette.motion.level === 1 && palette.windowDuration === 0, "instant: the window maps at once while the tier stays snappy")
+     palette.cancel()
+   })
    // ---- The row's flash overlay pulses and settles
    test.after(10, function() {
      var layer = test.flashLayer()
@@ -156,4 +185,4 @@ ShellRoot {
     if os.environ.get("MOTION_VERBOSE"): print(output)
     assert 'PASS palette motion' in output and 'FAIL' not in output, output
     assert 'TypeError' not in output and 'ReferenceError' not in output, output
-    print('PASS palette motion: reveal and close, gliding highlight, level slides, activation flash, and the off tier')
+    print('PASS palette motion: reveal and close, gliding highlight, level slides, activation flash, the off tier, the instant window and the highlight following typing')
