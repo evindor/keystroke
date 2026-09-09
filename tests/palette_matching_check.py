@@ -104,6 +104,16 @@ ShellRoot {
      var usageBefore=JSON.stringify(palette.usage)
      palette.setQuery("downlo"); palette.activate(false)
      test.check(palette.rows[0].id==="downloads" && JSON.stringify(palette.usage)!==usageBefore,"Enter flushes pending query before activation")
+     palette.registry.entries=[
+       {key:"files",source:"bundled",patterns:[],provider:{name:"Files",settings:[],query:function(ctx){
+         test.check(ctx.query==="~dwnlds","file prefix reaches its provider unchanged")
+         return [{id:"Downloads",title:"Downloads",score:55,action:{type:"noop"}}]
+       }}},
+       {key:"fixture",source:"bundled",patterns:[],provider:{name:"Other",settings:[],query:function(){throw Error("tilde must isolate files")}}}
+     ]
+     palette.setQuery("~dwnlds"); palette.runQuery()
+     test.check(palette.rows.length===1 && palette.rows[0].providerKey==="files" && !palette.errorMessage,"tilde restricts search to files")
+     test.check(!palette.testMatching.queued && palette.testMatching.requestedKey==="","tilde bypasses embeddings")
      palette.cancel()
      console.log("PASS palette matching modes, scope, catalog invalidation, raw text, exact fallback and selection")
      Qt.quit(); test.stage=4

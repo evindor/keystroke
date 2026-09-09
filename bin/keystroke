@@ -69,6 +69,7 @@ case "${1:-help}" in
   test)
     (cd "$ROOT/tests" && /usr/lib/qt6/bin/qmltestrunner -silent -input .)
     python3 "$ROOT/tests/applications_check.py"
+    python3 "$ROOT/tests/files_check.py"
     python3 "$ROOT/tests/catalog_check.py"
     python3 "$ROOT/tests/matching_session_check.py"
     python3 "$ROOT/tests/palette_matching_check.py"

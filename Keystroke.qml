@@ -11,6 +11,7 @@ import "voice"
 import "core"
 import "core/Match.js" as Match
 import "core/Frecency.js" as Frecency
+import "core/Files.js" as FileSearch
 import "core/Settings.js" as Settings
 import "core/VoiceBindings.js" as VoiceBindings
 import "core/Intent.js" as Intent
@@ -516,7 +517,8 @@ Item {
     if (root.dmenuActive) { root.applyRows(root.dmenuRows()); root.pending = false; root.afterRows(); return }
     root.generation++
     var raw = root.voiceRawText || search.text, sc = root.scope
-    var smart = !root.dictationMode && SmartMatch.enabled(root.matchingSettings.mode, !!root.voiceRawText)
+    var filePrefix = !root.dictationMode && (!sc || sc === "files") && FileSearch.prefixed(raw)
+    var smart = !root.dictationMode && !filePrefix && SmartMatch.enabled(root.matchingSettings.mode, !!root.voiceRawText)
     var req = SmartMatch.request(raw)
     // Provider queries keep case and arguments (paths, units, extension input).
     // Command rewrites belong to catalog matching; only whole arithmetic is substituted.
@@ -529,6 +531,7 @@ Item {
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var entry = providerRegistry.entries[i]
       if (!root.providerEnabled(entry)) continue
+      if (filePrefix && entry.key !== "files") continue
       if (sc && owner !== entry.key) continue
       // Declared patterns run before query(): the provider learns which shapes
       // matched, and the largest boost lifts every row it returns this time.

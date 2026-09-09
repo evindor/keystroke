@@ -1,5 +1,26 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Fuzzy file search and tilde prefix (2026-09-09)
+
+- Fixed candidate generation: `dwnlds` now reaches Downloads. `~` isolates Files
+  and bypasses embeddings; the main palette offers Fuzzy (default), Literal,
+  and Only with ~. Search remains under home and respects ignore rules.
+- Five real-home fd runs per query (`downlo`, `dwnlds`, `rpt`, `zzzxqv`), two
+  threads and 400 candidates: fuzzy medians 12.1–38.6 ms, maxima 12.4–40.7 ms;
+  literal medians 36.2–39.5 ms. This is a warm local-disk measurement, not a
+  latency guarantee. Broad fuzzy `rpt` reached the 400-candidate cap.
+- QML scoring of 400 synthetic report paths measured about 6 ms per query over
+  20 repetitions. No full-tree index or embedding work runs for file search.
+- Full `bin/keystroke test`: 142 QML tests plus integration checks passed.
+  New actual-fd integration covers all modes, bare tilde, directory matches,
+  space/slash path abbreviations, hidden filters, and newline filenames.
+  Palette integration verifies prefix isolation and embedding bypass. Targeted
+  tests also cover bounded input, safe regex/argv, cache keys, and incomplete
+  records after cancellation. Plugin validation and diff checks passed.
+- Large/slow trees can reach the three-second timeout; broad queries can omit
+  better results beyond the 400 candidates. Only with ~ avoids background file
+  walks for ordinary root queries. The installed plugin was not replaced.
+
 ## Smart Match (2026-09-09, dev / 1.2.0)
 
 - Full offscreen `bin/keystroke test` exits 0: **139 QML tests**, all prior

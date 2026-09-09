@@ -43,6 +43,7 @@
     },
     "files": {
       "enabled": true,
+      "searchMode": "fuzzy",
       "files": true,
       "folders": true,
       "hidden": false,

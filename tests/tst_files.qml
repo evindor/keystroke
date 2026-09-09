@@ -6,8 +6,8 @@ TestCase {
     name: "Files"
     property string home: "/home/me"
     property var both: ({ files: true, folders: true, hidden: false, limit: 10 })
-    property string output: "/home/me/Documents/report.pdf\n/home/me/Documents/reports/\n/home/me/Pictures/report-cover.png\n" +
-                            "/home/me/src/tool/docs/README.md\n/home/me/notes/weekly report notes.md\n/home/me/Documents/reports/budget.xlsx\n\n"
+    property string output: "/home/me/Documents/report.pdf\u0000/home/me/Documents/reports/\u0000/home/me/Pictures/report-cover.png\u0000" +
+                            "/home/me/src/tool/docs/README.md\u0000/home/me/notes/weekly report notes.md\u0000/home/me/Documents/reports/budget.xlsx\u0000\u0000"
 
     function test_short_or_disabled_queries_never_spawn() {
         compare(Files.cacheKey("", both), null)
@@ -21,6 +21,41 @@ TestCase {
         verify(Files.cacheKey("re", both) !== Files.cacheKey("re", { files: true, folders: false }))
     }
 
+    function test_prefix_and_search_modes() {
+        compare(Files.request("~dwnlds",both,false).query,"dwnlds")
+        compare(Files.request(" ~/docs rpt ",both,false).query,"docs rpt")
+        verify(Files.request("dwnlds",both,false).settings.fuzzy)
+        var literal = Object.assign({},both,{searchMode:"literal"})
+        verify(!Files.request("dwnlds",literal,false).settings.fuzzy)
+        verify(Files.request("~dwnlds",literal,false).settings.fuzzy)
+        var prefix = Object.assign({},both,{searchMode:"prefix"})
+        verify(!Files.request("dwnlds",prefix,false).enabled)
+        verify(Files.request("~dwnlds",prefix,false).enabled)
+        verify(Files.request("dwnlds",prefix,true).settings.fuzzy)
+        compare(Files.cacheKey("x".repeat(129),both),null)
+        compare(Files.cacheKey("bad\u0000name",both),null)
+    }
+
+    function test_fuzzy_candidates_and_filename_safety() {
+        var fuzzy = Object.assign({},both,{fuzzy:true})
+        var entries = Files.parse("/home/me/Downloads/\u0000/home/me/Downloads/unrelated.pdf\u0000/home/me/Documents/report.pdf\u0000/home/me/line\nreport.pdf\u0000",home)
+        compare(Files.rows("dwnlds",entries,both,false).length,0)
+        compare(Files.rows("dwnlds",entries,fuzzy,false).map(function(r){return r.title}),["Downloads"])
+        compare(Files.rows("dcmnts rpt",entries,fuzzy,false).map(function(r){return r.title}),["report.pdf"])
+        compare(entries[3].path,"/home/me/line\nreport.pdf")
+        compare(Files.argv("dwnlds",home,fuzzy).slice(-1)[0],"[^/]*d[^/]*w[^/]*n[^/]*l[^/]*d[^/]*s[^/]*/?$")
+        verify(Files.argv("dwnlds",home,fuzzy).indexOf("--print0")>0)
+        verify(Files.cacheKey("dwnlds",fuzzy)!==Files.cacheKey("dwnlds",both))
+        // Regex syntax remains literal even in subsequence mode.
+        var regex = new RegExp(Files.pattern("a+b",true))
+        verify(regex.test("a long + and b")); verify(!regex.test("aaab"))
+        var many=[]
+        for(var i=0;i<400;i++) many.push({rel:"Documents/report-"+i+".pdf",path:home+"/Documents/report-"+i+".pdf",dir:false})
+        var start=Date.now()
+        for(var j=0;j<20;j++) Files.rows("dcmnts rpt",many,fuzzy,false)
+        console.log("Files fuzzy scoring 400 candidates:", (Date.now()-start)/20, "ms/query")
+    }
+
     function test_argv_is_literal_and_bounded() {
         var a = Files.argv("--version report.pdf", home, both)
         compare(a[0], "fd")
@@ -28,8 +63,8 @@ TestCase {
         verify(a.indexOf("--max-results") > 0)
         compare(a[a.indexOf("--base-directory") + 1], home)
         // Earlier words ride on --and=, the last is anchored to the name after --; a dash never becomes a flag.
-        compare(a.slice(-3), ["--and=\\-\\-version", "--", "[^/]*report\\.pdf[^/]*$"])
-        compare(Files.argv("a+b (c)", home, both).slice(-1), ["[^/]*\\(c\\)[^/]*$"])
+        compare(a.slice(-3), ["--and=\\-\\-version", "--", "[^/]*report\\.pdf[^/]*/?$"])
+        compare(Files.argv("a+b (c)", home, both).slice(-1), ["[^/]*\\(c\\)[^/]*/?$"])
         verify(a.indexOf("--hidden") < 0)
         compare(Files.argv("x", home, { files: true, folders: false }).join(" ").indexOf("--type f --type d"), -1)
         compare(Files.argv("x", home, { files: false, folders: true }).join(" ").indexOf("--type d") > 0, true)
@@ -43,7 +78,8 @@ TestCase {
         compare(entries.length, 6)
         compare(entries[0], { path: "/home/me/Documents/report.pdf", rel: "Documents/report.pdf", dir: false })
         compare(entries[1], { path: "/home/me/Documents/reports", rel: "Documents/reports", dir: true })
-        compare(Files.parse("/elsewhere/report.pdf\n/home/me/\n", home).length, 0)
+        compare(Files.parse("/elsewhere/report.pdf\u0000/home/me/\u0000", home).length, 0)
+        compare(Files.parse("/home/me/partial", home).length, 0)
     }
 
     function test_rows_rank_names_first_and_respect_the_limit() {

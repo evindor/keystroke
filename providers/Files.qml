@@ -26,7 +26,11 @@ Item {
     icon: "󰈞",
     color: "#e5c07b",
     description: "Files and folders under your home folder, found with fd",
+    prefix: "~",
     settings: [
+      { key: "searchMode", type: "enum", label: "Search in the main palette", "default": "fuzzy",
+        options: ["fuzzy", "literal", "prefix"], optionLabels: ["Fuzzy", "Literal", "Only with ~"],
+        description: "Type ~ for fuzzy file and folder search in any mode. Searches under your home folder." },
       { key: "files", type: "boolean", label: "Include files", "default": true },
       { key: "folders", type: "boolean", label: "Include folders", "default": true },
       { key: "hidden", type: "boolean", label: "Include hidden entries", "default": false,
@@ -54,10 +58,13 @@ Item {
         var next = ({})
         for (var k in root.cache) next[k] = root.cache[k]
         next[fd.forKey] = Files.parse(text, root.home)
+        var keys = Object.keys(next)
+        while (keys.length > 32) delete next[keys.shift()]
         root.cache = next
       }
     }
     onExited: {
+      watchdog.stop()
       root.inflight = ""
       root.superseded = false
       if (root.host) root.host.requery()
@@ -67,6 +74,10 @@ Item {
   // Hidden walks of a huge home can take a while; whatever fd printed by then
   // is still a set of real matches, so the partial output is kept.
   Timer { id: watchdog; interval: 3000; onTriggered: if (fd.running) fd.signal(15) }
+
+  function cancelWalk() {
+    if (fd.running && !root.superseded) { root.superseded = true; fd.signal(15) }
+  }
 
   function start(key, query, settings) {
     if (fd.running) {
@@ -87,25 +98,33 @@ Item {
 
   function query(ctx) {
     if (ctx.scope && ctx.scope !== "files") return []
+    var req = Files.request(ctx.query, ctx.settings, !!ctx.scope)
     var rows = []
-    if (!ctx.scope) {
+    if (!ctx.scope && !req.explicit) {
       if (!ctx.query) return [navRow(20)]
       var s = Match.match(ctx.query, "Search Files", "files folders finder home")
       if (s) rows.push(navRow(s))
     }
+    if (!req.enabled) { root.cancelWalk(); return rows }
     if (!root.available) {
-      if (ctx.scope) rows.push({ id: "missing", title: "fd is not installed", subtitle: "sudo pacman -S fd, then search again", icon: "󰈞",
+      if (ctx.scope || req.explicit) rows.push({ id: "missing", title: "fd is not installed", subtitle: "sudo pacman -S fd, then search again", icon: "󰈞",
                                  section: "Files", verb: "", tier: "item", disabled: true, score: 1, action: { type: "noop" } })
       return rows
     }
-    var key = Files.cacheKey(ctx.query, ctx.settings)
-    if (!key) return rows
+    var key = Files.cacheKey(req.query, req.settings)
+    if (!key) {
+      root.cancelWalk()
+      if (req.explicit || ctx.scope) rows.push({ id:"hint", title:"Type a file or folder name", subtitle:"At least two characters · Searches under ~", icon:"󰈞",
+        section:"Files", tier:"item", score:1, disabled:true, action:{type:"noop"} })
+      return rows
+    }
     var hit = root.cache[key]
     if (hit === undefined) {
-      if (root.inflight !== key || root.superseded) root.start(key, ctx.query, ctx.settings)
+      if (root.inflight !== key || root.superseded) root.start(key, req.query, req.settings)
       ctx.pending()
       return rows
     }
-    return rows.concat(Files.rows(ctx.query, hit, ctx.settings, !!ctx.scope))
+    if (root.inflight && root.inflight !== key) root.cancelWalk()
+    return rows.concat(Files.rows(req.query, hit, req.settings, !!ctx.scope || req.explicit))
   }
 }
