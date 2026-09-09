@@ -30,7 +30,7 @@ Item {
       if (e.key === "settings") continue
       var schemas = e.provider.settings || []
       out.push({ key: e.key, name: e.provider.name, description: e.provider.description || "", icon: e.provider.icon || "", iconFont: e.provider.iconFont || "",
-                 color: e.provider.color || "", source: e.source, pluginId: e.pluginId || "", enabled: h.providerEnabled(e), schemas: schemas,
+                 iconSource: e.provider.iconSource || "", color: e.provider.color || "", source: e.source, pluginId: e.pluginId || "", enabled: h.providerEnabled(e), schemas: schemas,
                  values: Settings.values(h.config, ["providers", e.key], schemas) })
     }
     return { configPath: h.configPath, paletteSchema: h.paletteSchema, paletteValues: h.paletteValues(), voice: h.voiceModel(), entries: out, problems: h.registry.problems }

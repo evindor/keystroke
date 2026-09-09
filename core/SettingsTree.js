@@ -21,7 +21,7 @@ function navigate(scope, title) { return { type: "navigate", scope: scope, title
 function settingAction(path, key, value, schema) { return { type: "setting", path: path, key: key, value: value, schema: schema } }
 
 function node(parentScope, parts, fields) {
-  var n = { parentScope: parentScope, parts: parts, path: parts.join(" › "), title: parts[parts.length - 1], subtitle: "", icon: GEAR, iconFont: "",
+  var n = { parentScope: parentScope, parts: parts, path: parts.join(" › "), title: parts[parts.length - 1], subtitle: "", icon: GEAR, iconFont: "", iconSource: "",
             tint: "", section: "Settings", verb: "Open", order: 0, accessory: "", badge: "", keywords: "", description: "", disabled: false,
             lift: 0, listScore: 1, listOnly: false, confirm: "", relative: ({}) }
   for (var k in fields) n[k] = fields[k]
@@ -97,7 +97,7 @@ function voiceNodes(nodes, screens, rootParts, voice) {
 }
 
 // model: { configPath, paletteSchema, paletteValues, voice,
-//          entries: [{ key, name, description, icon, iconFont, color, source, pluginId, enabled, schemas, values }],
+//          entries: [{ key, name, description, icon, iconFont, iconSource, color, source, pluginId, enabled, schemas, values }],
 //          problems: [{ pluginId, message }] }
 function build(model) {
   var nodes = [], screens = ({})
@@ -119,7 +119,7 @@ function build(model) {
     var community = e.source === "community"
     var origin = community ? "Plugin " + e.pluginId : "Bundled"
     nodes.push(node("settings", parts, { id: e.key, subtitle: (e.enabled ? "Enabled" : "Disabled") + " · " + origin + (e.description ? " · " + e.description : ""),
-      icon: e.icon || "⌘", iconFont: e.iconFont || "", tint: e.color || "", section: "Providers", order: 10 + i, badge: community ? "plugin" : "",
+      icon: e.icon || "⌘", iconFont: e.iconFont || "", iconSource: e.iconSource || "", tint: e.color || "", section: "Providers", order: 10 + i, badge: community ? "plugin" : "",
       keywords: e.key, description: e.description || "", action: navigate(scope, e.name) }))
     var path = ["providers", e.key]
     // Labelled "Enabled" rather than "Enable provider": the row sits on the
@@ -159,7 +159,7 @@ function relativePath(n, depth) {
 }
 
 function row(n, score, subtitle, section) {
-  return { id: n.id, title: n.title, subtitle: subtitle, icon: n.icon, iconFont: n.iconFont, tint: n.tint, section: section, verb: n.verb, tier: "item",
+  return { id: n.id, title: n.title, subtitle: subtitle, icon: n.icon, iconFont: n.iconFont, iconSource: n.iconSource || "", tint: n.tint, section: section, verb: n.verb, tier: "item",
            score: score, order: n.order, accessory: n.accessory, badge: n.badge, disabled: n.disabled, confirm: n.confirm || "", action: n.action, previewDetail: n.path }
 }
 

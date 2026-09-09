@@ -7,7 +7,23 @@
       "description": "Countdown timers from the palette: `timer 10m tea` notifies you when the tea is ready",
       "author": "Arseniy Zarechnev",
       "repo": "https://github.com/evindor/keystroke-timer.git",
-      "tags": ["productivity", "timer"]
+      "tags": [
+        "productivity",
+        "timer"
+      ]
+    },
+    {
+      "id": "io.github.evindor.keystroke-calpad",
+      "name": "Calpad",
+      "description": "Quick Calpad sessions: `price = 10`, `$120 - 30%` or `now + 90 days` opens a live calculator note; Ctrl+O continues it in the Calpad desktop app",
+      "author": "Arseniy Zarechnev",
+      "repo": "https://github.com/evindor/keystroke-calpad.git",
+      "tags": [
+        "productivity",
+        "calculator",
+        "units",
+        "currency"
+      ]
     }
   ]
 }

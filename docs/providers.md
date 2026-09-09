@@ -26,20 +26,44 @@ Omarchy loads `Service.qml` into `omarchy-shell`, injects `shell`, `manifest` an
 ```js
 readonly property var provider: ({
   apiVersion: 1,
-  name: "Thing", icon: "✳", iconFont: "", color: "#hex", description: "",
+  name: "Thing", icon: "✳", iconFont: "", iconSource: "", color: "#hex", description: "",
   prefix: "th",                 // optional, documentation only for now
+  patterns: [ { id, regex, flags, boost, example, description } ],   // optional, see Patterns
   settings: [ { key, type: "boolean"|"enum"|"number"|"string", label, "default", options, min, max, integer, description } ],
+  view: Component { ... },                        // optional, see Provider views
   query: function(ctx) { ... return rows },       // required
   activate: function(row, ctx) { ... return effect }, // optional; defaults to row.action (row.altAction when ctx.alternate)
-  opened: function() { }                          // optional; called on every summon
+  opened: function() { },                         // optional; called on every summon
+  dismiss: function() { }                         // optional; called when the palette closes while your view is showing
 })
 ```
 
 Bundled providers also carry `id`; community providers are keyed by their plugin id.
 
+`icon` is a glyph (Omarchy's icon font unless `iconFont` names another); `iconSource` is an optional image URL that replaces the glyph wherever the provider itself is shown: its row on the Extensions screen, its screen's About row, and its entry under Keystroke Settings. Resolve it next to your QML file with `String(Qt.resolvedUrl("assets/icon.svg"))`, and put the same value in your rows' `iconSource` so the result rows carry it too. SVG and PNG both render; keep the glyph as the fallback for the moment before the image loads.
+
 ### ctx
 
-`query` (string), `rawQuery` (full original text before spoken-command normalization), `scope` (`""` at root, or `<key>` / `<key>/<sub>`), `sub`, `generation`, `settings` (validated values for your schema), `pending()` (call when more rows will arrive later), `host` (`host.requery()` re-runs the current query; `host.appLibrary`, `host.omarchyPath`, `host.shell`), `shell`, `appLibrary`, `omarchyPath`.
+`query` (string), `rawQuery` (full original text before spoken-command normalization), `scope` (`""` at root, or `<key>` / `<key>/<sub>`), `sub`, `generation`, `settings` (validated values for your schema), `patterns` (`{ matched: [ids], boost }` for your declared patterns against this query; `{ matched: [], boost: 0 }` when none matched or none are declared), `pending()` (call when more rows will arrive later), `host` (`host.requery()` re-runs the current query; `host.appLibrary`, `host.omarchyPath`, `host.shell`), `shell`, `appLibrary`, `omarchyPath`.
+
+### Patterns
+
+A provider that answers a recognisable shape of text (a unit conversion, a variable assignment, a currency amount, a date expression) declares it, so the host can rank its offer without the provider computing scores against every other provider's:
+
+```js
+patterns: [
+  { id: "assignment", regex: "^\\s*[a-z_]\\w*\\s*=\\s*\\S", flags: "i", boost: 14, example: "price = 10", description: "Assigns a variable" },
+  { id: "currency", regex: "[$€£]\\s*\\d", boost: 12, example: "$100 in EUR" }
+]
+```
+
+`regex` is a string (or a `RegExp`; flags limited to `i`, `m`, `s`, `u`), `boost` a number from 0 to 100 (default 10), `example` and `description` short prose. The host compiles the list once when the registry is built, tests every pattern against the query before calling `query(ctx)`, and:
+
+- adds the largest `boost` among the matched patterns to the score of every row the provider returns for that query, inside the row's tier, after the default matcher or the provider's explicit `score` has produced a positive score (a matched pattern never revives a row the matcher dropped);
+- passes the matched ids in `ctx.patterns.matched`, so the provider can return its offer only when something matched, pick a subtitle per shape, or skip work it knows is pointless;
+- lists the `example`s on the extension's screen ("Answers queries like price = 10 · $100 in EUR").
+
+Fallback rows (`tier: "fallback"`, the *Continue with* section) are where this matters most: the assistant hand-offs sit at scores 2 to 5 there, so an extension whose shape matched lands above them with a base score of 1 and a boost of 5 or more, and below them otherwise. An invalid pattern is reported under "Plugins needing attention" and skipped; the provider still loads. Patterns run on the UI thread for every keystroke: keep them linear (no nested quantifiers over the same text) and under 400 characters; the host keeps the first 64.
 
 Return quickly. `query` runs on the UI thread for every keystroke; anything that forks or reads large files must be cached or asynchronous (`Process`/`FileView` in your service, then `host.requery()`).
 
@@ -72,10 +96,31 @@ Navigating into a provider gives it scope `<key>`; deeper scopes are `<key>/<sub
 
 ## Stability
 
-API 1 is frozen once a second community provider ships against it. Changes that add optional fields keep the version; anything else bumps `apiVersion`, and Keystroke keeps loading the previous version for one Omarchy release.
+API 1 is frozen once a second community provider ships against it. Changes that add optional fields keep the version; anything else bumps `apiVersion`, and Keystroke keeps loading the previous version for one Omarchy release. Added as optional fields in September 2026, with [keystroke-calpad](https://github.com/evindor/keystroke-calpad) as the second community provider: `patterns`, `iconSource` and `ctx.patterns`, and the documented host surface for provider views. A provider that uses `ctx.patterns` should treat it as absent on older hosts (`ctx.patterns && ctx.patterns.matched.length`).
 
 ## Optional provider views (API 1)
 
-A provider may expose `view: Component { ... }` and return `{type: "provider-view", provider: "<registry key>"}` from activation. The host loads the component over the palette card, injects `host`, and calls optional `focusInput()`. A missing/disabled view produces a visible error. Ordinary row-only providers need no changes.
+A provider may expose `view: Component { ... }` and return `{type: "provider-view", provider: "<registry key>"}` from activation (a community provider's key is its plugin id, `manifest.id`). The host loads the component over the palette card, injects `host`, and calls optional `focusInput()`. A missing/disabled view produces a visible error. Ordinary row-only providers need no changes. Anything the view needs to know about the activation (the typed text, a saved item) goes through the provider: `activate(row, ctx)` stores it on the provider object before returning the effect, and the view reads it from there (`Component { MyView { service: root } }`, where `root` is your `Service.qml`).
 
-The provider owns view data and asynchronous work; keep durable state outside the loaded component. The view may implement `dismiss()`, `beginVoice()` and `transcript(text, final)`. The host calls dismissal before unloading or navigating and supplies voice snapshots to these optional methods. Dismiss must cancel or detach work without blocking close. The provider must stop its owned resources when disabled. See `providers/Codex.qml` for the reference implementation.
+The provider owns view data and asynchronous work; keep durable state outside the loaded component. The view may implement `dismiss()`, `beginVoice()` and `transcript(text, final)`. The host calls dismissal before unloading or navigating and supplies voice snapshots to these optional methods. Dismiss must cancel or detach work without blocking close. The provider must stop its owned resources when disabled; the host also drops a view whose provider is removed, unloaded or turned off while it is showing. See `providers/Codex.qml` and `codex/ConversationView.qml` for the bundled reference and [keystroke-calpad](https://github.com/evindor/keystroke-calpad) for a community one.
+
+### What a view may use on `host`
+
+The palette is the view's theme and its keyboard context. These members are part of API 1; anything else on the host object is internal and may change.
+
+| Member | Meaning |
+| --- | --- |
+| `background`, `foreground`, `accent`, `muted`, `hairline` (colors), `fontFamily` (string), `compact` (bool) | The palette's theme, already resolved against the active Omarchy theme and Keystroke's appearance settings. Use them instead of `Color.menu.*` so the accent choice applies to you too. |
+| `cancel()` | Close the palette (what `Esc` does). |
+| `goBack()` | Leave the view and return to the results, restoring the query. What `←` and `Backspace` on an empty composer do in the bundled views. |
+| `requery()` | Re-run the palette's query; relevant when your rows changed while the view was shown. |
+| `statusMessage`, `errorMessage` (strings, writable) | The footer text once the user is back on the results. |
+| `voice` (`active`, `phase`: `idle`/`starting`/`listening`/`transcribing`, `level` 0..1, `history` array), `voiceTrigger` (`tap`/`hold`), `voiceBegin("tap")`, `voiceStop()`, `voiceCancel()` | The dictation state, for a waveform and for forwarding keys while listening: while `voice.active`, `↵` should call `voiceStop()` and any other non-modifier key `voiceCancel()`. |
+| `isModifierKey(key)`, `isSuperKey(key)` | Key classification for the hold-to-talk release. |
+| `home`, `omarchyPath`, `shell`, `appLibrary`, `config` (read-only) | The same values `ctx` carries. |
+
+The view runs inside `omarchy-shell`, so `import qs.Commons` and `import qs.Ui` work: `Style.space`, `Style.font.*`, `Style.cornerRadius`, `Util.alpha`, `Ui.Button`, `Ui.BorderSurface` and `Ui.TextField` are the kit the bundled views are made of.
+
+## Installing from a local checkout
+
+The Extensions screen accepts `file:///absolute/path/to/repo.git` as well as https and `owner/repo`: Omarchy's plugin scripts clone the `file` transport, which makes a local bare repository the way to try an extension in the real palette before it is published (`git clone --bare <your checkout> /tmp/thing.git`, then type the `file://` URL). Relative paths, plain paths and anything containing `..` are refused.

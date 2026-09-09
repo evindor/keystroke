@@ -13,6 +13,7 @@ import "core/Frecency.js" as Frecency
 import "core/Settings.js" as Settings
 import "core/VoiceBindings.js" as VoiceBindings
 import "core/Intent.js" as Intent
+import "core/Patterns.js" as Patterns
 
 // Keystroke: an extension-first command palette that replaces the Omarchy
 // menu. Hosted by omarchy-shell as a `menu` plugin (see manifest.json).
@@ -84,6 +85,21 @@ Item {
     root.activeProviderKey = key
     providerView.sourceComponent = entry.provider.view
   }
+  // A view whose provider was removed, unloaded or turned off while it was
+  // showing (a community plugin disabled from the CLI, say) must not linger
+  // over the palette with a destroyed context behind it.
+  function dropOrphanedView() {
+    if (!root.providerViewActive) return
+    var entry = root.registryEntry(root.activeProviderKey)
+    if (entry && root.providerEnabled(entry)) return
+    root.closeProviderView()
+    if (root.opened) { root.runQuery(); search.forceActiveFocus() }
+  }
+  Connections {
+    target: providerRegistry
+    function onEntriesChanged() { root.dropOrphanedView() }
+  }
+  onConfigChanged: root.dropOrphanedView()
 
   // -------------------------------------------------------------- settings
   property var config: Settings.empty()
@@ -441,18 +457,22 @@ Item {
     var q = root.voiceRawText && !root.dictationMode ? Intent.normalize(root.voiceRawText) : search.text, sc = root.scope
     var owner = sc.split("/")[0]
     var sub = sc.indexOf("/") >= 0 ? sc.slice(owner.length + 1) : ""
-    var collected = [], errors = [], pend = false
+    var collected = [], errors = [], pend = false, matchedPatterns = ({})
     var mark = function() { pend = true }
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var entry = providerRegistry.entries[i]
       if (!root.providerEnabled(entry)) continue
       if (sc && owner !== entry.key) continue
+      // Declared patterns run before query(): the provider learns which shapes
+      // matched, and the largest boost lifts every row it returns this time.
+      var patterns = Patterns.evaluate(entry.patterns, q)
+      if (patterns.matched.length) matchedPatterns[entry.key] = patterns.matched
       var ctx = { query: q, rawQuery: root.voiceRawText || search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
-                  pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
+                  patterns: patterns, pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
       try {
         var out = entry.provider.query(ctx) || []
         for (var r = 0; r < out.length && r < 400; r++) {
-          var row = root.normalize(out[r], entry, q)
+          var row = root.normalize(out[r], entry, q, patterns.boost)
           if (row) collected.push(row)
         }
       } catch (e) {
@@ -463,12 +483,14 @@ Item {
     if (root.configError) errors.push(root.configError)
     var ranked = Match.rank(collected, root.bonusFor)
     root.applyRows(ranked.slice(0, 120))
+    root.lastPatterns = matchedPatterns
     root.pending = pend
     root.errorMessage = errors.join(" · ")
     root.afterRows()
   }
 
-  function normalize(row, entry, q) {
+  property var lastPatterns: ({})           // provider key → matched pattern ids, for inspect()
+  function normalize(row, entry, q, boost) {
     if (!row || typeof row !== "object" || typeof row.title !== "string") return null
     var out = {}
     for (var k in row) out[k] = row[k]
@@ -485,14 +507,16 @@ Item {
     out.section = String(row.section || entry.provider.name)
     out.verb = String(row.verb || (row.action && row.action.type === "navigate" ? "Open" : "Run"))
     out.tier = row.tier === "answer" || row.tier === "fallback" ? row.tier : "item"
-    out.score = typeof row.score === "number" ? row.score : Match.match(q, row.title, row.keywords || "", row.path || "", row.description || "")
+    var base = typeof row.score === "number" ? row.score : Match.match(q, row.title, row.keywords || "", row.path || "", row.description || "")
+    // A matched provider pattern lifts rows that already match; it never revives a row the matcher dropped.
+    out.score = q && base > 0 && boost > 0 ? base + boost : base
     out.accessory = String(row.accessory || "")
     out.badge = String(row.badge || (entry.source === "community" ? "plugin" : ""))
     out.hint = String(row.hint || "")
     out.disabled = row.disabled === true
     out.remember = row.remember === true
     out.confirm = String(row.confirm || "")
-    if (q && !(out.score > 0)) return null
+    if (q && !(base > 0)) return null
     return out
   }
 
@@ -703,7 +727,8 @@ Item {
   }
   function inspect() {
     return JSON.stringify({ opened: root.opened, mode: root.mode, view: root.activeProviderKey, scope: root.scope, query: search.text, count: root.rows.length,
-      titles: root.rows.map(function(r) { return r.title }), selected: root.selected, pending: root.pending,
+      titles: root.rows.map(function(r) { return r.title }), selected: root.selected, pending: root.pending, patterns: root.lastPatterns,
+      current: { uid: root.current.uid || "", icon: root.current.icon || "", iconSource: root.current.iconSource || "", badge: root.current.badge || "", tier: root.current.tier || "" },
       modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems,
       error: root.errorMessage, configError: root.configError, status: root.statusMessage,
       voice: { backend: "voxtype", state: voice.phase, trigger: root.voiceTrigger, enabled: root.voiceEnabled, detected: voice.detected, version: voice.version,
