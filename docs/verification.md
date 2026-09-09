@@ -451,3 +451,32 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
 - Full `bin/keystroke test`: 140 QML tests passed, plus all integration checks;
   plugin validation and `git diff --check` passed. The installed plugin was not
   replaced as part of this change.
+
+## Omarchy 4.0.3 scoped-shell revocation (2026-09-09)
+
+- Applications disappeared again after 1dc4e48 restored `keepLoaded`. The
+  4.0.3 manifest conversion has a second consequence beyond the null
+  `appLibrary`: `createScopedPluginShell` stamps the API with a capability
+  profile computed from the converted manifest (`…|no-menu`), and
+  `prunePluginApis` recomputes the expected profile from the registry manifest,
+  whose `kinds` is a real array (`…|menu`). The mismatch revokes and destroys
+  the API, so the panel's injected `shell` becomes null — the shell assigns it
+  once in `Loader.onLoaded`, so it never comes back.
+- Without `keepLoaded` the panel is destroyed and recreated on every open, so a
+  fresh `shell` was injected each time and the fallback stayed active. With
+  `keepLoaded` the single long-lived instance loses `shell` on the first prune,
+  which deactivated the fallback Loader and left zero applications.
+- `core/ApplicationLibrary.qml` now latches `hostSeen` on the first injection
+  and keeps the fallback active while no shared library is present, so the
+  library survives revocation. Verified live on 4.0.3-1: `hostShell` drops to
+  false a second after startup and the palette still reports 73 applications
+  (93 before the configured-hides file loads).
+- `tests/applications_check.py` covers the revocation: it drops `hostShell` back
+  to null after a shared library and asserts the fallback keeps serving rows.
+  The check fails against the pre-fix component.
+- Still lost after revocation: everything else the injected `shell` provides —
+  `serviceFor`/`ensureService` for extension-provided services, and the `shell`
+  handed to extension contexts. This needs an upstream fix in
+  `manifestHasKind`, which should accept a QML sequence, not only a JS array.
+- Validation: 148 QML tests, application compatibility and palette dictation
+  checks passed; plugin validation clean.
