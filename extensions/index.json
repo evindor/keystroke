@@ -24,6 +24,19 @@
         "units",
         "currency"
       ]
+    },
+    {
+      "id": "ozz1ee.keystroke-keyboard-cleaner",
+      "name": "Keyboard Cleaner",
+      "description": "Block the keyboard and pointer for a chosen duration so the keyboard can be wiped without triggering keys: `wipe 5m` or `block 30s` opens the cleaning window",
+      "author": "ozz1ee",
+      "repo": "https://github.com/radiohost-cloud/ozz1ee.keystroke-keyboard-cleaner.git",
+      "tags": [
+        "productivity",
+        "keyboard",
+        "input",
+        "cleanup"
+      ]
     }
   ]
 }
