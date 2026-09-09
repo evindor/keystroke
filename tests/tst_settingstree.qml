@@ -148,6 +148,7 @@ TestCase {
         compare(titles(screen), ["Voxtype is not installed", "Install dictation (voxtype)"])
         verify(screen[0].disabled)
         compare(screen[1].action.type, "shell")
+        compare(screen[1].action.command, "omarchy-launch-floating-terminal-with-presentation omarchy-voxtype-install")
         compare(SettingsTree.rows(t.nodes, "", "hold bind").length, 0)
         compare(t.screens["settings/voice/keys"], undefined)
         t = SettingsTree.build(model())                                              // no voice model at all: nothing changes

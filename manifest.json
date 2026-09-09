@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "evindor.keystroke",
   "name": "Keystroke",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "author": "Arseniy Zarechnev",
   "license": "MIT",
   "description": "A Raycast-style command palette that replaces the Omarchy menu, with voice, Codex and community extensions",

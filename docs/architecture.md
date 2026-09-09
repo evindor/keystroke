@@ -16,7 +16,7 @@ omarchy-shell
        │                             and the marketplace catalog (core/Extensions.js)
        ├─ core/*.js   Match (fuzzy matcher + tiers), Patterns (provider-declared query shapes), SettingsTree, Frecency, Settings, VoiceBindings, Intent, Calculator, Units, Colors, Emoji, AiTargets, Files, Extensions
        ├─ omarchy/MenuModel.js   vendored stock menu model (parse, merge, routes, guards)
-       ├─ voice/VoiceSession.qml   voxtype recording lifecycle, live transcript and audio levels
+       ├─ voice/VoiceSession.qml   voxtype recording lifecycle, optional live transcript and audio levels
        ├─ codex/      AppServer, CodexSession, ConversationView, Policy
        └─ ui/         ResultRow, PreviewPane, Keycap, VoiceWave
 ```
@@ -32,9 +32,9 @@ Two triggers, both host-owned in `Keystroke.qml`:
 
 `↵` while listening only stops recording; a fresh Enter after transcription activates the visible selection. Any other non-modifier key cancels the recording and pending suggestion before behaving as usual. The transcript replaces the query through the normal `edited()` path, so ranking, previews and frecency are untouched.
 
-**Binary.** `VoiceSession` prefers `~/.local/share/keystroke/voxtype/voxtype` (the build `bin/keystroke voice-setup` installs: voxtype 1.1 with the live transcript mirror, whisper on Vulkan) and falls back to `voxtype` on the PATH; the audio bridge is taken from the same directory. Every CLI call uses that binary, so the client and the daemon (a systemd drop-in points `voxtype.service` at the same file) never disagree on the `--wait` protocol.
+**Binary and configuration.** `VoiceSession` resolves `voxtype` from the user's `PATH` and takes the audio bridge from the same directory (falling back to `voxtype-audio-bridge` on `PATH`). Keystroke does not install another build, write a systemd drop-in, or edit Voxtype's config. Its only behavior overrides are scoped to its own recording: `--file` keeps the result out of the user's configured output target and `--no-osd` avoids drawing two recording interfaces. Every other Voxtype choice remains the user's.
 
-**Live words.** Streaming engines (`[whisper] streaming = true`) make the daemon rewrite `$XDG_RUNTIME_DIR/voxtype/transcript` after every partial, final and revision event with the session's text so far, atomically by rename, empty at session start and removed at idle (the patch in `feature/live-transcript-file`, proposed upstream). While listening the session loads that file through a `FileView` behind a `Loader` plus an 80 ms poll (a watcher can lose the inode across renames) and emits `partial(text)` on change; the host puts the text in the query field and runs the normal debounced query, so the results follow the speech. The final transcript still comes from `record stop --wait --json` (the same patch publishes the completion sidecar for streaming file sessions), with the transcript file as fallback.
+**Live words.** Live partials are opportunistic. While listening, the session watches `$XDG_RUNTIME_DIR/voxtype/transcript` through a `FileView` behind a `Loader` plus an 80 ms poll (a mirror writer may replace the file by rename). If the running daemon publishes that integration file, `partial(text)` updates the query and results as speech arrives. If it does not, the path stays absent and the final transcript still arrives through `record stop --wait --json`, with the requested transcript file as fallback. This keeps current Voxtype releases useful without opting the user into an experimental build or streaming configuration.
 
 **Query.** `core/Intent.normalize()` turns the transcript into a query: trailing punctuation, a leading launcher verb and filler words are dropped ("Launch Chrome." → `Chrome`), because the matcher treats punctuation as literal characters and AND-s the words.
 

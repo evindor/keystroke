@@ -2,7 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Voice entry through the voxtype daemon Omarchy already ships. One recording
+// Voice entry through the user's ordinary voxtype daemon. One recording
 // at a time: `voxtype record start --file … --no-osd` (voxtype hides its own
 // overlay for tools that draw their own), audio levels from voxtype's own
 // bridge socket while listening, then `voxtype record stop --wait --json` to
@@ -18,8 +18,8 @@ Item {
   readonly property string statePath: runtimeDir + "/voxtype/state"
 
   property bool detected: false          // a usable voxtype binary was found
-  property string command: "voxtype"     // the binary in use: Keystroke's own build under ~/.local/share/keystroke, else PATH
-  property bool waitFile: false          // the CLI takes --wait-file (1.1); streaming sessions need it, see stop()
+  property string command: "voxtype"     // the user's binary from PATH; Keystroke never installs or replaces it
+  property bool waitFile: false          // the CLI takes --wait-file; streaming sessions need it, see stop()
   property string version: ""
   property string daemonState: ""        // idle | recording | streaming | transcribing | "" (no daemon)
   readonly property bool daemonRunning: daemonState !== ""
@@ -48,11 +48,11 @@ Item {
     root.detectedAt = now
     detectProc.running = true
   }
-  // Keystroke's own voxtype build (bin/keystroke voice-setup: the 1.1 line
-  // with the live transcript mirror) wins over the packaged one on the PATH.
+  // Use exactly the user's regular voxtype. In particular, do not revive an
+  // old Keystroke-owned fork that may remain on disk from an earlier version.
   Process {
     id: detectProc
-    command: ["sh", "-c", "for b in \"$HOME/.local/share/keystroke/voxtype/voxtype\" \"$(command -v voxtype 2>/dev/null)\"; do [ -n \"$b\" ] && [ -x \"$b\" ] || continue; printf '%s\\n' \"$b\"; if \"$b\" record stop --help 2>/dev/null | grep -q -- --wait-file; then echo wait-file; else echo -; fi; exec \"$b\" --version; done; exit 1"]
+    command: ["sh", "-c", "b=\"$(command -v voxtype 2>/dev/null)\"; [ -n \"$b\" ] && [ -x \"$b\" ] || exit 1; printf '%s\\n' \"$b\"; if \"$b\" record stop --help 2>/dev/null | grep -q -- --wait-file; then echo wait-file; else echo -; fi; exec \"$b\" --version"]
     stdout: StdioCollector { id: detectOut }
     onExited: function(code) {
       var lines = String(detectOut.text || "").trim().split("\n")
@@ -198,10 +198,10 @@ Item {
   Process { id: cleanupProc; command: ["rm", "-f", root.transcriptPath] }
 
   // ------------------------------------------------------------ live words
-  // With a streaming engine the daemon mirrors the session's text so far to
-  // <runtime>/voxtype/transcript after every partial (empty at the start,
-  // removed at idle). Watched while listening, plus a short poll because the
-  // daemon replaces the file by rename and a watcher can lose the inode.
+  // If a future/upstream daemon publishes a live transcript mirror, use it.
+  // Current releases can simply leave this path absent: dictation still fills
+  // the query from the final `record stop --wait` result. The poll complements
+  // the watcher because mirror implementations replace the file by rename.
   readonly property string livePath: runtimeDir + "/voxtype/transcript"
   Loader {
     id: liveLoader

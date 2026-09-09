@@ -23,7 +23,7 @@ There is no build step. The shell loads the QML files as they are.
 | `docs/` | Contract, architecture, verification log. |
 | `examples/keystroke-hello/` | The smallest possible extension. |
 | `extensions/index.json` | The curated index of known extensions the Extensions screen fetches. |
-| `bin/keystroke` | Developer commands: `install`, `uninstall`, `validate`, `test`, `open <query>`, `voice-setup`. |
+| `bin/keystroke` | Developer commands: `install`, `uninstall`, `validate`, `test`, `open <query>`. |
 
 ## Conventions
 

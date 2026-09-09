@@ -72,9 +72,9 @@ function voiceNodes(nodes, screens, rootParts, voice) {
     keywords: "voxtype dictation speech microphone", description: "voice dictation voxtype speech microphone hold to talk transcribe",
     action: navigate(scope, "Voice") }))
   if (!voice.detected) {
-    nodes.push(node(scope, parts.concat(["Voxtype is not installed"]), { id: "voice/missing", subtitle: "Voice entry uses Omarchy's dictation package",
+    nodes.push(node(scope, parts.concat(["Voxtype is not installed"]), { id: "voice/missing", subtitle: "Voice is optional; Keystroke never installs it in the background",
       icon: "󰀦", verb: "", order: 0, disabled: true, listOnly: true, action: { type: "noop" } }))
-    nodes.push(node(scope, parts.concat(["Install dictation (voxtype)"]), { id: "voice/install", subtitle: "Runs Omarchy's voxtype installer in a floating terminal",
+    nodes.push(node(scope, parts.concat(["Install dictation (voxtype)"]), { id: "voice/install", subtitle: "Runs Omarchy's stock voxtype installer in a floating terminal",
       icon: "", verb: "Install", order: 1, keywords: "voxtype install", description: "install voxtype dictation",
       action: { type: "shell", command: "omarchy-launch-floating-terminal-with-presentation omarchy-voxtype-install" } }))
     return

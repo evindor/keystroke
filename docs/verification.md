@@ -1,4 +1,11 @@
-> Historical checkpoints below include retired local-model implementations. Current build: [Codex integration verification](codex-integration-verification.md).
+> Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
+
+## Non-intrusive Voxtype integration (2026-09-09)
+
+- Retired the pinned Voxtype fork, build helper, bundled patch, systemd drop-in writer and TOML rewriting. Keystroke now resolves only the user's ordinary `voxtype` from `PATH`; the absent-Voxtype row still launches Omarchy's installer only when the user explicitly selects it. Keystroke passes `--file` and `--no-osd` for its own recording and otherwise leaves the user's daemon and preferences alone.
+- Kept the runtime live-transcript reader as an optional, read-only capability. On Voxtype versions without the mirror, the path remains absent and the completed `record stop --wait --json` transcript fills the query. A future upstream implementation can provide partials without another Keystroke installer or configuration migration.
+- `tests/voice_session_check.py` now puts both a stale Keystroke-owned binary and a normal `PATH` binary in a temporary home, verifies the `PATH` binary wins, exercises stop/cancel/auto-stop, and confirms a sentinel `~/.config/voxtype/config.toml` remains byte-identical. Focused voice check, site check, plugin validation and `git diff --check`: pass. Full offscreen `bin/keystroke test`: 119 QML tests and all integration checks pass; hotkeys skipped without a Hyprland session; qmllint emitted only the existing metadata warnings. A first full-suite attempt without the documented offscreen Qt environment aborted before loading tests because the sandbox could not connect to Wayland or X11; the core stack was entirely in Qt platform initialization and the offscreen rerun passed.
+- Not exercised: a real microphone recording or a daemon that publishes live partials. No installed Voxtype config, service or binary was changed during this work.
 
 
 ## Provider patterns, image icons, view host surface; Calpad as the second extension (2026-09-09)

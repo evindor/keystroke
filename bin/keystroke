@@ -20,8 +20,6 @@ Usage: bin/keystroke <command>
   open <q>    Open the palette with a query
   validate    omarchy plugin validate on this checkout
   test        Run QML, voice lifecycle, time-zone checks, and qmllint
-  voice-setup Build/install streaming voxtype with Vulkan speech recognition
-  voice-status Show speech daemon and GPU status
 USAGE
 }
 
@@ -74,8 +72,6 @@ case "${1:-help}" in
     python3 "$ROOT/tests/hotkeys_check.py"
     "$ROOT/tests/lint.sh"
     ;;
-  voice-setup) shift; exec "$ROOT/helpers/voice-setup.sh" "$@" ;;
-  voice-status) exec "$ROOT/helpers/voice-setup.sh" --status ;;
   help|-h|--help) usage ;;
   *) usage >&2; exit 2 ;;
 esac

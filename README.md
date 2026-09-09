@@ -67,7 +67,7 @@ Every install and removal asks for confirmation and states that the code runs un
 
 ## Voice
 
-Keystroke dictates through [voxtype](https://voxtype.io), the dictation daemon Omarchy installs from Install › AI › Dictation. Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the PATH, and offers Omarchy's installer when it is not. `bin/keystroke voice-setup` (no root) installs a voxtype build with live words and whole-request revision, compiled from Keystroke's fork of voxtype at one fixed commit (`FORK_COMMIT` in `helpers/voice-setup.sh`, checked out detached and verified before anything is built), never from a moving branch.
+Keystroke dictates through [voxtype](https://voxtype.io), the optional dictation daemon Omarchy installs from Install › AI › Dictation. Keystroke Settings › Voice shows **Voxtype voice command integration**, on by default as soon as `voxtype` is on the `PATH`, and offers Omarchy's installer when it is not. Keystroke uses that ordinary installation as-is: it does not install a fork, replace the user service, or edit `~/.config/voxtype/config.toml`. Model, language, audio, VAD and output preferences remain entirely under `voxtype configure`.
 
 Two ways in, both while the palette is open:
 
@@ -81,11 +81,11 @@ Two ways in, both while the palette is open:
   -- <<< keystroke voice
   ```
 
-While listening, live words fill the query field and a small waveform sits to the right; matches update as you speak. Releasing the hotkey, tapping it again, or pressing `↵` finishes the recording, and a fresh `↵` after transcription runs the visible selection. Typing or navigating cancels the recording. Voxtype's overlay stays hidden, the transcript never goes through the clipboard or a virtual keyboard, and temporary transcript files are removed afterwards. Trailing punctuation, a leading launcher verb ("open", "go to") and filler are dropped before matching, so "Launch Chrome." is searched as `Chrome`.
+While listening, a small waveform sits to the right. Releasing the hotkey, tapping it again, or pressing `↵` finishes the recording; the completed transcript then fills the query and a fresh `↵` runs the visible selection. Typing or navigating cancels the recording. Voxtype's overlay is hidden for Keystroke's one recording only, the transcript never goes through the clipboard or a virtual keyboard, and temporary transcript files are removed afterwards. If a future Voxtype release publishes live partials for file-output integrations, Keystroke already watches its runtime mirror and will update matches as the words arrive. Trailing punctuation, a leading launcher verb ("open", "go to") and filler are dropped before matching, so "Launch Chrome." is searched as `Chrome`.
 
 **Copy to Clipboard** appears under **Continue with** after any spoken or typed query: `↵` copies the original text and closes, `Ctrl+↵` copies, closes and pastes into the previous window. The separate **Dictate to Clipboard** launcher (`bin/keystroke dictate`) starts a prose-only recording with the same keys.
 
-Model, language and VAD are voxtype's settings (`voxtype configure`). Whisper on the GPU is what makes live words keep up: `voxtype setup gpu --enable` (Vulkan). With the daemon stopped the palette says so instead of listening.
+Keystroke passes only per-recording `--file` and `--no-osd` overrides. With the daemon stopped the palette says so instead of listening.
 
 ## Codex inside Keystroke
 
