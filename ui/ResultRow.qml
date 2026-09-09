@@ -16,6 +16,8 @@ BorderSurface {
   property string accessory: ""
   property string badge: ""
   property string hint: ""
+  // The Ctrl+digit that runs this row; shown in place of the icon while set.
+  property string shortcut: ""
   property bool disabled: false
   property bool answer: false
   property bool selected: false
@@ -47,21 +49,22 @@ BorderSurface {
     width: root.chip
     height: width
     radius: Math.min(Style.cornerRadius, Style.space(root.compact ? 7 : 9))
-    color: root.iconSource ? "transparent" : (root.answer ? Util.alpha(root.accent, 0.16) : Util.alpha(root.foreground, 0.07))
+    color: root.iconSource && !root.shortcut ? "transparent" : (root.answer || root.shortcut ? Util.alpha(root.accent, 0.16) : Util.alpha(root.foreground, 0.07))
     Text {
       anchors.centerIn: parent
-      visible: !root.iconSource || appIcon.status !== Image.Ready
-      text: root.icon
+      visible: !!root.shortcut || !root.iconSource || appIcon.status !== Image.Ready
+      text: root.shortcut || root.icon
       textFormat: Text.PlainText
-      color: root.tint ? root.tint : (root.answer ? root.accent : Util.alpha(root.foreground, 0.8))
-      font.family: root.iconFont ? root.iconFont : Style.font.menuFamily
+      color: root.shortcut ? root.accent : root.tint ? root.tint : (root.answer ? root.accent : Util.alpha(root.foreground, 0.8))
+      font.family: root.shortcut ? Style.font.menuFamily : root.iconFont ? root.iconFont : Style.font.menuFamily
+      font.weight: root.shortcut ? Font.Bold : Font.Normal
       font.pixelSize: root.compact ? Style.font.iconLarge : Style.font.iconLarge + 3
     }
     Image {
       id: appIcon
       anchors.fill: parent
       anchors.margins: Style.space(2)
-      visible: !!root.iconSource
+      visible: !!root.iconSource && !root.shortcut
       source: root.iconSource
       fillMode: Image.PreserveAspectFit
       sourceSize.width: width * Screen.devicePixelRatio

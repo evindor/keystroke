@@ -351,6 +351,10 @@ Item {
   property var uids: []
   property int selected: 0
   property bool selectionTouched: false
+  // While Ctrl is down the first rows show their Ctrl+digit in place of the
+  // icon. Cleared on open: a launch under Ctrl+digit never sees the release.
+  property bool ctrlHeld: false
+  readonly property int shortcutRows: 8
   property int generation: 0
   property bool pending: false
   property bool showLoading: false
@@ -401,6 +405,7 @@ Item {
   function resetSelection() {
     root.selected = 0
     root.selectionTouched = false
+    root.ctrlHeld = false
     pointerGate.reset()
   }
 
@@ -1092,8 +1097,12 @@ Item {
             // hotkey's own release, and its release bind only fires while the
             // modifier is still down). A tap's release must not end anything.
             if (voice.active && root.voiceTrigger === "hold" && root.isSuperKey(event.key)) { root.voiceStop(); event.accepted = true }
+            if (event.key === Qt.Key_Control) root.ctrlHeld = false
           }
           Keys.onPressed: function(event) {
+            // Ctrl's own press carries no modifier flag yet; a chord pressed
+            // with Ctrl already down (before the palette opened) does.
+            root.ctrlHeld = event.key === Qt.Key_Control || !!(event.modifiers & Qt.ControlModifier)
             if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && event.isAutoRepeat) { event.accepted = true; return }
             if (root.confirmPending) { confirmDialog.handleKey(event); event.accepted = true; return }
             if (voice.active) {
@@ -1208,6 +1217,7 @@ Item {
               title: delegateRoot.title; subtitle: delegateRoot.subtitle; icon: delegateRoot.icon; iconFont: delegateRoot.iconFont
               iconSource: delegateRoot.iconSource; tint: delegateRoot.tint; verb: delegateRoot.verb; accessory: delegateRoot.accessory
               badge: delegateRoot.badge; hint: delegateRoot.hint; disabled: delegateRoot.disabled; answer: delegateRoot.answer
+              shortcut: root.ctrlHeld && !root.dmenuActive && delegateRoot.index < root.shortcutRows ? String(delegateRoot.index + 1) : ""
               compact: root.compact
               selected: root.selected === delegateRoot.index
               accent: root.accent; foreground: root.foreground
