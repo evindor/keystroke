@@ -9,8 +9,9 @@ omarchy-shell
        ├─ providers/Registry.qml
        │    ├─ bundled: OmarchyMenu, Applications, Calculator, Converter, Colors,
        │    │           Emoji, Clipboard, Files, Hotkeys, Codex, AiWeb, Extensions, SettingsProvider
-       │    └─ community: shell.serviceFor(<plugin id>) for every enabled plugin
-       │                  whose manifest carries "x-keystroke"
+       │    └─ community: Service.qml of every ~/.config/omarchy/plugins folder whose manifest
+       │                  carries "x-keystroke", created and injected here (omarchy-shell hands
+       │                  a third-party plugin only its own manifest and service)
        ├─ providers/Extensions.qml   install/update/remove/toggle community providers through
        │                             Omarchy's plugin scripts; discovery from extensions/index.json
        │                             and the marketplace catalog (core/Extensions.js)
@@ -74,7 +75,7 @@ Keystrokes debounce 25 ms; asynchronous refreshes respect that pending pause, wh
 
 ## Integration points used
 
-All from Omarchy 4.0.2 source: property injection of `shell`, `manifest`, `pluginRegistry` (`shell.qml`), `open/close/opened` and `shell call` methods, `PluginRegistry.resolveEnabledId` and `restoreCloneSource` keyed by `omarchy.clonedFrom`, `shell.serviceFor` for service plugins, `Color.menu.*`, `Style.font.menuFamily`, `Style.space`, `Style.cornerRadius`, `Style.gapsOut`, `Border.surfaceSpec`, `BorderSurface`, `ConfirmDialog`, `PointerMoveGate`, `Util.execDetached/execArgv/alpha/fileUrl/shellQuote`. The layer namespace is `omarchy-menu` so the stock no-animation layer rule applies.
+All from Omarchy 4.0.2 source: property injection of `shell`, `manifest`, `pluginRegistry` (`shell.qml`), `open/close/opened` and `shell call` methods, `PluginRegistry.resolveEnabledId` and `restoreCloneSource` keyed by `omarchy.clonedFrom`, `Color.menu.*`, `Style.font.menuFamily`, `Style.space`, `Style.cornerRadius`, `Style.gapsOut`, `Border.surfaceSpec`, `BorderSurface`, `ConfirmDialog`, `PointerMoveGate`, `Util.execDetached/execArgv/alpha/fileUrl/shellQuote`. The layer namespace is `omarchy-menu` so the stock no-animation layer rule applies.
 
 ## Files
 

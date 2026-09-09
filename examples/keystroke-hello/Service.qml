@@ -1,9 +1,9 @@
 import QtQuick
 
 // A Keystroke provider is an Omarchy `service` plugin whose root object
-// exposes `provider`. Omarchy loads this object into omarchy-shell, injects
-// `shell`/`manifest`, and destroys it when the plugin is disabled or removed.
-// Keystroke discovers it through shell.serviceFor(<plugin id>).
+// exposes `provider`. Keystroke reads the plugin folder, creates this object
+// inside omarchy-shell, injects `shell`/`manifest`/`omarchyPath`, and destroys
+// it when the plugin is updated or removed.
 QtObject {
   id: root
   property var shell: null

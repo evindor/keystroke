@@ -52,7 +52,7 @@ Record what you ran in `docs/verification.md` when you change behaviour, includi
 
 ## Build an extension
 
-An extension is an ordinary Omarchy plugin of kind `service` whose manifest carries `"x-keystroke": { "apiVersion": 1 }` and whose `Service.qml` root object exposes `readonly property var provider`. Omarchy installs, loads, updates and removes it; Keystroke only reads `provider`. The complete reference is [keystroke-timer](https://github.com/evindor/keystroke-timer); use it as a template.
+An extension is an ordinary Omarchy plugin of kind `service` whose manifest carries `"x-keystroke": { "apiVersion": 1 }` and whose `Service.qml` root object exposes `readonly property var provider`. Omarchy installs, updates and removes the folder; Keystroke loads `Service.qml` itself, injects `shell`, `manifest` and `omarchyPath`, and reads `provider`. (omarchy-shell shows a third-party plugin only its own manifest and service, so the shell cannot do the loading for us; an extension is never listed in `shell.json`.) The complete reference is [keystroke-timer](https://github.com/evindor/keystroke-timer); use it as a template.
 
 ### 1. Files
 
@@ -97,13 +97,13 @@ Effects: `navigate`, `exec` (argv), `shell` (trusted string), `copy`, `url`, `ap
 
 **A view of your own.** An extension that needs more than rows (a conversation, a multi-line editor) exposes `view: Component { MyView { service: root } }` on the provider and returns `{type: "provider-view", provider: manifest.id}` from `activate`. The host loads the component over the palette card and injects `host`; the view draws with `host.background`, `host.foreground`, `host.accent`, `host.muted`, `host.hairline` and `host.fontFamily`, closes with `host.cancel()`, returns to the results with `host.goBack()`, and forwards voice through `host.voice`. The contract, with the full list of host members a view may rely on, is in [docs/providers.md](docs/providers.md) under *Optional provider views*; [keystroke-calpad](https://github.com/evindor/keystroke-calpad) is a complete community example (patterns, image icon, a session view and an offscreen check of all three).
 
-A service outlives the palette: timers, sockets and caches you keep on the root object survive the window closing and are destroyed only when the plugin is disabled, removed or the shell restarts. Stop what you own when that happens (`Component.onDestruction`).
+A service outlives the palette window: timers, sockets and caches you keep on the root object survive the window closing and are destroyed when the extension is updated or removed, when the shell reloads its plugins (every `omarchy plugin add/update/remove` does that) and when it restarts. Stop what you own when that happens (`Component.onDestruction`). Turning an extension off in Keystroke keeps the service but sends it no queries.
 
 ### 3. Test it
 
 - Unit-test `core/*.js` with qmltestrunner (`bin/test`). Cover parsing edge cases, argv construction (no injection), rows for the root and for your scope.
 - Validate: `omarchy plugin validate .` must pass; lint: `qmllint -I /usr/lib/qt6/qml Service.qml`.
-- Try it in the shell: copy the folder to `~/.config/omarchy/plugins/<id>` (copy, not symlink), `omarchy-shell shell rescanPlugins`, `omarchy plugin enable <id>`, then in Keystroke open **Extensions → <name>** and turn **Enabled** on. `omarchy plugin list` shows the plugin; `journalctl --user -u omarchy-shell -f` (or `qs log`) shows QML errors. To go through the palette's own installer instead, `git clone --bare <your checkout> /tmp/<id>.git` and type `file:///tmp/<id>.git` on the Extensions screen: the install, update and remove rows then behave exactly as they will for the published repository.
+- Try it in the shell: copy the folder to `~/.config/omarchy/plugins/<id>` (copy, not symlink; the folder name must equal the id) and open Keystroke: the folder is scanned on every open, and **Extensions → <name>** shows the extension, with **Needs attention** and the QML error if `Service.qml` failed to load. The QML engine caches components by file and Quickshell 0.3.1 has no `Qt.clearComponentCache` (omarchy-shell guards the call, so a rescan does not clear it): after editing `Service.qml` or anything it imports, run `omarchy-restart-shell`. The same applies to users after **Update now**; the status line says so. `omarchy plugin list` shows the plugin; `journalctl --user -u omarchy-shell -f` (or `qs log`) shows QML errors too. To go through the palette's own installer instead, `git clone --bare <your checkout> /tmp/<id>.git` and type `file:///tmp/<id>.git` on the Extensions screen: the install, update and remove rows then behave exactly as they will for the published repository.
 - Check the palette's view of it: `omarchy-shell shell summon omarchy.menu '{"query":"thing"}'` then `omarchy-shell shell call omarchy.menu inspect '{}'`.
 
 ### 4. Publish it

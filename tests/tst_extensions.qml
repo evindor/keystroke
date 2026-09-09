@@ -7,16 +7,19 @@ TestCase {
     name: "Extensions"
     property string omarchy: "/usr/share/omarchy"
     property string timerId: "io.github.evindor.keystroke-timer"
+    property string dir: "/home/me/.config/omarchy/plugins/"
     property var plugins: ({
         "io.github.evindor.keystroke-timer": { id: "io.github.evindor.keystroke-timer", name: "Timer", version: "1.0.0", author: "A", description: "Countdown timers",
-                                               homepage: "https://github.com/evindor/keystroke-timer", kinds: ["service"], "x-keystroke": { apiVersion: 1 } },
-        "example.keystroke-hello": { id: "example.keystroke-hello", name: "Hello", version: "1.0.0", kinds: ["service"], "x-keystroke": { apiVersion: 1 } },
+                                               homepage: "https://github.com/evindor/keystroke-timer", kinds: ["service"], entryPoints: { service: "Service.qml" },
+                                               "x-keystroke": { apiVersion: 1 }, __sourceDir: "/home/me/.config/omarchy/plugins/io.github.evindor.keystroke-timer" },
+        "example.keystroke-hello": { id: "example.keystroke-hello", name: "Hello", version: "1.0.0", kinds: ["service"], entryPoints: { service: "Service.qml" },
+                                     "x-keystroke": { apiVersion: 1 }, __sourceDir: "/home/me/.config/omarchy/plugins/example.keystroke-hello" },
         "jankeesvw.workspace-name": { id: "jankeesvw.workspace-name", name: "Workspace name", kinds: ["bar-widget"] },
         "omarchy.clock": { id: "omarchy.clock", name: "Clock", kinds: ["bar-widget"] }
     })
-    function loaded(id) { return id === timerId }
     function on(id) { return id === timerId }
-    function installed(git) { return Extensions.installed(plugins, loaded, on, git || {}) }
+    function installed(git, problems) { return Extensions.installed(plugins, on, git || {}, problems || []) }
+    function record(folder, body) { return dir + folder + "/manifest.json\n" + body + "\u0000" }
     // The check script prints tab-separated lines; build them here so the file itself stays tab-free.
     function line(parts) { return parts.join("\t") + "\n" }
     function ranked(rows, q) {
@@ -95,14 +98,55 @@ TestCase {
         compare(names(Extensions.discover(index, catalog)), ["One", "Two", "Three"])
     }
 
-    function test_installed_lists_marked_plugins_only_with_both_switches() {
+    function test_scan_output_is_parsed_into_marked_manifests_and_problems() {
+        var argv = Extensions.scanArgv("/home/me")
+        compare(argv.slice(0, 2), ["bash", "-c"])
+        compare(argv.slice(-1), ["/home/me/.config/omarchy/plugins"])
+        var text = record(timerId, JSON.stringify({ id: timerId, name: "Timer", kinds: ["service"], entryPoints: { service: "Service.qml" }, "x-keystroke": { apiVersion: 1 } }))
+                 + record("omarchy.clock", JSON.stringify({ id: "omarchy.clock", name: "Clock", kinds: ["bar-widget"] }))
+                 + record("broken.keystroke-thing", '{ "id": "broken.keystroke-thing", "x-keystroke": { "apiVersion": 1 }, oops')
+                 + record("wrong-folder", JSON.stringify({ id: "x.keystroke-misnamed", kinds: ["service"], "x-keystroke": { apiVersion: 1 } }))
+                 + record("plain.broken", '{ not json')
+                 + record("no.id", JSON.stringify({ kinds: ["service"], "x-keystroke": { apiVersion: 1 } }))
+        var found = Extensions.parseScan(text)
+        compare(Object.keys(found.manifests), [timerId])
+        compare(found.manifests[timerId].__sourceDir, dir + timerId)
+        compare(found.manifests[timerId].name, "Timer")
+        compare(found.problems, [
+            { pluginId: "broken.keystroke-thing", message: "manifest.json is not valid JSON" },
+            { pluginId: "wrong-folder", message: "Folder name must equal the plugin id (x.keystroke-misnamed)" },
+            { pluginId: "no.id", message: "Folder name must equal the plugin id (missing)" }
+        ])
+        compare(Extensions.parseScan(""), { manifests: {}, problems: [] })
+        compare(Extensions.parseScan("garbage without newline"), { manifests: {}, problems: [] })
+
+        compare(Extensions.serviceUrl(found.manifests[timerId]), "file://" + dir + timerId + "/Service.qml")
+        compare(Extensions.serviceUrl({ __sourceDir: "/d", kinds: ["service"], entryPoints: { service: "sub/Main.qml" } }), "file:///d/sub/Main.qml")
+        compare(Extensions.serviceUrl({ __sourceDir: "/d", kinds: ["bar-widget"], entryPoints: { service: "Service.qml" } }), "")
+        compare(Extensions.serviceUrl({ __sourceDir: "/d", kinds: ["service"], entryPoints: {} }), "")
+        compare(Extensions.serviceUrl({ __sourceDir: "/d", kinds: ["service"], entryPoints: { service: "../other/Service.qml" } }), "")
+        compare(Extensions.serviceUrl({ __sourceDir: "/d", kinds: ["service"], entryPoints: { service: "/etc/Service.qml" } }), "")
+        compare(Extensions.serviceUrl({ kinds: ["service"], entryPoints: { service: "Service.qml" } }), "")
+
+        var pub = Extensions.publicManifest(found.manifests[timerId])
+        compare(pub.id, timerId)
+        verify(!("__sourceDir" in pub))
+        verify("__sourceDir" in found.manifests[timerId])
+    }
+
+    function test_installed_lists_marked_plugins_with_keystrokes_switch_and_problems() {
         var list = installed()
         compare(list.map(function(e) { return e.id }), ["example.keystroke-hello", timerId])
         var timer = list[1]
-        verify(timer.loaded); verify(timer.enabled); verify(timer.git); verify(!timer.checked); verify(!timer.updateAvailable)
+        verify(timer.enabled); verify(timer.git); verify(!timer.checked); verify(!timer.updateAvailable); compare(timer.problem, "")
         compare(timer.homepage, "https://github.com/evindor/keystroke-timer")
         var hello = list[0]
-        verify(!hello.loaded); verify(!hello.enabled)
+        verify(!hello.enabled)
+        // Everything on disk is on unless the user said otherwise.
+        verify(Extensions.installed(plugins, null, {}, [])[0].enabled)
+        var sick = installed({}, [{ pluginId: timerId, message: "Service.qml:3:1 Syntax error" }, { pluginId: timerId, message: "later" }])
+        compare(sick[1].problem, "Service.qml:3:1 Syntax error")
+        compare(sick[0].problem, "")
 
         var git = Extensions.parseCheck(line([timerId, "aaaa", "bbbb", "https://github.com/evindor/keystroke-timer.git"]) + line(["example.keystroke-hello", "", "", ""]) + "\ngarbage line\n")
         var after = installed(git)
@@ -116,8 +160,9 @@ TestCase {
     }
 
     function test_commands_are_literal_argv_through_omarchy_scripts() {
-        compare(Extensions.installArgv(omarchy, "https://github.com/evindor/keystroke-timer.git"), ["/usr/share/omarchy/bin/omarchy-plugin-add", "https://github.com/evindor/keystroke-timer.git", "--yes", "--enable"])
+        compare(Extensions.installArgv(omarchy, "https://github.com/evindor/keystroke-timer.git"), ["/usr/share/omarchy/bin/omarchy-plugin-add", "https://github.com/evindor/keystroke-timer.git", "--yes"])
         compare(Extensions.updateArgv(omarchy, "a.b"), ["/usr/share/omarchy/bin/omarchy-plugin-update", "a.b", "--yes"])
+        compare(Extensions.updatedText("Timer"), "Updated Timer · omarchy-restart-shell loads its new code")
         compare(Extensions.removeArgv(omarchy, "a.b"), ["/usr/share/omarchy/bin/omarchy-plugin-remove", "a.b", "--yes"])
         var check = Extensions.checkArgv("/home/me", ["a.b", "c.d; rm -rf /"])
         compare(check.slice(0, 5), ["env", "GIT_TERMINAL_PROMPT=0", "GIT_SSH_COMMAND=ssh -oBatchMode=yes", "bash", "-c"])
@@ -128,11 +173,11 @@ TestCase {
         compare(Extensions.parseAdded("Cloning into '/x'...\nAdded io.github.evindor.keystroke-timer into /home/me/.config/omarchy/plugins/io.github.evindor.keystroke-timer\nEnabled io.github.evindor.keystroke-timer\n"), "io.github.evindor.keystroke-timer")
         compare(Extensions.parseAdded("omarchy-plugin-add: refusing to add: validation failed"), "")
         var job = { kind: "install", id: "", name: "Timer", label: "Installing Timer", done: "Installed Timer", url: "u", startedAt: 5 }
-        var argv = Extensions.jobArgv("/run/user/1000/keystroke/extensions", job, omarchy, ["/usr/share/omarchy/bin/omarchy-plugin-add", "u", "--yes", "--enable"])
+        var argv = Extensions.jobArgv("/run/user/1000/keystroke/extensions", job, omarchy, ["/usr/share/omarchy/bin/omarchy-plugin-add", "u", "--yes"])
         compare(argv.slice(0, 2), ["bash", "-c"])
         compare(argv.slice(3, 5), ["keystroke-extension-job", "/run/user/1000/keystroke/extensions"])
         compare(JSON.parse(argv[5]), job)
-        compare(argv.slice(6), ["/usr/share/omarchy/bin/omarchy-notification-send", "Installed Timer", "/usr/share/omarchy/bin/omarchy-plugin-add", "u", "--yes", "--enable"])
+        compare(argv.slice(6), ["/usr/share/omarchy/bin/omarchy-notification-send", "Installed Timer", "/usr/share/omarchy/bin/omarchy-plugin-add", "u", "--yes"])
         compare(Extensions.jobArgv("/d", { kind: "check", label: "Checking" }, omarchy, ["git"])[7], "")   // checks stay silent
         compare(Extensions.parseResult("junk"), null)
         compare(Extensions.parseResult(JSON.stringify({ code: 0 })), null)
@@ -147,10 +192,15 @@ TestCase {
         var state = { installed: installed(), discover: discover, job: null, fetching: false, checked: "", error: "", marketplace: true }
         var rows = ranked(Extensions.screenRows("", state), "")
         compare(titles(rows), ["Hello", "Timer", "Check for updates", "Refresh catalog", "Spotify"])
-        compare(rows[0].accessory, "Not loaded")
+        compare(rows[0].accessory, "Off")
         compare(rows[1].accessory, "On")
         compare(rows[1].action.scope, "extensions/" + timerId)
-        compare(rows[1].altAction.op, "enable"); compare(rows[1].altAction.value, false)
+        compare(rows[1].altAction.type, "setting"); compare(rows[1].altAction.value, false); compare(rows[1].altAction.path, ["providers", timerId])
+        compare(rows[0].altAction.value, true)
+        state.installed = installed({}, [{ pluginId: timerId, message: "Service.qml:3:1 Syntax error" }])
+        var sick = ranked(Extensions.screenRows("", state), "")
+        compare(sick[1].accessory, "Needs attention")
+        verify(sick[1].subtitle.indexOf("Syntax error") > 0)
         compare(rows[4].verb, "Install")
         compare(rows[4].action, { type: "ext", op: "install", id: "x.keystroke-spotify", name: "Spotify", url: "https://github.com/x/keystroke-spotify.git" })
         verify(rows[4].confirm.indexOf("unsandboxed") > 0)
@@ -186,25 +236,30 @@ TestCase {
         compare(empty[0].title, "No extensions installed")
     }
 
-    function test_detail_screen_covers_enable_load_update_repo_and_remove() {
+    function test_detail_screen_covers_enable_problem_update_repo_and_remove() {
         var e = installed(Extensions.parseCheck(line([timerId, "a", "b", "https://github.com/evindor/keystroke-timer.git"])))[1]
         var rows = ranked(Extensions.detailRows("", e, { job: null }), "")
-        compare(titles(rows), ["Enabled", "Loaded in omarchy-shell", "Settings", "Update now", "Open repository", "Remove", "Timer v1.0.0"])
-        compare(rows[0].action, { type: "ext", op: "enable", id: e.id, name: "Timer", value: false })
-        compare(rows[1].action, { type: "ext", op: "load", id: e.id, name: "Timer", value: false })
-        compare(rows[2].action.scope, "settings/" + timerId)
-        compare(rows[3].action, { type: "ext", op: "update", id: e.id, name: "Timer" })
-        compare(rows[4].action, { type: "url", url: "https://github.com/evindor/keystroke-timer" })
-        compare(rows[5].action, { type: "ext", op: "remove", id: e.id, name: "Timer" })
-        verify(rows[5].confirm.indexOf("Remove Timer") === 0)
+        compare(titles(rows), ["Enabled", "Settings", "Update now", "Open repository", "Remove", "Timer v1.0.0"])
+        compare(rows[0].action, { type: "setting", path: ["providers", e.id], key: "enabled", value: false, schema: { key: "enabled", type: "boolean" } })
+        compare(rows[0].subtitle, "Include this extension's results in Keystroke")
+        compare(rows[1].action.scope, "settings/" + timerId)
+        compare(rows[2].action, { type: "ext", op: "update", id: e.id, name: "Timer" })
+        compare(rows[3].action, { type: "url", url: "https://github.com/evindor/keystroke-timer" })
+        compare(rows[4].action, { type: "ext", op: "remove", id: e.id, name: "Timer" })
+        verify(rows[4].confirm.indexOf("Remove Timer") === 0)
+        verify(rows[4].subtitle.indexOf("Stops the extension") === 0)
         var fresh = installed()[1]
         var rows2 = Extensions.detailRows("", fresh, {})
-        compare(rows2[3].title, "Check for updates")
-        compare(rows2[3].action, { type: "ext", op: "check", id: fresh.id })
+        compare(rows2[2].title, "Check for updates")
+        compare(rows2[2].action, { type: "ext", op: "check", id: fresh.id })
         var hello = installed(Extensions.parseCheck(line(["example.keystroke-hello", "", "", ""])))[0]
         var rows3 = Extensions.detailRows("", hello, {})
-        compare(rows3[0].subtitle, "Turning it on also loads the plugin into omarchy-shell")
-        compare(rows3[3].title, "Not git-managed")
+        compare(rows3[0].action.value, true)
+        compare(rows3[2].title, "Not git-managed")
+        var sick = installed({}, [{ pluginId: timerId, message: "Service.qml:3:1 Syntax error" }])[1]
+        var rows4 = ranked(Extensions.detailRows("", sick, {}), "")
+        compare(titles(rows4).slice(0, 3), ["Enabled", "Needs attention", "Settings"])
+        compare(rows4[1].subtitle, "Service.qml:3:1 Syntax error"); verify(rows4[1].disabled)
         compare(ranked(Extensions.detailRows("rem", e, {}), "rem")[0].title, "Remove")
     }
 

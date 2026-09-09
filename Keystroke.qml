@@ -161,7 +161,7 @@ Item {
   }
   function paletteValues() { return root.paletteSettings }
   function settingsFor(entry) { return Settings.values(root.config, ["providers", entry.key], entry.provider.settings || []) }
-  function providerEnabled(entry) { return Settings.isEnabled(root.config, ["providers", entry.key], entry.source === "bundled") }
+  function providerEnabled(entry) { return Settings.isEnabled(root.config, ["providers", entry.key], true) }
   function registryEntry(key) {
     for (var i = 0; i < providerRegistry.entries.length; i++) if (providerRegistry.entries[i].key === key) return providerRegistry.entries[i]
     return null
@@ -520,6 +520,7 @@ Item {
   function notifyOpened() {
     root.invalidateCatalog()
     providerRegistry.rebuild()
+    providerRegistry.scan()
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var p = providerRegistry.entries[i].provider
       if (typeof p.opened === "function") { try { p.opened() } catch (e) { console.warn("keystroke: provider opened() threw", e) } }
