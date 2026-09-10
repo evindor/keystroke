@@ -88,7 +88,7 @@ Third-party extensions live inside Keystroke itself, one folder each under [exte
 **Every extension is off until you turn it on.** Installing or updating Keystroke never runs code from `extensions/`: an extension that is off is not even compiled. Type `ext` and open **Extensions**:
 
 - The list shows every extension with its version and state. `↵` opens its screen; `Ctrl+↵` on a row that is on turns it off.
-- **Enabled** on an extension's screen asks for confirmation, states the folder whose code will run in your shell with your permissions, and then loads it at once. Turning it off destroys its service. One that failed to load shows **Needs attention** with the QML error.
+- **Enabled** on an extension's screen asks for confirmation: it says the extension was automatically checked and reviewed before it shipped, recommends reading its source first, and links to the exact folder on GitHub (`Ctrl+O` or a click opens it). Confirming loads it at once. Turning it off destroys its service. One that failed to load shows **Needs attention** with the QML error.
 - **Run setup** appears only for an extension that declares a setup script (a model to download, something to build). It opens a visible terminal and runs the script in front of you; nothing runs on its own.
 - **Settings** opens the extension's settings screen; **Open source** opens its folder on GitHub.
 - **Write your own** points at the guide. A folder in `~/.local/share/keystroke/extensions/` is picked up next time the palette opens, so you can use an extension you are writing before, or instead of, sending it upstream.

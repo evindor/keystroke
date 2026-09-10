@@ -1,5 +1,6 @@
 .pragma library
 .import "Match.js" as Match
+.import "Extensions.js" as Extensions
 
 // The settings screens as one flat, searchable tree. build() turns the
 // palette schema and the provider registry into nodes; rows() lists one
@@ -23,7 +24,7 @@ function settingAction(path, key, value, schema) { return { type: "setting", pat
 function node(parentScope, parts, fields) {
   var n = { parentScope: parentScope, parts: parts, path: parts.join(" › "), title: parts[parts.length - 1], subtitle: "", icon: GEAR, iconFont: "", iconSource: "",
             tint: "", section: "Settings", verb: "Open", order: 0, accessory: "", badge: "", keywords: "", description: "", disabled: false,
-            lift: 0, listScore: 1, listOnly: false, confirm: "", relative: ({}) }
+            lift: 0, listScore: 1, listOnly: false, confirm: "", confirmDetail: "", confirmLink: null, relative: ({}) }
   for (var k in fields) n[k] = fields[k]
   return n
 }
@@ -142,7 +143,9 @@ function build(model) {
     // Turning an extension on runs its code: that asks first, as the Extensions screen does.
     nodes.push(node(scope, parts.concat([enabledSchema.label]), { id: e.key + "/enabled", subtitle: enabledSchema.description, verb: "Toggle", order: -1, lift: 1,
       accessory: e.enabled ? "On" : "Off", keywords: "enabled", description: "enable disable toggle on off " + enabledSchema.description,
-      confirm: extension && !e.enabled ? "Turn on " + e.name + "? It runs the code in " + (e.dir || "its folder") + " inside your shell, with your permissions." : "",
+      confirm: extension && !e.enabled ? Extensions.enableConfirm(e) : "",
+      confirmDetail: extension && !e.enabled ? Extensions.enableDetail(e) : "",
+      confirmLink: extension && !e.enabled ? Extensions.sourceLink({ id: e.extensionId, dir: e.dir, local: e.local }) : null,
       action: settingAction(path, "enabled", !e.enabled, enabledSchema) }))
     if (extension)
       nodes.push(node(scope, parts.concat(["Manage extension"]), { id: e.key + "/provenance", subtitle: (e.loaded ? "Loaded from " : "Off · ") + (e.dir || e.extensionId),
@@ -174,7 +177,8 @@ function relativePath(n, depth) {
 
 function row(n, score, subtitle, section) {
   return { id: n.id, title: n.title, subtitle: subtitle, icon: n.icon, iconFont: n.iconFont, iconSource: n.iconSource || "", tint: n.tint, section: section, verb: n.verb, tier: "item",
-           score: score, order: n.order, accessory: n.accessory, badge: n.badge, disabled: n.disabled, confirm: n.confirm || "", action: n.action, previewDetail: n.path }
+           score: score, order: n.order, accessory: n.accessory, badge: n.badge, disabled: n.disabled, confirm: n.confirm || "", confirmDetail: n.confirmDetail || "",
+           confirmLink: n.confirmLink || null, action: n.action, previewDetail: n.path }
 }
 
 // Empty query: the screen at `scope`. Otherwise every node at or below it,

@@ -135,8 +135,16 @@ function iconOf(e) { return { icon: e.icon || ICON, iconFont: e.iconFont || "", 
 function enableEffect(id, value) {
   return { type: "setting", path: ["providers", id], key: "enabled", value: !!value, schema: { key: "enabled", type: "boolean" } }
 }
-function enableConfirm(e) {
-  return "Turn on " + e.name + "? It runs the code in " + e.dir + " inside your shell, with your permissions."
+// The question, what has been checked, and a link to the exact code that is
+// about to run: the shipped folder on GitHub, or the local folder itself.
+function enableConfirm(e) { return "Turn on " + e.name + "?" }
+function enableDetail(e) {
+  if (e.local) return "This is a local folder that nobody has reviewed. It will run inside your shell with your permissions; read its source first."
+  return "Automatically checked and reviewed before it shipped with Keystroke. It will run inside your shell with your permissions; reading its source first is recommended."
+}
+function sourceLink(e) {
+  if (e.local) return { label: e.dir, url: "file://" + e.dir }
+  return { label: "evindor/keystroke/extensions/" + e.id, url: SOURCE_URL + e.id }
 }
 
 // ------------------------------------------------------------------ setup
@@ -207,7 +215,7 @@ function detailRows(query, e) {
   var on = { id: e.id + "/enabled", title: "Enabled", subtitle: e.enabled ? "Answering queries" : "Off: its code is not loaded",
              icon: "", section: e.name, verb: "Toggle", tier: "item", order: 0, accessory: e.enabled ? "On" : "Off", keywords: "enable disable on off",
              action: enableEffect(e.id, !e.enabled) }
-  if (!e.enabled) on.confirm = enableConfirm(e)
+  if (!e.enabled) { on.confirm = enableConfirm(e); on.confirmDetail = enableDetail(e); on.confirmLink = sourceLink(e) }
   rows.push(on)
   if (e.problem)
     rows.push({ id: e.id + "/problem", title: "Needs attention", subtitle: e.problem, icon: "󰀦", section: e.name, verb: "", tier: "item", order: 1,

@@ -29,6 +29,14 @@
   by path, no symlinks, no manifest.json, README, qmllint, qmltestrunner.
   `.github/workflows/extensions.yml` runs it with `--qt auto` on pull
   requests; that job was not executed here (no CI run from a worktree).
+- The confirmation for turning an extension on is Keystroke's own
+  `ui/ConfirmSheet.qml` (the shell's dialog with a muted note and a
+  highlighted link): rendered offscreen with the Timer text, `handleKey` with
+  Ctrl+O emits `linkOpened` once and a plain O does not; the link opens
+  through `xdg-open` without dismissing the question. The Enabled rows on the
+  Extensions screen and under Settings carry `confirmDetail` and
+  `confirmLink` (unit-tested; the offscreen harness checks the local probe
+  links to its own folder).
 - Not exercised: the Run setup row against a real terminal (no shipped
   extension declares one; the argv is unit-tested), and the live palette
   (the patched plugin was not installed over the user's copy).
