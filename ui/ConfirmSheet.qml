@@ -3,25 +3,22 @@ import qs.Commons
 import qs.Ui
 
 // Keystroke's confirmation: the shell's ConfirmDialog (same look, same keys)
-// with two optional lines under the question, a note in the muted colour and
-// a highlighted link the user can click or open with Ctrl+O. Turning an
-// extension on uses both: the note says what was checked, the link opens the
-// exact folder whose code is about to run.
+// with an optional note in the muted colour under the question. Turning an
+// extension on uses it to say what was checked and that the code runs at the
+// user's own risk. No link: opening anything from here would move focus away
+// from the palette, and the palette cannot survive that.
 Item {
   id: root
 
   property bool opened: false
   property string message: ""
   property string detail: ""
-  property string linkLabel: ""
-  property string linkUrl: ""
   property string cancelText: "Cancel"
   property string confirmText: "Confirm"
   property int selectedIndex: 1
   property color background: Color.background
   property color foreground: Color.foreground
   property color muted: Util.alpha(Color.foreground, 0.6)
-  property color accent: Color.accent
   property color scrim: Util.alpha(Color.background, 0.7)
   property color selectedBackground: Util.alpha(Color.foreground, 0.08)
   property color selectedText: Color.accent
@@ -30,9 +27,6 @@ Item {
 
   signal canceled()
   signal confirmed()
-  signal linkOpened(string url)
-
-  readonly property bool hasLink: linkUrl.length > 0
 
   function handleKey(event) {
     if (!root.opened) return false
@@ -41,7 +35,6 @@ Item {
       root.selectedIndex = root.selectedIndex === 0 ? 1 : 0
       return true
     }
-    if (event.key === Qt.Key_O && (event.modifiers & Qt.ControlModifier) && root.hasLink) { root.linkOpened(root.linkUrl); return true }
     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       if (root.selectedIndex === 0) root.canceled()
       else root.confirmed()
@@ -102,37 +95,6 @@ Item {
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall
             wrapMode: Text.WordWrap
-          }
-          // The link: accent-coloured, underlined, a hand cursor, and a keycap for the keyboard.
-          Row {
-            visible: root.hasLink
-            width: parent.width
-            spacing: Style.space(8)
-            Text {
-              id: linkText
-              width: parent.width - hint.width - parent.spacing
-              textFormat: Text.PlainText
-              text: root.linkLabel || root.linkUrl
-              color: linkArea.containsMouse ? root.foreground : root.accent
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-              font.underline: true
-              wrapMode: Text.WrapAnywhere
-              MouseArea {
-                id: linkArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.linkOpened(root.linkUrl)
-              }
-            }
-            Row {
-              id: hint
-              spacing: Style.space(4)
-              anchors.verticalCenter: parent.verticalCenter
-              Keycap { label: "ctrl O"; foreground: root.foreground }
-              Text { text: "open"; textFormat: Text.PlainText; color: root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.caption; anchors.verticalCenter: parent.verticalCenter }
-            }
           }
         }
 

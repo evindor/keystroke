@@ -86,7 +86,7 @@ TestCase {
         var hello = SettingsTree.rows(t.nodes, "settings/hello", "")
         compare(hello[0].title, "Enabled")
         compare(hello[0].confirm, "Turn on Hello?")
-        compare(hello[0].confirmLink.url, "https://github.com/evindor/keystroke/tree/main/extensions/hello")
+        verify(hello[0].confirmDetail.indexOf("run it at your own risk") > 0)
         compare(hello[1].title, "Manage extension")
         compare(hello[1].action.type, "navigate")
         compare(hello[1].action.scope, "extensions/hello")

@@ -377,7 +377,7 @@ Item {
   property bool showLoading: false
   property string errorMessage: ""
   property string statusMessage: ""
-  property var confirmPending: null       // { message, detail, link: { label, url }, confirmText, run }
+  property var confirmPending: null       // { message, detail, confirmText, run }
   readonly property var current: rows.length && selected >= 0 && selected < rows.length ? rows[selected] : ({})
   readonly property bool compact: paletteSettings.density !== "comfortable"
   readonly property color accent: paletteSettings.accent === "ember" ? "#ee987e" : paletteSettings.accent === "violet" ? "#b5a0ef" : paletteSettings.accent === "mint" ? "#8bceb4" : Color.accent
@@ -786,7 +786,6 @@ Item {
     out.remember = row.remember === true
     out.confirm = String(row.confirm || "")
     out.confirmDetail = String(row.confirmDetail || "")
-    out.confirmLink = row.confirmLink && typeof row.confirmLink === "object" && row.confirmLink.url ? { label: String(row.confirmLink.label || ""), url: String(row.confirmLink.url) } : null
     if (q && !(base > 0)) return null
     return out
   }
@@ -971,7 +970,7 @@ Item {
     if (!effect) return
     root.flash(row.uid)
     var run = function() { root.remember(row); root.perform(effect, row) }
-    if (row.confirm) root.confirmPending = { message: row.confirm, detail: row.confirmDetail || "", link: row.confirmLink || null, confirmText: "Confirm", run: run }
+    if (row.confirm) root.confirmPending = { message: row.confirm, detail: row.confirmDetail || "", confirmText: "Confirm", run: run }
     else run()
   }
 
@@ -1160,8 +1159,7 @@ Item {
           mode: voice.phase
           level: voice.level
           history: voice.history
-          accent: root.accent
-          foreground: root.foreground
+            foreground: root.foreground
         }
         TextInput {
           id: search
@@ -1363,8 +1361,7 @@ Item {
           height: parent.height
           row: root.current
           compact: root.compact
-          accent: root.accent
-          foreground: root.foreground
+            foreground: root.foreground
         }
         Column {
           visible: root.rows.length === 0 && root.mode !== "input" && (!root.pending || root.showLoading)
@@ -1417,13 +1414,10 @@ Item {
         opened: root.confirmPending !== null
         message: root.confirmPending ? root.confirmPending.message : ""
         detail: root.confirmPending && root.confirmPending.detail ? root.confirmPending.detail : ""
-        linkLabel: root.confirmPending && root.confirmPending.link ? root.confirmPending.link.label : ""
-        linkUrl: root.confirmPending && root.confirmPending.link ? root.confirmPending.link.url : ""
         confirmText: root.confirmPending ? root.confirmPending.confirmText : "Confirm"
         background: root.background
         foreground: root.foreground
         muted: root.muted
-        accent: root.accent
         scrim: root.scrim
         selectedBackground: root.selectedBackground
         selectedText: root.selectedText
@@ -1431,8 +1425,6 @@ Item {
         cornerRadius: Style.cornerRadius
         onCanceled: { root.confirmPending = null; Qt.callLater(function() { search.forceActiveFocus() }) }
         onConfirmed: { var run = root.confirmPending ? root.confirmPending.run : null; root.confirmPending = null; if (run) run() }
-        // The source opens next to the palette; the question stays up for when the user comes back.
-        onLinkOpened: function(url) { Util.execArgv(["xdg-open", String(url)]) }
       }
     }
   }

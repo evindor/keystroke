@@ -151,7 +151,7 @@ ShellRoot {
    case 8:
      if (palette.pending || !palette.rows.length) return
      test.check(row("Enabled") && row("Enabled").accessory === "Off" && row("Enabled").confirm === "Turn on Probe?", "turning on asks first: " + (row("Enabled") && row("Enabled").confirm))
-     test.check(row("Enabled") && row("Enabled").confirmDetail.indexOf("local folder") > 0 && row("Enabled").confirmLink.url.indexOf("file://") === 0 && row("Enabled").confirmLink.url.indexOf("/probe") > 0, "the confirmation links to the folder: " + JSON.stringify(row("Enabled") && row("Enabled").confirmLink))
+     test.check(row("Enabled") && row("Enabled").confirmDetail.indexOf("local folder in ") > 0 && row("Enabled").confirmDetail.indexOf("/probe") > 0, "the confirmation names the folder: " + (row("Enabled") && row("Enabled").confirmDetail))
      palette.cancel()
      console.log(test.failures ? "FAIL palette extensions" : "PASS palette extensions")
      Qt.quit(); test.stage = 9; return

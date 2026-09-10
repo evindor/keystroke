@@ -23,7 +23,7 @@ The reference extension is [extensions/timer](../extensions/timer/); the step-by
 
 ## Extensions screen
 
-`providers/Extensions.qml` (logic in `core/Extensions.js`) lists every extension found by the registry with Keystroke's switch. Turning one on goes through a confirmation that says the extension was checked and reviewed before it shipped (or that a local folder was not), recommends reading its source first, and links to the exact folder: the shipped one on GitHub, or the local folder itself. The same confirmation guards the **Enabled** row under Keystroke Settings. `Ctrl+↵` on a list row that is on turns it off. An extension that declares `setup` gets a **Run setup** row: after a confirmation, the palette closes and `omarchy-launch-floating-terminal-with-presentation` runs the script in a visible terminal from the extension's folder (`setupArgv`); the script's exit status is shown there. Keystroke does not track whether setup has happened; the provider checks for what it needs and says so in its rows. The screen never touches the network: extensions arrive with Keystroke's own updates. `tests/palette_extensions_check.py` drives the real palette offscreen through the whole lifecycle.
+`providers/Extensions.qml` (logic in `core/Extensions.js`) lists every extension found by the registry with Keystroke's switch. Turning one on goes through a confirmation that says the extension was checked and reviewed before it shipped (or that a local folder was not), that it nonetheless runs at the user's own risk, and that checking its code first is recommended; **Open source** on the same screen is where to do that. The same confirmation guards the **Enabled** row under Keystroke Settings. `Ctrl+↵` on a list row that is on turns it off. An extension that declares `setup` gets a **Run setup** row: after a confirmation, the palette closes and `omarchy-launch-floating-terminal-with-presentation` runs the script in a visible terminal from the extension's folder (`setupArgv`); the script's exit status is shown there. Keystroke does not track whether setup has happened; the provider checks for what it needs and says so in its rows. The screen never touches the network: extensions arrive with Keystroke's own updates. `tests/palette_extensions_check.py` drives the real palette offscreen through the whole lifecycle.
 
 ## Provider object
 
@@ -79,14 +79,14 @@ Return quickly. `query` runs on the UI thread for every keystroke; anything that
 { id: "stable-id", title: "…", subtitle: "", icon: "󰀻", iconFont: "", iconSource: "file:///…",
   tint: "#hex", section: "Thing", verb: "Open", tier: "item",  // "answer" | "item" | "fallback"
   score: 100, order: 0, keywords: "ids aliases", path: "Parent › Child › …", description: "prose", accessory: "✓", hint: "↵ copies",
-  disabled: false, remember: false, confirm: "Really?", confirmDetail: "one muted line under the question", confirmLink: { label: "…", url: "https://…" },
+  disabled: false, remember: false, confirm: "Really?", confirmDetail: "one muted line under the question",
   preview: "text", previewLabel: "RESULT", previewDetail: "…", previewImage: "/path.png", swatch: "#hex",
   action: effect, altAction: effect }
 ```
 
 Legacy `catalog(ctx)` fields are ignored; the local model command classifier has been removed.
 
-`confirm` asks before the effect runs; the optional `confirmDetail` is a muted line under the question and `confirmLink` a highlighted link the user can click or open with `Ctrl+O` without dismissing the question (an `https://` or `file://` URL, opened with `xdg-open`). Turning an extension on uses both to say what was checked and to point at the exact folder whose code is about to run.
+`confirm` asks before the effect runs; the optional `confirmDetail` is a muted line under the question. Turning an extension on uses it to say what was checked and that the code runs at the user's own risk. A confirmation never carries a link: opening anything would move focus away from the palette.
 
 `altAction` is optional and runs on `Ctrl+↵` (a row without one runs `action` again). Say what it does in `hint` ("ctrl ↵ terminal"). A provider's `activate(row, ctx)` receives `ctx.alternate === true` for that key so it can compute the effect itself.
 
