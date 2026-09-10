@@ -4,8 +4,11 @@ Keystroke is one Omarchy `menu` plugin. Everything runs in `omarchy-shell`'s QML
 
 ```text
 omarchy-shell
+  ├─ BarWidget.qml (bar-widget entry point: the menu button, then the palette's bar items,
+  │                 read off the keepLoaded Keystroke instance through shell.panelLoaders)
   └─ Keystroke.qml (menu entry point, keepLoaded)
-       ├─ window, keys, navigation stack, dmenu protocol, effects, config, frecency
+       ├─ window, keys, navigation stack, dmenu protocol, effects, config, frecency,
+       │  bar items (host.setBarItem: one { text, tooltip, payload } per enabled provider)
        ├─ providers/Registry.qml
        │    ├─ bundled: OmarchyMenu, Applications, Calculator, Converter, Colors,
        │    │           Emoji, Clipboard, Files, Hotkeys, Codex, AiWeb, Extensions, SettingsProvider

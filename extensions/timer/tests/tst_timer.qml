@@ -71,4 +71,39 @@ TestCase {
         compare(hint[0].title, "No timers running")
         verify(hint[0].disabled)
     }
+
+    function test_sound() {
+        compare(TimerModel.soundPath({ sound: "off" }, "/home/u"), "")
+        compare(TimerModel.soundPath({ sound: "off", soundFile: "/x.wav" }, "/home/u"), "")   // off is silent even with a custom file
+        compare(TimerModel.soundPath({ sound: "alarm" }, "/home/u"), "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga")
+        compare(TimerModel.soundPath({ sound: "chime" }, "/home/u"), "/usr/share/sounds/freedesktop/stereo/complete.oga")
+        compare(TimerModel.soundPath({ sound: "bell" }, "/home/u"), "/usr/share/sounds/freedesktop/stereo/bell.oga")
+        compare(TimerModel.soundPath({ sound: "bell", soundFile: " ~/ding.wav " }, "/home/u"), "/home/u/ding.wav")
+        compare(TimerModel.soundPath({ sound: "nonsense" }, "/home/u"), "")
+        compare(TimerModel.soundPath({}, "/home/u"), "")
+        compare(TimerModel.soundArgv({ sound: "off" }, "/home/u"), null)
+        var argv = TimerModel.soundArgv({ sound: "alarm", soundFile: "/tmp/it's $(x).wav" }, "/home/u")
+        compare(argv.length, 5)
+        compare(argv.slice(0, 2), ["bash", "-c"])
+        compare(argv[4], "/tmp/it's $(x).wav")   // the path is a positional parameter, never part of the script
+        verify(argv[2].indexOf('[ -f "$f" ] || exit 0') > 0)
+        verify(argv[2].indexOf("pw-play -- \"$f\"") > 0)
+    }
+
+    function test_bar_item() {
+        var key = "timer"
+        compare(TimerModel.barItem([], now, key), null)
+        var tea = TimerModel.make(600, "tea", now - 60000)
+        var one = TimerModel.barItem([tea], now, key)
+        compare(one.text, "󰔛 9:00")
+        compare(one.tooltip, "tea · 10 min · ends at 14:09")
+        compare(one.payload, { scope: key, title: "Timers" })
+        var bread = TimerModel.make(3600, "", now - 1000)
+        var eggs = TimerModel.make(300, "eggs", now)
+        var three = TimerModel.barItem([tea, bread, eggs], now, key)
+        compare(three.text, "󰔛 5:00 +2")   // the soonest counts down; the others are a count
+        compare(three.tooltip, "eggs · 5 min · ends at 14:05 · 2 more running")
+        compare(TimerModel.barItem([bread], now, key).text, "󰔛 59:59")
+        compare(TimerModel.barItem([bread], now, key).tooltip, "Timer · 1 h · ends at 14:59")
+    }
 }

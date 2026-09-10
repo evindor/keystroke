@@ -96,7 +96,11 @@ Legacy `catalog(ctx)` fields are ignored; the local model command classifier has
 
 `{type:"navigate", scope, title}` · `{type:"exec", argv}` (literal argv, login-shell env) · `{type:"shell", command}` (trusted strings only) · `{type:"copy", text}` · `{type:"url", url}` · `{type:"app", id, name}` (launch via AppLibrary) · `{type:"notify", glyph, headline, body}` · `{type:"setting", path, key, value, schema}` · `{type:"compound", actions}` · `{type:"close"}` (dismiss the palette, nothing else) · `{type:"noop"}` (stay open; pair it with `host.requery()` when your rows changed). The host closes the palette before anything that launches.
 
-A provider's own `activate(row, ctx)` may perform work itself (start a process, mutate its state) and return one of the effects above; private action types are fine as long as `activate` translates them (see `providers/Extensions.qml`). `ctx.host` is the palette: `host.requery()`, `host.statusMessage = "…"`, `host.errorMessage = "…"`, `host.opened`, `host.scope`, `host.config`, `host.registry` (the provider registry: `entries`, `manifests`, `problems`, `scan()`).
+A provider's own `activate(row, ctx)` may perform work itself (start a process, mutate its state) and return one of the effects above; private action types are fine as long as `activate` translates them (see `providers/Extensions.qml`). `ctx.host` is the palette: `host.requery()`, `host.statusMessage = "…"`, `host.errorMessage = "…"`, `host.opened`, `host.scope`, `host.config`, `host.registry` (the provider registry: `entries`, `manifests`, `problems`, `scan()`), `host.providerSettings(id)` (the validated values of one provider's settings, for a service that keeps state between queries; `host.configChanged` fires on every save), `host.setBarItem(id, item)` (below).
+
+### Bar items
+
+A provider with something to show next to the menu button in the bar calls `host.setBarItem(id, { text, tooltip, payload })` with its own key as `id`, and `host.setBarItem(id, null)` to clear it. `text` (up to 40 characters, glyphs from the bar's font are fine) is drawn as a bar button after the menu button by Keystroke's own `BarWidget.qml`; `tooltip` shows on hover; `payload` is what the palette is opened with when the item is pressed (`{ scope: extension.id, title: "Timers" }` opens your screen; `{ query: "…" }` types a query; without one the press toggles the menu). One item per provider: a second call replaces the first, an equal one is ignored. The palette keeps items only for loaded, enabled providers, so an extension's item disappears when it is turned off; clear yours in `Component.onDestruction` all the same. Update the text from your own clock (the Timer extension's once-a-second tick), never per query, and bear in mind the space is shared with every other widget the user put in the bar. Old hosts have no `setBarItem`: guard the call with `typeof host.setBarItem === "function"`.
 
 ## Scopes and settings
 
@@ -104,7 +108,7 @@ Navigating into a provider gives it scope `<key>`; deeper scopes are `<key>/<sub
 
 ## Stability
 
-API 1 is frozen once a second extension ships against it. Changes that add optional fields keep the version; anything else bumps `apiVersion`, and Keystroke keeps loading the previous version for one Omarchy release. Added as optional fields in September 2026, with [keystroke-calpad](https://github.com/evindor/keystroke-calpad) as the second extension: `patterns`, `iconSource` and `ctx.patterns`, and the documented host surface for provider views. A provider that uses `ctx.patterns` should treat it as absent on older hosts (`ctx.patterns && ctx.patterns.matched.length`).
+API 1 is frozen once a second extension ships against it. Changes that add optional fields keep the version; anything else bumps `apiVersion`, and Keystroke keeps loading the previous version for one Omarchy release. Added as optional fields in September 2026, with [keystroke-calpad](https://github.com/evindor/keystroke-calpad) as the second extension: `patterns`, `iconSource` and `ctx.patterns`, and the documented host surface for provider views; later that month `host.setBarItem` and `host.providerSettings`, for the Timer extension's countdown in the bar. A provider that uses `ctx.patterns` should treat it as absent on older hosts (`ctx.patterns && ctx.patterns.matched.length`).
 
 ## Optional provider views (API 1)
 

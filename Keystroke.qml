@@ -105,9 +105,9 @@ Item {
   }
   Connections {
     target: providerRegistry
-    function onEntriesChanged() { root.invalidateCatalog(); root.dropOrphanedView() }
+    function onEntriesChanged() { root.invalidateCatalog(); root.dropOrphanedView(); root.pruneBarItems() }
   }
-  onConfigChanged: { root.invalidateCatalog(); root.dropOrphanedView() }
+  onConfigChanged: { root.invalidateCatalog(); root.dropOrphanedView(); root.pruneBarItems() }
 
   // -------------------------------------------------------------- settings
   property var config: Settings.empty()
@@ -478,6 +478,52 @@ Item {
   readonly property var registry: providerRegistry
   ListModel { id: resultModel }
   PointerMoveGate { id: pointerGate; referenceItem: card }
+
+  // ------------------------------------------------------------- bar items
+  // A provider with something to show next to the menu button in the bar
+  // (the Timer extension's countdown) calls host.setBarItem(id, item) with
+  // { text, tooltip, payload } and clears it with null; BarWidget.qml reads
+  // barList from the running palette. An item belongs to a loaded, enabled
+  // provider: the rest are dropped whenever the registry or the config
+  // changes, so nothing lingers after an extension is turned off.
+  property var barItems: ({})
+  readonly property var barList: {
+    var ids = Object.keys(root.barItems).sort(), out = []
+    for (var i = 0; i < ids.length; i++) out.push(root.barItems[ids[i]])
+    return out
+  }
+  function setBarItem(id, item) {
+    var key = String(id || ""), current = root.barItems[key]
+    if (!key) return
+    var entry = root.registryEntry(key)
+    var next = null
+    if (item && typeof item === "object" && entry && root.providerEnabled(entry)) {
+      var payload = item.payload && typeof item.payload === "object" ? JSON.parse(JSON.stringify(item.payload)) : null
+      next = { id: key, text: String(item.text || "").slice(0, 40), tooltip: String(item.tooltip || "").slice(0, 200), payload: payload }
+      if (!next.text) next = null
+    }
+    if (!next && current === undefined) return
+    if (next && current && JSON.stringify(next) === JSON.stringify(current)) return
+    var items = ({})
+    for (var k in root.barItems) if (k !== key) items[k] = root.barItems[k]
+    if (next) items[key] = next
+    root.barItems = items
+  }
+  function pruneBarItems() {
+    var items = ({}), changed = false
+    for (var k in root.barItems) {
+      var entry = root.registryEntry(k)
+      if (entry && root.providerEnabled(entry)) items[k] = root.barItems[k]; else changed = true
+    }
+    if (changed) root.barItems = items
+  }
+  // Validated values of one provider's settings, for a service that keeps
+  // state between queries and needs the current values when they change
+  // (host.configChanged fires on every save).
+  function providerSettings(id) {
+    var entry = root.registryEntry(String(id || ""))
+    return entry ? root.settingsFor(entry) : ({})
+  }
 
   // ---------------------------------------------------------------- opening
   function resetSelection() {
@@ -1046,7 +1092,7 @@ Item {
     return JSON.stringify({ opened: root.opened, mode: root.mode, view: root.activeProviderKey, scope: root.scope, query: search.text, count: root.rows.length,
       titles: root.rows.map(function(r) { return r.title }), selected: root.selected, pending: root.pending, patterns: root.lastPatterns,
       current: { uid: root.current.uid || "", icon: root.current.icon || "", iconSource: root.current.iconSource || "", badge: root.current.badge || "", tier: root.current.tier || "" },
-      modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems,
+      modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems, bar: root.barList,
       applications: { library: !!root.appLibrary, entries: appEntries.length },
       matching: { mode: root.matchingSettings.mode, model: root.matchingSettings.model, loaded: matchingSession.loaded, status: matchingSession.status, error: matchingSession.error },
       error: root.errorMessage, configError: root.configError, status: root.statusMessage,

@@ -1,5 +1,45 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Timer sound and a countdown in the bar (2026-09-10)
+
+- Host API, optional under API 1: `host.setBarItem(id, { text, tooltip,
+  payload })` keeps one item per loaded, enabled provider on
+  `Keystroke.barItems`/`barList` (pruned on every registry and config
+  change, so nothing outlives an extension that is turned off);
+  `host.providerSettings(id)` returns a provider's validated settings for a
+  service that needs them outside a query. `BarWidget.qml` finds the
+  keepLoaded palette through `shell.panelLoaders[moduleName].item`, binds
+  its `barList`, and draws each item as a `WidgetButton` after the menu
+  button; a press summons `omarchy.menu` with the item's payload. Text
+  items are hidden on a vertical bar, like Omarchy's own.
+- Timer 1.2.0: settings `sound` (off/chime/bell/alarm, default alarm, the
+  freedesktop sound theme that libcanberra brings in), `soundFile` (custom
+  path, `~` expanded) and `showInBar` (default on). The sound argv is
+  `bash -c '<script>' keystroke-timer-sound <path>`: the file is checked and
+  `pw-play`, then `mpv`, then `paplay` is used, with the path only ever in
+  `$1`. `sndfile-info` confirms libsndfile decodes the `.oga` files, so
+  `pw-play` plays them. The service publishes the soonest countdown on start,
+  cancel, every tick and every config change (a `Connections` on
+  `host.configChanged`), and clears it on destruction.
+- `tests/palette_extensions_check.py` (real `Keystroke.qml` and the real
+  `BarWidget.qml` against a fake bar, offscreen): the bar list is empty
+  before a start; activating `timer 10m tea` through the service puts
+  `󰔛 10:00` with the Timers payload and a tooltip on it at once; the widget
+  shows it after the menu glyph; pressing it runs `omarchy-shell shell
+  summon omarchy.menu '{"scope":"timer","title":"Timers"}'`; items from
+  other enabled providers are accepted, empty text and unknown providers
+  are not; the item survives another extension turning off and goes when
+  the timer is turned off. The timer is started through the service's own
+  `activate`, not the palette's, so no desktop notification is sent.
+- `extensions/timer/tests/tst_timer.qml` (+2 tests): sound paths and argv
+  (off is silent even with a custom file, a path with quotes and `$(…)`
+  stays a positional parameter) and the bar item (soonest timer first,
+  `+n` for the rest, tooltip, payload).
+- Ran: `bin/keystroke check-extensions` (ok), `tests/lint.sh` (no new
+  warnings beyond the pre-existing QObject member ones), the 148 QML tests,
+  `tests/palette_extensions_check.py` (PASS). Not driven on the live
+  desktop; the sound was not played.
+
 ## Extensions ship inside Keystroke (2026-09-10)
 
 - Extensions moved from separate Omarchy plugins (git-installed into

@@ -138,3 +138,51 @@ function navRow(timers, score, scopeKey) {
            verb: "Open", tier: "item", score: score, order: 40, keywords: "timer countdown", description: "timer countdown alarm remind",
            accessory: timers.length ? String(timers.length) : "", action: { type: "navigate", scope: scopeKey, title: "Timers" } }
 }
+
+// ------------------------------------------------------------------ sound
+// The built-in choices are the freedesktop sound theme, which Omarchy has
+// through libcanberra; a custom file replaces the chosen one. The script
+// checks the file and the player itself, so a missing sound is silent
+// rather than an error, and the path only ever lands in "$1".
+var SOUND_DIR = "/usr/share/sounds/freedesktop/stereo/"
+var SOUNDS = { chime: SOUND_DIR + "complete.oga", bell: SOUND_DIR + "bell.oga", alarm: SOUND_DIR + "alarm-clock-elapsed.oga" }
+var SOUND_SCRIPT = 'f="$1"; [ -f "$f" ] || exit 0; ' +
+  'if command -v pw-play >/dev/null 2>&1; then exec pw-play -- "$f"; fi; ' +
+  'if command -v mpv >/dev/null 2>&1; then exec mpv --really-quiet --no-video -- "$f"; fi; ' +
+  'command -v paplay >/dev/null 2>&1 && exec paplay -- "$f"'
+
+// The file to play when a timer ends, or "" for silence. A custom path may
+// start with ~, which the shell would not expand inside "$1".
+function soundPath(settings, home) {
+  var s = settings || {}, choice = String(s.sound || "off")
+  if (choice === "off") return ""
+  var custom = String(s.soundFile || "").trim()
+  if (custom) return custom.charAt(0) === "~" ? String(home || "") + custom.slice(1) : custom
+  return SOUNDS[choice] || ""
+}
+
+// argv that plays the sound, or null when there is nothing to play.
+function soundArgv(settings, home) {
+  var path = soundPath(settings, home)
+  return path ? ["bash", "-c", SOUND_SCRIPT, "keystroke-timer-sound", path] : null
+}
+
+// -------------------------------------------------------------------- bar
+// The soonest timer, counting down next to the menu button, with the number
+// of others behind it; null when nothing is running. The payload opens the
+// palette on the Timers screen when the item is clicked.
+function soonest(timers) {
+  var best = null
+  for (var i = 0; i < timers.length; i++) if (!best || timers[i].endsAt < best.endsAt) best = timers[i]
+  return best
+}
+
+function barItem(timers, now, scopeKey) {
+  var t = soonest(timers || [])
+  if (!t) return null
+  var others = timers.length - 1
+  var text = "󰔛 " + countdown(remaining(t, now)) + (others ? " +" + others : "")
+  var tooltip = (t.label || "Timer") + " · " + describe(t.seconds) + " · ends at " + endsAt(t.startedAt, t.seconds)
+  if (others) tooltip += " · " + others + " more running"
+  return { text: text, tooltip: tooltip, payload: { scope: scopeKey, title: "Timers" } }
+}

@@ -1,8 +1,8 @@
 {
   "name": "Timer",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "Arseniy Zarechnev",
-  "description": "Countdown timers with a notification when they end: timer 10m tea",
+  "description": "Countdown timers with a sound, a notification and a countdown in the bar: timer 10m tea",
   "apiVersion": 1,
   "icon": "󰔛",
   "color": "#e5c07b",
