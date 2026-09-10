@@ -1,6 +1,6 @@
 # Timer
 
-Countdown timers for the [Keystroke](../../README.md) command palette. Type `timer 10m tea`, press Enter, and the countdown shows next to the menu button in the bar until an alarm sounds and a notification tells you the tea is ready. Timers keep running after the palette closes because the extension's service object outlives the window.
+Countdown timers for the [Keystroke](../../README.md) command palette. Type `timer 10m tea`, press Enter, and the countdown shows next to the menu button in the bar until a chime sounds and a notification tells you the tea is ready. Timers keep running after the palette closes because the extension's service object outlives the window.
 
 This is also the reference extension: small enough to read in one sitting, complete enough to copy. It shows a provider with settings, answer and list rows, a scoped screen, confirmations, state that outlives the palette, a bar item and unit tests. To write your own, copy this folder and follow [Build an extension](../../CONTRIBUTING.md#build-an-extension).
 
@@ -19,14 +19,14 @@ Extensions ship with Keystroke switched off. Type `ext`, open **Extensions → T
 | `10 min tea` · `45s` | works without the prefix when a unit is present, ranked as an ordinary item |
 | `countdown …` · `remind me in …` | aliases for `timer` |
 
-Enter starts the timer and closes the palette. From that moment the soonest timer counts down in the bar, right after the Keystroke menu button (`󰔛 9:59`, with `+1` when another is running behind it); hovering shows its label and end time, and pressing it opens the Timers screen. **Timers** at the palette root (or the running timer rows themselves) opens the same list: each row shows the remaining time and Enter cancels it after a confirmation. When a timer ends the alarm sounds and you get an Omarchy notification.
+Enter starts the timer and closes the palette. From that moment the soonest timer counts down in the bar, right after the Keystroke menu button (`󰔛 9:59`, with `+1` when another is running behind it); hovering shows its label and end time, and pressing it opens the Timers screen. **Timers** at the palette root (or the running timer rows themselves) opens the same list: each row shows the remaining time and Enter cancels it after a confirmation. When a timer ends the chime sounds and you get an Omarchy notification.
 
 ## Settings
 
 Keystroke Settings → Timer:
 
 - **Default length (minutes)**: used when no duration is given. Default 5.
-- **Sound when a timer ends**: Off, Chime, Bell or Alarm (default). The three sounds are the freedesktop sound theme in `/usr/share/sounds/freedesktop/stereo`, which Omarchy has through libcanberra.
+- **Sound when a timer ends**: Off, Chime (default), Bell or Alarm. The three sounds are the freedesktop sound theme in `/usr/share/sounds/freedesktop/stereo`, which Omarchy has through libcanberra.
 - **Custom sound file**: a path to any audio file (`~` is expanded), played instead of the built-in sound while the sound is not Off.
 - **Notify when a timer ends**: on by default.
 - **Show the countdown in the bar**: on by default. Off keeps the bar as it was; the Timers screen still shows the countdowns.

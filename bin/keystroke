@@ -50,7 +50,7 @@ case "${1:-help}" in
       if omarchy-plugin-list --json | jq -e --arg id "$ID" 'any(.[]; .id == $id)' >/dev/null; then break; fi
       sleep 0.05
     done
-    omarchy plugin enable "$ID"
+    omarchy plugin enable "$ID" left --index 0
     echo "Keystroke is now the Omarchy menu. Super+Space and every omarchy-menu caller route to it."
     ;;
   uninstall)
@@ -59,7 +59,7 @@ case "${1:-help}" in
     omarchy-shell shell rescanPlugins >/dev/null
     echo "Removed $TARGET; the stock Omarchy menu is active again."
     ;;
-  enable) omarchy plugin enable "$ID" ;;
+  enable) omarchy plugin enable "$ID" left --index 0 ;;
   disable) omarchy plugin disable "$ID" ;;
   dictate) exec omarchy-shell shell summon omarchy.menu '{"scope":"dictation","title":"Dictate to Clipboard","dictate":true}' ;;
   toggle) exec omarchy-shell shell toggle omarchy.menu '{"menu":"root"}' ;;

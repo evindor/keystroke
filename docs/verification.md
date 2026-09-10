@@ -51,7 +51,15 @@
   its `barList`, and draws each item as a `WidgetButton` after the menu
   button; a press summons `omarchy.menu` with the item's payload. Text
   items are hidden on a vertical bar, like Omarchy's own.
-- Timer 1.2.0: settings `sound` (off/chime/bell/alarm, default alarm, the
+- `bin/keystroke install` and `enable` now run `omarchy plugin enable
+  evindor.keystroke left --index 0`. Omarchy's registry replaces the stock
+  menu button in place when it is in the bar and leaves Keystroke where it
+  is when it already sits there; the placement only matters for a fresh
+  insert, which without it landed after `omarchy.workspaces` (the
+  registry's left-section anchor) instead of first. `omarchy plugin add
+  --enable` asks for a section only, so the README names `omarchy bar move`
+  for that path.
+- Timer 1.2.0: settings `sound` (off/chime/bell/alarm, default chime, the
   freedesktop sound theme that libcanberra brings in), `soundFile` (custom
   path, `~` expanded) and `showInBar` (default on). The sound argv is
   `bash -c '<script>' keystroke-timer-sound <path>`: the file is checked and

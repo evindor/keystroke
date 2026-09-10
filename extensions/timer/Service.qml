@@ -21,7 +21,7 @@ QtObject {
   readonly property string home: Quickshell.env("HOME")
   property var host: null            // the palette, captured from ctx on each query and activation
   property var timers: []
-  property var settings: ({ defaultMinutes: 5, notify: true, sound: "alarm", soundFile: "", showInBar: true })
+  property var settings: ({ defaultMinutes: 5, notify: true, sound: "chime", soundFile: "", showInBar: true })
   property double now: Date.now()
   readonly property string key: extension && extension.id ? String(extension.id) : "timer"
 
@@ -35,7 +35,7 @@ QtObject {
     settings: [
       { key: "defaultMinutes", type: "number", label: "Default length (minutes)", "default": 5, min: 1, max: 720, integer: true,
         description: "Used by `timer tea` when no duration is given" },
-      { key: "sound", type: "enum", label: "Sound when a timer ends", "default": "alarm", options: ["off", "chime", "bell", "alarm"],
+      { key: "sound", type: "enum", label: "Sound when a timer ends", "default": "chime", options: ["off", "chime", "bell", "alarm"],
         optionLabels: { off: "Off", chime: "Chime", bell: "Bell", alarm: "Alarm" },
         description: "Chime, Bell and Alarm are the freedesktop sounds in /usr/share/sounds; Custom sound file replaces the chosen one" },
       { key: "soundFile", type: "string", label: "Custom sound file", "default": "",
