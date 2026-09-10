@@ -1,5 +1,57 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.4.0 (2026-09-11)
+
+- Release tree: 1.3.0 plus the in-repo extensions, the Translate extension,
+  the Timer sound and bar countdown, the bar widget sizing fix, declared
+  commands with Tab as a space, the route fallback, and this release's own
+  additions: the **Learn Keystroke** row (`core/SettingsTree.js`, a `url`
+  effect to the guide; `tst_settingstree.qml` covers it from the root, from
+  Settings and by the words learn, guide and help), the usage guide
+  (`site/guide/index.html`) and the offscreen screenshot harness.
+- `tools/showcase/offscreen.py` renders the real `Keystroke.qml` under
+  Quickshell's offscreen platform at `QT_SCALE_FACTOR=4` (a 640x540 card
+  grabbed as the 2560x2160 PNG `site/check.py` expects) in a fake HOME
+  holding demo files, a demo clipboard history, `keystroke.json` with Timer
+  and Translate on, and a symlink to `~/.local/state/omarchy/current` so the
+  captures wear the desktop's current theme; a fake `curl` answers Translate
+  from a table, `wl-paste` finds no selection, and a fake `OMARCHY_PATH`
+  whose `omarchy-menu-keybindings` prints twelve demo binds in the script's
+  record format feeds the Hotkeys provider. 32 scenes drive the real palette
+  (queries, scopes, `activateAt` for the confirmations and the Translate
+  editor, `ctrlHeld` for the numbered rows, the Timer service's own
+  `activate` for the running countdowns) and three staged states (apps,
+  Codex, voice) come from the `prepare.py` fixture palette, which gained a
+  `KEYSTROKE_SHOWCASE_DEST`/`HOME` override and an `approvalDetail` stub
+  the conversation view now calls. The Timer countdown in the bar is the
+  real `BarWidget.qml` against the fake bar from
+  `palette_extensions_check.py`, saved as `bar-timer.png` (the preflight
+  accepts `bar-*` strips at any wide size). All 35 PNGs were looked at on
+  contact sheets; the settings screen shows the config path under `~`
+  through a harness-only patch of the copied `SettingsTree.js`.
+- Seen while capturing, not changed: with Translate on, `5 miles in km`
+  also offers a translation into Khmer, because `km` is a language code and
+  the natural `… in <language>` form matches; the Converter answer still
+  ranks first. Two-letter unit symbols that are also language codes are a
+  Translate follow-up. The guide uses `5 miles in kilometers`.
+- `python3 site/check.py` walks both pages, resolves `guide/` and `../` to
+  their index pages and checks anchors across pages: PASS, 2 pages, 199
+  references, 35 screenshots. `node --check site/script.js` passes; the
+  lightbox now reads the clicked image's own path so it works from
+  `guide/`. Both pages were rendered headless in Chromium at 1400 px and
+  looked at. `.github/workflows/pages.yml` copies `site/guide` too.
+- Full offscreen `bin/keystroke test` on the release tree: 162 QML tests,
+  the application, file, catalog, matching session, palette matching,
+  shortcut, route, motion, dictation, extensions and commands checks, the
+  matching worker and engine checks, voice, clipboard, Codex, 48 time-zone
+  cases, the extension review checks for Timer and Translate, the hotkey
+  check and qmllint (the existing metadata warnings only) all pass.
+  `omarchy plugin validate` passes.
+- Not exercised: the release plugin on the live desktop (per practice,
+  offscreen only; the user checks the installed palette), the `Learn
+  Keystroke` row opening a real browser, the GitHub Pages deployment (it
+  runs on the push to `main`).
+
 ## Timer 1.2.1: the Bell sound is called Drop (2026-09-10)
 
 - The `sound` option `bell` is renamed `drop` (label Drop), still the
