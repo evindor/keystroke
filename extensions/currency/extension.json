@@ -1,0 +1,11 @@
+{
+  "name": "Currency",
+  "version": "1.0.0",
+  "author": "Gunhan Selas",
+  "description": "Currency conversion with daily rates from Frankfurter: 100 usd to eur, $100 in try, 129usd",
+  "apiVersion": 1,
+  "icon": "󰄔",
+  "color": "#81c8b6",
+  "license": "MIT",
+  "homepage": "https://github.com/gunhanselas/keystroke-currency"
+}
