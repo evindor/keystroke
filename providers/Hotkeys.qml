@@ -31,6 +31,7 @@ Item {
         description: "Binds Omarchy cannot run from a menu (Lua closures such as Close window) still appear, greyed, so the keys can be learned." }
     ],
     query: function(ctx) { return root.query(ctx) },
+    catalog: function(ctx) { return root.catalog(ctx) },
     activate: function(row, ctx) { return root.activate(row) },
     opened: function() { root.refresh(false) }
   })
@@ -56,13 +57,26 @@ Item {
     onExited: {
       root.loaded = true
       root.loadedAt = Date.now()
-      if (root.host) root.host.requery()
+      if (root.host) root.host.requery({ provider: root.provider.id })
     }
   }
 
   function activate(row) {
     if (!row.action || row.action.type !== "hotkey") return row.action
     return { type: "exec", argv: Hotkeys.dispatchArgv(root.omarchyPath, row.action.dispatcher, row.action.arg) }
+  }
+
+  function catalog(ctx) {
+    var rows = []
+    for (var i = 0; i < root.binds.length; i++) {
+      var bind = root.binds[i]
+      if (!Hotkeys.runnable(bind)) continue
+      var row = Hotkeys.row(bind, 1)
+      row.keywords = Hotkeys.keywords(bind)
+      row.descriptionKey = bind.dispatcher + "\u001f" + bind.arg
+      rows.push(row)
+    }
+    return rows
   }
 
   function query(ctx) {

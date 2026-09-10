@@ -12,7 +12,7 @@ Item {
 
   onLibraryChanged: {
     root.searchCache = ({})
-    if (root.host) root.host.requery()
+    if (root.host) root.host.requery({ provider: root.provider.id })
   }
 
   readonly property var provider: ({
@@ -24,12 +24,13 @@ Item {
     description: "Launch installed desktop apps",
     settings: [],
     query: function(ctx) { return root.query(ctx) },
+    catalog: function(ctx) { return root.query({ scope: "applications", query: "" }) },
     opened: function() { if (root.library) root.library.refreshIcons() }
   })
 
   Connections {
     target: root.library
-    function onAppsChanged() { root.searchCache = ({}); if (root.host) root.host.requery() }
+    function onAppsChanged() { root.searchCache = ({}); if (root.host) root.host.requery({ provider: root.provider.id }) }
   }
 
   // The name is fuzzy-matched; GenericName, Keywords and Comment are words
@@ -52,7 +53,8 @@ Item {
     return {
       id: String(entry.id), title: name, subtitle: subtitle, icon: "󰀻", iconSource: root.library.iconSource(entry.icon),
       section: "Applications", verb: "Launch", tier: "item", score: score, order: order, remember: true,
-      appId: String(entry.id), action: { type: "app", id: String(entry.id), name: name }, hint: "Del uninstall"
+      appId: String(entry.id), action: { type: "app", id: String(entry.id), name: name }, hint: "Del uninstall",
+      description: root.searchText(entry), descriptionKey: name
     }
   }
 

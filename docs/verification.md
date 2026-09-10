@@ -1,5 +1,529 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.4.1 (2026-09-11)
+
+- Documentation only: `site/guide/index.html` copy pass (32 replacements:
+  every heading except the four kept on purpose, the hero, two asides) after
+  the user's review of 1.4.0's guide. `manifest.json` 1.4.0 → 1.4.1; no other
+  file under the plugin changes. `python3 site/check.py` passes (2 pages, 199
+  references, 35 screenshots); `tst_settingstree` and the full QML suite are
+  unchanged from the 1.4.0 run. Not exercised: nothing new to exercise.
+
+## Release 1.4.0 (2026-09-11)
+
+- Release tree: 1.3.0 plus the in-repo extensions, the Translate extension,
+  the Timer sound and bar countdown, the bar widget sizing fix, declared
+  commands with Tab as a space, the route fallback, and this release's own
+  additions: the **Learn Keystroke** row (`core/SettingsTree.js`, a `url`
+  effect to the guide; `tst_settingstree.qml` covers it from the root, from
+  Settings and by the words learn, guide and help), the usage guide
+  (`site/guide/index.html`) and the offscreen screenshot harness.
+- `tools/showcase/offscreen.py` renders the real `Keystroke.qml` under
+  Quickshell's offscreen platform at `QT_SCALE_FACTOR=4` (a 640x540 card
+  grabbed as the 2560x2160 PNG `site/check.py` expects) in a fake HOME
+  holding demo files, a demo clipboard history, `keystroke.json` with Timer
+  and Translate on, and a symlink to `~/.local/state/omarchy/current` so the
+  captures wear the desktop's current theme; a fake `curl` answers Translate
+  from a table, `wl-paste` finds no selection, and a fake `OMARCHY_PATH`
+  whose `omarchy-menu-keybindings` prints twelve demo binds in the script's
+  record format feeds the Hotkeys provider. 32 scenes drive the real palette
+  (queries, scopes, `activateAt` for the confirmations and the Translate
+  editor, `ctrlHeld` for the numbered rows, the Timer service's own
+  `activate` for the running countdowns) and three staged states (apps,
+  Codex, voice) come from the `prepare.py` fixture palette, which gained a
+  `KEYSTROKE_SHOWCASE_DEST`/`HOME` override and an `approvalDetail` stub
+  the conversation view now calls. The Timer countdown in the bar is the
+  real `BarWidget.qml` against the fake bar from
+  `palette_extensions_check.py`, saved as `bar-timer.png` (the preflight
+  accepts `bar-*` strips at any wide size). All 35 PNGs were looked at on
+  contact sheets; the settings screen shows the config path under `~`
+  through a harness-only patch of the copied `SettingsTree.js`.
+- Seen while capturing, not changed: with Translate on, `5 miles in km`
+  also offers a translation into Khmer, because `km` is a language code and
+  the natural `… in <language>` form matches; the Converter answer still
+  ranks first. Two-letter unit symbols that are also language codes are a
+  Translate follow-up. The guide uses `5 miles in kilometers`.
+- `python3 site/check.py` walks both pages, resolves `guide/` and `../` to
+  their index pages and checks anchors across pages: PASS, 2 pages, 199
+  references, 35 screenshots. `node --check site/script.js` passes; the
+  lightbox now reads the clicked image's own path so it works from
+  `guide/`. Both pages were rendered headless in Chromium at 1400 px and
+  looked at. `.github/workflows/pages.yml` copies `site/guide` too.
+- Full offscreen `bin/keystroke test` on the release tree: 162 QML tests,
+  the application, file, catalog, matching session, palette matching,
+  shortcut, route, motion, dictation, extensions and commands checks, the
+  matching worker and engine checks, voice, clipboard, Codex, 48 time-zone
+  cases, the extension review checks for Timer and Translate, the hotkey
+  check and qmllint (the existing metadata warnings only) all pass.
+  `omarchy plugin validate` passes.
+- Not exercised: the release plugin on the live desktop (per practice,
+  offscreen only; the user checks the installed palette), the `Learn
+  Keystroke` row opening a real browser, the GitHub Pages deployment (it
+  runs on the push to `main`).
+
+## Timer 1.2.1: the Bell sound is called Drop (2026-09-10)
+
+- The `sound` option `bell` is renamed `drop` (label Drop), still the
+  freedesktop `bell.oga`; a saved `bell` falls back to the default Chime
+  through the schema validation. Unit tests and `check-extensions` pass.
+
+## Declared commands: hint line, placeholders, usage (2026-09-10)
+
+- Providers declare their typed triggers (`commands`: prefix, title, summary,
+  positional args with hints, examples) in `extension.json` or on the provider
+  object; `core/Commands.js` compiles them, builds the index with the user's
+  prefixes (`providers.<id>.prefix`, a reserved setting listed first on the
+  settings screen), matches the query (longest prefix wins, sigils attach and
+  are exclusive), computes the placeholders after the caret and the hint line,
+  and builds the rows for the `/` screen, the name suggestions and an
+  extension's Usage section. The host routes a matched query to its owner with
+  `ctx.command = { id, prefix, rest, args }` and a boost of 20, asks no other
+  provider (a typed command is exclusive; this generalises the old `~` special
+  case and keeps other providers' fuzzy matches on the prefix out of the
+  list), scores rows against the rest, adds the `query`
+  effect, Tab completion, the sheen over a recognised prefix (Motion tier
+  `sheen`), and says what to type when an extension is turned on. Emoji,
+  Files, Timer and Translate migrated to `ctx.command.rest` with their old
+  checks kept as fallbacks; Translate's prefix pattern is gone.
+- `tests/tst_commands.qml` (12 tests): compile and its rejections, prefix
+  rules, usage strings, the index and conflicts, matching (case, whitespace,
+  sigils, longest prefix), placeholders following the caret including the
+  rest argument, the ghost with a leading space after a bare prefix, the hint
+  line, help and suggestion rows, usage rows and the enable notice.
+  `tests/tst_extensions.qml` covers commands in the manifest and the Usage
+  rows on the detail screen. All 161 palette unit tests pass; both extension
+  checks pass.
+- `tests/palette_commands_check.py` (real `Keystroke.qml` offscreen, fake
+  curl): the empty root's row and index; `tr` recognised live with hint and
+  ghost before any query runs; Tab adding the space after the prefix and
+  after the first argument, doing nothing on the last argument, with a
+  trailing space or after a sigil; the ghost and hint
+  following the caret through `tr fr ` and `tr fr hello`; `timer 10m tea`
+  routed through `ctx.command`; `tm 10m tea` after renaming the prefix in
+  keystroke.json; `:smi` answered by Emoji alone; `/` listing every command
+  with the renamed prefix and `/tr` filtering; `trans` suggesting Translate
+  and Tab typing `tr `; the Translate screen starting with `tr [to] <text>`,
+  a runnable `tr bonjour`, the Prefix row; the Timer screen showing
+  `tm <duration> [name]` while off and the enable notice naming it; the Prefix
+  setting under Keystroke Settings › Timer. With `KEYSTROKE_CAPTURE_DIR` set it
+  saves PNGs of the ghost, the `/` screen and a Usage screen; all three were
+  looked at. `palette_extensions_check.py`, `palette_matching_check.py` (its
+  fixture now declares the `~` command), route, shortcut, motion, dictation,
+  catalog, files, applications, hotkeys and the Translate check all pass.
+- Not exercised: the sheen on the desktop (transient; offscreen it runs
+  through the same NumberAnimation), typing on a real keyboard (the check
+  drives `setQuery` and `completeCommand`), calpad (external; its `=` keeps
+  working through its own pattern until it declares a command).
+
+## Translate extension (2026-09-10)
+
+- `extensions/translate` ports the Raycast google-translate extension onto
+  the in-repo extension system: keyless calls to the translate.google.com
+  page endpoint through `curl` (no `tk` token: verified not validated for
+  `client=dict-chrome-ex`), `tr bonjour` / `tr fr …` / `… to english`
+  grammar as `patterns`, the same-language fallback and the reverse
+  translation, a target picker scope instead of 250-option enums, an editor
+  view with dictation, selection rows that deliver after the palette closed,
+  a 350 ms debounce, a session cache, superseded requests killed, HTTP 429
+  backed off for a minute. Paste goes through wl-copy plus Shift+Insert like
+  the palette's own dictation.
+- `tests/tst_translate.qml` (14 tests, offline): language resolution and the
+  ambiguous-code rule, the grammar, the pattern examples, curl argv (GET,
+  POST past 2 KB, proxy, no token, user text never in a command string), the
+  parser over nine bodies captured from the live endpoint on 2026-09-10
+  (`tests/Fixtures.js`: phrase, Japanese romanisation, single-word
+  dictionary, spelling correction, auto-correction, same language,
+  Ukrainian, multi-sentence, 2.7 KB POST), the request chain after the
+  detected language lands, ordering and fallback, view blocks, rows at the
+  root, in scope, with answers, with a correction, the picker, the settings
+  schema. `bin/keystroke check-extensions extensions/translate` passes.
+- `extensions/translate/tests/palette_check.py` drives the real
+  `Keystroke.qml` offscreen with a fake `curl`, `wl-paste`, `wl-copy`,
+  `wtype` and notification script on PATH: off until switched on; `tr hello
+  world` yields the answer row, the reverse row and the follow-ups from
+  exactly three requests in order (auto→en, auto→fr, fr→en); the editor view
+  opens with the text; the root offers the selection; the scoped screen's
+  "Copy the translated selection" closes the palette and wl-copy receives
+  "Good day" with a notification; a 429 shows the back-off row; the picker
+  adds German through a setting the service picks up; turning the extension
+  off destroys the service. With `KEYSTROKE_CAPTURE_DIR` set it also saves
+  PNGs of the rows, the view, the scoped screen and the picker; all four were
+  looked at.
+- Live endpoint probes (curl, this machine): GET and POST both HTTP 200 with
+  the indices documented in the spec; `translate_tts` streams audio/mpeg. Not
+  exercised live: the palette on the desktop (per practice, offscreen only),
+  Shift+Insert paste into a real app, `mpv` playback, dictation into the
+  editor, the `setQuery` retry of a spelling correction.
+## Timer sound and a countdown in the bar (2026-09-10)
+
+- Host API, optional under API 1: `host.setBarItem(id, { text, tooltip,
+  payload })` keeps one item per loaded, enabled provider on
+  `Keystroke.barItems`/`barList` (pruned on every registry and config
+  change, so nothing outlives an extension that is turned off);
+  `host.providerSettings(id)` returns a provider's validated settings for a
+  service that needs them outside a query. `BarWidget.qml` finds the
+  keepLoaded palette through `shell.panelLoaders[moduleName].item`, binds
+  its `barList`, and draws each item as a `WidgetButton` after the menu
+  button; a press summons `omarchy.menu` with the item's payload. Text
+  items are hidden on a vertical bar, like Omarchy's own.
+- `bin/keystroke install` and `enable` now run `omarchy plugin enable
+  evindor.keystroke left --index 0`. Omarchy's registry replaces the stock
+  menu button in place when it is in the bar and leaves Keystroke where it
+  is when it already sits there; the placement only matters for a fresh
+  insert, which without it landed after `omarchy.workspaces` (the
+  registry's left-section anchor) instead of first. `omarchy plugin add
+  --enable` asks for a section only, so the README names `omarchy bar move`
+  for that path.
+- Timer 1.2.0: settings `sound` (off/chime/bell/alarm, default chime, the
+  freedesktop sound theme that libcanberra brings in), `soundFile` (custom
+  path, `~` expanded) and `showInBar` (default on). The sound argv is
+  `bash -c '<script>' keystroke-timer-sound <path>`: the file is checked and
+  `pw-play`, then `mpv`, then `paplay` is used, with the path only ever in
+  `$1`. `sndfile-info` confirms libsndfile decodes the `.oga` files, so
+  `pw-play` plays them. The service publishes the soonest countdown on start,
+  cancel, every tick and every config change (a `Connections` on
+  `host.configChanged`), and clears it on destruction.
+- `tests/palette_extensions_check.py` (real `Keystroke.qml` and the real
+  `BarWidget.qml` against a fake bar, offscreen): the bar list is empty
+  before a start; activating `timer 10m tea` through the service puts
+  `󰔛 10:00` with the Timers payload and a tooltip on it at once; the widget
+  shows it after the menu glyph; pressing it runs `omarchy-shell shell
+  summon omarchy.menu '{"scope":"timer","title":"Timers"}'`; items from
+  other enabled providers are accepted, empty text and unknown providers
+  are not; the item survives another extension turning off and goes when
+  the timer is turned off. The timer is started through the service's own
+  `activate`, not the palette's, so no desktop notification is sent.
+- `extensions/timer/tests/tst_timer.qml` (+2 tests): sound paths and argv
+  (off is silent even with a custom file, a path with quotes and `$(…)`
+  stays a positional parameter) and the bar item (soonest timer first,
+  `+n` for the rest, tooltip, payload).
+- Regression found live: the first `BarWidget.qml` anchored its Row to the
+  widget's height while the widget took its implicit height from the Row,
+  and the bar showed no menu button at all (the widget measured 0x0, no
+  error in the shell log). The Row now sizes from the buttons' implicit
+  sizes and nothing reads the widget's size back. The check hosts the
+  widget in a `Window` (positioners lay out on polish, which needs one) and
+  asserts 27x30 with the menu button alone and a wider widget once the
+  countdown is there.
+- Ran: `bin/keystroke check-extensions` (ok), `tests/lint.sh` (no new
+  warnings beyond the pre-existing QObject member ones), the 148 QML tests,
+  `tests/palette_extensions_check.py` (PASS). Not driven on the live
+  desktop; the sound was not played.
+
+## Extensions ship inside Keystroke (2026-09-10)
+
+- Extensions moved from separate Omarchy plugins (git-installed into
+  `~/.config/omarchy/plugins`, discovered from a hosted index and the
+  marketplace catalog) to folders under `extensions/` in this repository,
+  reviewed through pull requests, plus `~/.local/share/keystroke/extensions`
+  for local work. `core/Extensions.js` shrank from the install/update/remove
+  job protocol to the folder scan, the listing and the screen rows;
+  `providers/Extensions.qml` from 292 lines to 75. `extensions/timer` is the
+  ported keystroke-timer, key `timer`; `examples/` and `extensions/index.json`
+  are gone.
+- Security property verified offscreen (`tests/palette_extensions_check.py`,
+  real `Keystroke.qml`): with no switch in keystroke.json, three extensions
+  are listed but `registry.services` is empty and a broken `Service.qml` is
+  not reported, because it was never compiled; after `providers.<id>.enabled:
+  true` the probe is created with `extension` (id, dir, source) and
+  `omarchyPath` injected and answers `probe tea`, the shipped timer answers
+  `timer 10m tea`, the broken one is reported with the QML error; turning the
+  switch off destroys the service and the listing stays. The Enabled row of
+  an extension that is off carries a confirmation naming its folder.
+- `tests/tst_extensions.qml` (12 tests): scan parsing and every rejection
+  message, local-over-builtin replacement, placeholder entries, listing,
+  screen and detail rows, the setup argv with single-quoted arguments, scope
+  ids. `tests/tst_settingstree.qml` updated to the extension entry shape.
+- `tools/check_extensions.py` (`bin/keystroke check-extensions`) passes on
+  `extensions/timer`: extension.json fields, folder-local imports resolved
+  by path, no symlinks, no manifest.json, README, qmllint, qmltestrunner.
+  `.github/workflows/extensions.yml` runs it with `--qt auto` on pull
+  requests; that job was not executed here (no CI run from a worktree).
+- The confirmation for turning an extension on is Keystroke's own
+  `ui/ConfirmSheet.qml` (the shell's dialog with a muted note under the
+  question), rendered offscreen with the Timer text. A first version carried
+  a link to the source folder; it was removed because opening it moves focus
+  away from the palette, which cannot survive that, so the note now says the
+  code runs at the user's own risk and recommends checking it first. The
+  Enabled rows on the Extensions screen and under Settings carry
+  `confirmDetail` (unit-tested; the offscreen harness checks the local probe
+  names its own folder).
+- Not exercised: the Run setup row against a real terminal (no shipped
+  extension declares one; the argv is unit-tested), and the live palette
+  (the patched plugin was not installed over the user's copy).
+
+## Disabled provider routes (2026-09-09)
+
+- Reproduced on Omarchy 4.0.3-1 with Keystroke 1.3.0: an `omarchy-menu
+  toggle apps` binding opened the Applications scope while
+  `providers.applications.enabled` was false. The route was accepted before
+  provider filtering removed Applications, leaving a generic empty state;
+  Backspace returned to the populated root palette.
+- Direct routes now verify their target after resolving it. A disabled target
+  falls back to root and reports that the provider is disabled in Keystroke
+  Settings; enabled routes retain their existing scoped behaviour.
+- `tests/palette_route_check.py` drives the real palette offscreen and covers
+  both states. It fails against `v1.3.0` at the disabled-route assertion and
+  passes on this tree. Full `bin/keystroke test` passes: 149 QML tests and all
+  integration checks, including the new palette route check. `bin/keystroke
+  validate` and `git diff --check` pass; qmllint reports only the existing
+  metadata warnings. The patched plugin was not installed over the user's
+  release copy and the fallback was not exercised in a live shell.
+
+## Release 1.3.0 (2026-09-10)
+
+- Root cause of "installed extension never appears": omarchy-shell gives a
+  third-party plugin `PluginRegistryApi` (`shell.qml` `pluginRegistryFor`),
+  whose `installedPlugins` holds only the plugin's own manifest, and a
+  `serviceFor` scoped by `pluginOwnsTarget` to the plugin's own id. Confirmed
+  in the journal by the `onPluginsChanged` "no signal of the target matches"
+  warning from `providers/Registry.qml` and `providers/Extensions.qml`: the
+  facade has no such signal, the real `PluginRegistry` does. Keystroke's
+  `clonedFrom: omarchy.menu` inherits no capabilities (`omarchy.menu` declares
+  none) and no capability grants cross-plugin service access.
+- `providers/Registry.qml` now scans the plugin folder (`core/Extensions.js`
+  `scanArgv`/`parseScan`) and creates services with `Qt.createComponent`,
+  injecting `shell`, `manifest`, `omarchyPath`. `providers/Extensions.qml`
+  reads `host.registry.manifests`/`problems`; install drops `--enable`; the
+  shell-side switch and `op("load")` are gone; an installed extension defaults
+  to on. Job protocol fixed: a job ends when its result is read (or both files
+  are confirmed absent), results are finished once per instance, the next
+  wrapper removes the previous result, chained checks are quiet.
+- Measured on Quickshell 0.3.1: `typeof Qt.clearComponentCache` is
+  `undefined`, `Qt.createComponent` returns the cached component after the
+  file changed, and a `?v=` query on the URL reloads the `.qml` but not its JS
+  imports. The update status therefore advises `omarchy-restart-shell`; the
+  trick is not used.
+- Full offscreen `bin/keystroke test` on the release tree: 149 QML tests
+  (`tst_extensions` covers the scan parser, `serviceUrl` escaping,
+  `publicManifest`, the problem rows and the argv without `--enable`), the
+  application, file, catalog, matching session, palette matching, shortcut,
+  motion and dictation checks, the matching worker and engine checks, voice,
+  clipboard, Codex, 48 time-zone cases, `tests/extensions_check.py` end to end
+  (its registry stub now uses the real scan and parser; it asserts the install
+  writes nothing to keystroke.json, that no "loaded" row exists, and the
+  restart advice after an update), the new `tests/palette_extensions_check.py`
+  (real `Keystroke.qml`, fake HOME: working, broken, misnamed and unmarked
+  folders) and the hotkeys check passed. `tests/lint.sh` exits 0 with 206
+  warning lines, the same count as the `v1.2.1` tree. `bin/keystroke validate`,
+  `git diff --check`, `site/check.py` and `node --check site/script.js` pass.
+- Live on Omarchy 4.0.3-1: after `bin/keystroke install` the rescan alone kept
+  running the old code (cache, above); after `omarchy-restart-shell`,
+  `omarchy-shell shell call omarchy.menu inspect '{}'` lists
+  `io.github.evindor.keystroke-timer` among the providers with no problems.
+  The stale `shell.json` `plugins[]` entry was removed with
+  `omarchy plugin disable`. See [release notes](releases/v1.3.0.md).
+
+## Release 1.2.1 (2026-09-09)
+
+- Hotfix release for Omarchy 4.0.3: the scoped-shell revocation recorded below
+  and the `keepLoaded` restore from `1dc4e48`. Manifest bumped to 1.2.1.
+- Full offscreen suite on the release tree (`QT_QPA_PLATFORM=offscreen`,
+  `QT_QPA_PLATFORMTHEME=generic`, `QT_QUICK_BACKEND=software`): 148 QML tests,
+  the application (now covering revocation), file, catalog, matching session,
+  palette matching, shortcut and motion checks, the matching worker and engine
+  checks, voice, clipboard, Codex, dictation, 48 time-zone cases and the hotkeys
+  check against the live `omarchy-menu-keybindings` passed. `tests/lint.sh`
+  exits 0 with 206 warning lines, the same count on the `v1.2.0` tree.
+  `bin/keystroke validate`, `git diff --check`, `site/check.py` and
+  `node --check site/script.js` pass.
+- `tests/extensions_check.py` stops at the same "update applied" race recorded
+  for 1.2.0; every other step of that check passes.
+- Live desktop check on Omarchy 4.0.3-1: installed from this tree, shell
+  restarted, the Applications screen rendered all 73 rows with icons.
+  See [release notes](releases/v1.2.1.md).
+
+## Release 1.2.0 (2026-09-09)
+
+- Full offscreen `bin/keystroke test` on the release tree (`QT_QPA_PLATFORM=offscreen`,
+  `QT_QPA_PLATFORMTHEME=generic`, `QT_QUICK_BACKEND=software`, `UV_OFFLINE=1`):
+  148 QML tests, the application, file, catalog, matching session, palette
+  matching, shortcut and motion checks, the matching worker and engine checks
+  (build, protocol, tokenizer parity, shipped-binary digest), voice, clipboard,
+  Codex, dictation and 48 time-zone cases passed. The suite then stopped at
+  `tests/extensions_check.py`, which fails its "update applied" step
+  ("Extensions are up to date" instead of "Updated Probe") on three runs here and
+  identically on the exported 1.1.5 tree (`origin/main` at `4798c4a`): the
+  update job schedules a check job the moment it finishes and the check's status
+  overwrites the update's before the harness reads it, the race recorded under
+  the time-zone entry below. Every other step of that check passes (install,
+  update detection, update job, manifest at the new version, toggles, removal).
+- Run separately after that stop: `tests/hotkeys_check.py` against the live
+  `omarchy-menu-keybindings` on this machine passed; `tests/lint.sh` exits 0
+  with 81 warnings, unchanged from the animation-tiers entry; `bin/keystroke
+  validate`, `git diff --check`, `site/check.py` and `node --check site/script.js`
+  pass.
+- Release scope: the fourteen commits on `dev` after the 1.1.5 release merge,
+  `c7cc2cb` (Smart Match) through `c2213e2` (Instant window transition), plus
+  the release documentation. The installed plugin was not replaced and no live
+  desktop check was run for this release; the manifest was already at 1.2.0.
+  See [release notes](releases/v1.2.0.md).
+
+## Animation tiers (2026-09-09)
+
+Appearance gained **Animations** (Off, Snappy, Fluid; default Snappy) and
+**Window transition** (Instant, Fade, Slide up; default Instant, chosen apart
+from the tier so the window can stay instant while the rest animates).
+`core/Motion.js` holds the one table of durations: Snappy 38 ms for the level
+slide, the selection glide and the window, with a 14 + 34 ms flash (the first
+cut was 32 ms and felt too short, so every Snappy figure grew by 20 %); Fluid
+90 ms with a 20 + 50 ms flash; Off is all zeros and takes every path as a
+plain assignment. Four transitions:
+
+- A menu level (results, breadcrumb, or a provider view) enters from the right
+  after `navigate` and from the left after `goBack`; rows are reconciled in
+  place, so only the entering level moves.
+- The selection is one `ListView` highlight that glides between rows (rows no
+  longer paint their own background); a reset after typing or a level change
+  jumps instead of gliding.
+- The activated row flashes with the selected text color, and a launch waits
+  for the flash to peak before the window starts leaving.
+- The window fades (or slides up 20 px while fading) in and out on an
+  `OutExpo` curve, so most of the change lands in the first frames; a gentler
+  ramp read as the palette being late rather than as motion. The layer stays
+  mapped for the fade-out without keyboard focus, so the launched app gets
+  the keyboard at once.
+
+Fixed after the first live check: the highlight vanished or sat on the wrong
+row after typing. The `ListView` follows the surviving item when rows above the
+selection are removed, so its own `currentIndex` drifted from `selected` while
+the highlight read `currentItem`; reproduced offscreen (selected 0, list index
+1 after the first row went away). The index is now re-asserted from the
+selection after every reconcile instead of being bound to it.
+
+Checked offscreen (`QT_QPA_PLATFORM=offscreen`, software backend):
+
+- `tests/tst_motion.qml` (6 tests): tier ranges, fallback to Snappy, offsets.
+- `tests/palette_motion_check.py` on the real palette with a fixture provider:
+  the reveal starts below 1 and reaches 1; the highlight exists, covers the row
+  and not its section header, glides after `select()` and jumps after a reset;
+  `navigate`/`goBack` enter from the right/left and settle; activation flashes
+  the activated row; closing keeps the window mapped until the fade ends and
+  the slide-up leaves the card lower; reopening while leaving cancels the
+  fade-out; with animations Off the reveal, highlight, level and window change
+  at once and nothing flashes; after typing removes the first row the list
+  index and the highlight follow the selection onto the new first row, and a
+  kept selection is re-indexed when everything above it goes; Instant maps
+  and unmaps at once while the tier stays Snappy; the row's flash overlay
+  brightens then settles and a zero-length flash does nothing.
+- Card renders grabbed mid-glide and mid-flash confirmed the highlight is
+  painted under the row text and the flash reads as a brightening of the row.
+- `qmltestrunner` (148 tests), the shortcut, matching, dictation and catalog
+  checks pass; qmllint warnings unchanged (81).
+
+Not exercised: the live layer-shell window (fade-in timing against surface
+mapping, keyboard focus release during the fade-out) and the exact durations;
+the numbers are the starting points to tune by feel, all in `core/Motion.js`.
+
+## Smart Match performance and compiled engine (2026-09-09)
+
+Profiled offscreen with `tools/profile_palette.py` on the laptop (Core Ultra X7
+358H, 16 threads): the actual providers, this machine's Omarchy menu, 58 apps,
+230 hotkeys and home folder, the installed small model, and 41 typed keystrokes
+across four queries. Milliseconds are wall time of one `runQuery()` on the UI
+thread (1 ms resolution).
+
+| per query on the UI thread | before (`cdcfffe`) | after |
+| --- | --- | --- |
+| total, median / p90 / max | 35 / 148 / 287 | 10 / 16 / 21 |
+| rank (frecency + sort) | 5 / 96 / 245 | 0 / 1 / 1 |
+| providers + catalog enumeration | 23 / 30 / 56 | 8 / 15 / 18 |
+| documents + request key | 2 / 3 / 4 | 0 / 0 / 1 |
+| merge (lexical + semantic) | 4 / 7 / 9 | 1 / 3 / 6 |
+
+- The ranking cost was `Qt.md5` (about 25 µs per call in the engine) run four
+  times per comparison inside the sort; keys are now memoized and the bonus is
+  computed once per row. Learned query keys changed shape to item hash, colon,
+  context hash; previous learned entries decay out of `usage.json` unchanged.
+- The catalog (rows, intent descriptions, fingerprint hashes, filtered documents
+  and their digest) is built once per summon, scope, configuration or provider
+  change and prewarmed while the palette waits for the first keystroke; the
+  first-keystroke enumeration hitch (34 ms) is gone. Refreshes from one provider
+  (`fd` finishing, an embedding reply) re-run only that provider; lexical scores
+  are reused across the refreshes of one keystroke. Files and Hotkeys build rows
+  only for the survivors; menu visibility is memoized until guards change.
+- Engine: `matching/engine` (Rust, 600 KB, no ML framework) replaces the Python
+  runtime when cargo is available. Tokenizer parity with `tokenizers` on 3,771
+  texts (618 descriptions, catalog keys, 2,500 random and unicode strings):
+  identical. Scores agree with the Python worker within 4e-7 and produce the same
+  top-30 order for every checked query. Ready in 18 ms (65 ms submit-to-result
+  through `Session.qml` after an idle unload, versus about 250 ms), 16 MiB
+  resident versus 92 MiB for the live Python worker, 1,500 documents embedded in
+  5 ms, a query in under 0.1 ms. Model files are fetched by URL with pinned
+  SHA-256 digests; `huggingface_hub` is no longer needed. The Python path remains
+  as the fallback without cargo and serves the same protocol.
+- Shipped binary: `matching/bin/keystroke-matching` is a static-pie x86_64 build
+  (1.5 MB, `ldd`: statically linked) with a manifest naming the machine and the
+  engine-source fingerprint; the start script takes it only while both match. A
+  fresh data directory now needs only the 8 MB model download (1.8 s here) and no
+  cargo; the engine check verifies the manifest, digest and tokenizer parity of
+  the shipped binary as well.
+- Full `bin/keystroke test` except one pre-existing failure: 142 QML tests, all
+  integration checks and the new `matching_engine_check.py` (build, protocol,
+  parity) pass; `tests/extensions_check.py` fails at "update applied" on the
+  untouched `cdcfffe` checkout as well. qmllint warning count is unchanged (283).
+  Plugin validation and `git diff --check` pass. The installed plugin was not
+  replaced; the live check is the user's.
+
+## Fuzzy file search and tilde prefix (2026-09-09)
+
+- Fixed candidate generation: `dwnlds` now reaches Downloads. `~` isolates Files
+  and bypasses embeddings; the main palette offers Fuzzy (default), Literal,
+  and Only with ~. Search remains under home and respects ignore rules.
+- Five real-home fd runs per query (`downlo`, `dwnlds`, `rpt`, `zzzxqv`), two
+  threads and 400 candidates: fuzzy medians 12.1–38.6 ms, maxima 12.4–40.7 ms;
+  literal medians 36.2–39.5 ms. This is a warm local-disk measurement, not a
+  latency guarantee. Broad fuzzy `rpt` reached the 400-candidate cap.
+- QML scoring of 400 synthetic report paths measured about 6 ms per query over
+  20 repetitions. No full-tree index or embedding work runs for file search.
+- Full `bin/keystroke test`: 142 QML tests plus integration checks passed.
+  New actual-fd integration covers all modes, bare tilde, directory matches,
+  space/slash path abbreviations, hidden filters, and newline filenames.
+  Palette integration verifies prefix isolation and embedding bypass. Targeted
+  tests also cover bounded input, safe regex/argv, cache keys, and incomplete
+  records after cancellation. Plugin validation and diff checks passed.
+- Large/slow trees can reach the three-second timeout; broad queries can omit
+  better results beyond the 400 candidates. Only with ~ avoids background file
+  walks for ordinary root queries. The installed plugin was not replaced.
+
+## Smart Match (2026-09-09, dev / 1.2.0)
+
+- Full offscreen `bin/keystroke test` exits 0: **139 QML tests**, all prior
+  integration checks, and new worker, session, catalog and palette matching checks.
+  Used `QT_QPA_PLATFORM=offscreen`, `QT_QPA_PLATFORMTHEME=generic`,
+  `QT_QUICK_BACKEND=software`; dependencies were cached and `UV_OFFLINE=1` was set.
+- Pure logic covers spoken arithmetic, ambiguous prose, defaults and enum labels,
+  launch-vs-install filtering, Chromium-only alias, typo distance, negation,
+  recording direction, volume direction, on/off setters, and confirmation-preserving
+  command deduplication. Typed provider arguments keep case and raw input.
+- Real QML process checks cover one-in-flight/latest-queued requests, stale replies,
+  Off unloading, changing size during loading, cancellation, idle unloading without
+  immediately reloading on a status refresh, waking with a fresh index, and no
+  leaked helper processes. Targeted session/palette checks were rerun after the idle
+  lifecycle refinement and passed.
+- Actual palette checks cover Only voice vs typed input, Voice and text, Off,
+  scoped enumeration, removal from a live catalog, raw transcript preservation,
+  ordinary matching fallback and stable selection during result reordering.
+  The same palette harness also passed with the real installed 2M worker offline.
+- Catalog checks execute no menu actions: unresolved/false guards and guarded
+  ancestors are excluded from semantic enumeration; subtree scope and later changes
+  are respected. Worker checks cover input limits, cache reuse/eviction, replacement
+  of catalog IDs and IDs/scores-only replies.
+- The pinned installer was exercised with Python 3.13 and the desktop's Python
+  3.14.7. Small (2M) is installed under the current user's Keystroke data directory;
+  Large (8M) was downloaded and validated only in an isolated `/tmp` directory.
+  The installed small model subsequently served requests with `HF_HUB_OFFLINE=1`.
+- Rendered and inspected Matching, Smart match choices and Matching model choices
+  offscreen: correct labels, selected defaults, existing theme/layout and no clipped
+  setting text. These were temporary screenshots, not new product artwork.
+- `bin/keystroke validate` and `git diff --check` pass. Lint has no new warning
+  messages compared with the untouched dev checkout; existing Quickshell/Qt metadata
+  warnings remain. The 618 descriptions and source fingerprints have full coverage.
+- No live desktop commands were activated, no real microphone recordings were
+  tested, and the running plugin was not replaced. Installation/download performance
+  was not measured on low-end laptops. This is a local suggestions system, not an
+  automatic command executor or a production accuracy claim for arbitrary speech.
+
 ## Release 1.1.5 (2026-09-09)
 
 - Full offscreen `bin/keystroke test`: 119 QML tests, application-library
@@ -249,3 +773,43 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
 - Validation: 119 QML tests, application compatibility and palette integration
   checks passed. Plugin validation and qmllint passed (existing metadata
   warnings only). The live Applications screen rendered all 73 result rows.
+# Query-specific selection learning — 2026-09-09
+
+- Reproduced the `downlo` ranking with actual file scoring and Smart Match merge:
+  the Downloads folder loses to hotkeys before learning and ranks first after
+  one selection, with embeddings enabled or disabled.
+- Verified serialization, query/scope isolation, normalization, decaying/capped
+  weights, and answer/fallback tier boundaries. The actual palette integration
+  test activates a remembered result, reopens, and verifies the learned ranking.
+- Full `bin/keystroke test`: 140 QML tests passed, plus all integration checks;
+  plugin validation and `git diff --check` passed. The installed plugin was not
+  replaced as part of this change.
+
+## Omarchy 4.0.3 scoped-shell revocation (2026-09-09)
+
+- Applications disappeared again after 1dc4e48 restored `keepLoaded`. The
+  4.0.3 manifest conversion has a second consequence beyond the null
+  `appLibrary`: `createScopedPluginShell` stamps the API with a capability
+  profile computed from the converted manifest (`…|no-menu`), and
+  `prunePluginApis` recomputes the expected profile from the registry manifest,
+  whose `kinds` is a real array (`…|menu`). The mismatch revokes and destroys
+  the API, so the panel's injected `shell` becomes null — the shell assigns it
+  once in `Loader.onLoaded`, so it never comes back.
+- Without `keepLoaded` the panel is destroyed and recreated on every open, so a
+  fresh `shell` was injected each time and the fallback stayed active. With
+  `keepLoaded` the single long-lived instance loses `shell` on the first prune,
+  which deactivated the fallback Loader and left zero applications.
+- `core/ApplicationLibrary.qml` now latches `hostSeen` on the first injection
+  and keeps the fallback active while no shared library is present, so the
+  library survives revocation. Verified live on 4.0.3-1: `hostShell` drops to
+  false a second after startup and the palette still reports 73 applications
+  (93 before the configured-hides file loads).
+- `tests/applications_check.py` covers the revocation: it drops `hostShell` back
+  to null after a shared library and asserts the fallback keeps serving rows.
+  The check fails against the pre-fix component.
+- Still lost after revocation: everything else the injected `shell` provides —
+  `serviceFor`/`ensureService` for extension-provided services, and the `shell`
+  handed to extension contexts. This needs an upstream fix in
+  `manifestHasKind`, which should accept a QML sequence, not only a JS array.
+- Validation: 148 QML tests, application compatibility and palette dictation
+  checks passed; plugin validation clean.

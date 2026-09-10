@@ -31,7 +31,7 @@ Item {
     id: session
     host: root.host
     settings: root.preferences
-    onChanged: if (root.host) root.host.requery()
+    onChanged: if (root.host) root.host.requery({ catalog: false, provider: root.provider.id })
     onHandoffReady: id => root.launch(id, "", session.cwd)
   }
   Process {

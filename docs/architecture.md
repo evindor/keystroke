@@ -4,17 +4,20 @@ Keystroke is one Omarchy `menu` plugin. Everything runs in `omarchy-shell`'s QML
 
 ```text
 omarchy-shell
+  ├─ BarWidget.qml (bar-widget entry point: the menu button, then the palette's bar items,
+  │                 read off the keepLoaded Keystroke instance through shell.panelLoaders)
   └─ Keystroke.qml (menu entry point, keepLoaded)
-       ├─ window, keys, navigation stack, dmenu protocol, effects, config, frecency
+       ├─ window, keys, navigation stack, dmenu protocol, effects, config, frecency,
+       │  bar items (host.setBarItem: one { text, tooltip, payload } per enabled provider)
        ├─ providers/Registry.qml
        │    ├─ bundled: OmarchyMenu, Applications, Calculator, Converter, Colors,
-       │    │           Emoji, Clipboard, Files, Hotkeys, Codex, AiWeb, Extensions, SettingsProvider
-       │    └─ community: shell.serviceFor(<plugin id>) for every enabled plugin
-       │                  whose manifest carries "x-keystroke"
-       ├─ providers/Extensions.qml   install/update/remove/toggle community providers through
-       │                             Omarchy's plugin scripts; discovery from extensions/index.json
-       │                             and the marketplace catalog (core/Extensions.js)
-       ├─ core/*.js   Match (fuzzy matcher + tiers), Patterns (provider-declared query shapes), SettingsTree, Frecency, Settings, VoiceBindings, Intent, Calculator, Units, Colors, Emoji, AiTargets, Files, Extensions
+       │    │           Emoji, Clipboard, Files, Hotkeys, Codex, AiWeb, Extensions, CommandsProvider, SettingsProvider
+       │    └─ extensions: Service.qml of every folder under extensions/ (ships with Keystroke) and
+       │                   ~/.local/share/keystroke/extensions (local work), created here only once
+       │                   the user turns it on; off means never compiled
+       ├─ providers/Extensions.qml   the Extensions screen: switches, setup scripts in a visible
+       │                             terminal, source links (core/Extensions.js)
+       ├─ core/*.js   Match (fuzzy matcher + tiers), Patterns (provider-declared query shapes), Commands (declared prefixes: routing, hint line, placeholders, usage), SettingsTree, Frecency, Settings, VoiceBindings, Intent, Calculator, Units, Colors, Emoji, AiTargets, Files, Extensions
        ├─ omarchy/MenuModel.js   vendored stock menu model (parse, merge, routes, guards)
        ├─ voice/VoiceSession.qml   voxtype recording lifecycle, optional live transcript and audio levels
        ├─ codex/      AppServer, CodexSession, ConversationView, Policy
@@ -54,7 +57,19 @@ Quick mode explicitly disables shell, code execution, local environments, inheri
 
 ## Query flow
 
-Keystrokes debounce 16 ms, then the host calls `query(ctx)` on every enabled provider (root) or the owning provider (scoped). Before each call the host tests the provider's declared `patterns` (`core/Patterns.js`, compiled once per registry rebuild in `providers/Registry.qml`) against the query: the matched ids reach the provider as `ctx.patterns`, and the largest boost is added in `normalize()` to every row the provider returns that already has a positive score. Providers return rows synchronously. Anything slow (guards, dynamic menu providers, the time-zone helper) returns what it has, calls `ctx.pending()`, and later calls `host.requery()`; the host re-runs the query and keeps the selection. Rows are normalized, ranked by host-owned tiers (`answer > item > fallback`), scored within a tier, and reconciled into a fixed-role `ListModel` by uid so delegates update in place while typing. Previews are read from the selected row's JS object, never copied into the model.
+Selection learning is the final ranking pass, after lexical and semantic matching.
+Remembered rows retain their general frecency bonus (12 points for one selection,
+capped at 36). A choice for the same normalized query and scope adds a separate
+72-point first-selection bonus, capped at 108, so a preferred file can overcome
+the file provider's score discount. Both weights decay with a 14-day half-life.
+Only current matching candidates in the item tier are reordered; learning cannot
+revive filtered rows or overtake computed answers. Query-specific choices share
+the existing bounded usage store as hashed keys, with no raw query text. Old usage
+data remains valid; query preferences start with selections made after this update.
+Query case and repeated whitespace are normalized; different prefixes and scopes
+learn independently. No embedding model or retraining is required for learning.
+
+Keystrokes debounce 25 ms; asynchronous refreshes respect that pending pause, while Enter flushes it immediately. A refresh (`host.requery(options)`) is coalesced per event-loop turn; when it names its provider (`{ provider, catalog: false }`) only that provider is queried again and the other providers' rows for the unchanged query are reused. Then the host calls `query(ctx)` on every enabled provider (root) or the owning provider (scoped). Before each call the host tests the provider's declared `patterns` (`core/Patterns.js`, compiled once per registry rebuild in `providers/Registry.qml`) against the query: the matched ids reach the provider as `ctx.patterns`, and the largest boost is added in `normalize()` to every row the provider returns that already has a positive score. Providers return rows synchronously. Anything slow (guards, dynamic menu providers, the time-zone helper) returns what it has, calls `ctx.pending()`, and later calls `host.requery()`; the host re-runs the query and keeps the selection. Rows are normalized, ranked by host-owned tiers (`answer > item > fallback`), scored within a tier, and reconciled into a fixed-role `ListModel` by uid so delegates update in place while typing. Previews are read from the selected row's JS object, never copied into the model.
 
 ## Omarchy menu parity
 
@@ -62,11 +77,17 @@ Keystrokes debounce 16 ms, then the host calls `query(ctx)` on every enabled pro
 
 ## Integration points used
 
-All from Omarchy 4.0.2 source: property injection of `shell`, `manifest`, `pluginRegistry` (`shell.qml`), `open/close/opened` and `shell call` methods, `PluginRegistry.resolveEnabledId` and `restoreCloneSource` keyed by `omarchy.clonedFrom`, `shell.serviceFor` for service plugins, `Color.menu.*`, `Style.font.menuFamily`, `Style.space`, `Style.cornerRadius`, `Style.gapsOut`, `Border.surfaceSpec`, `BorderSurface`, `ConfirmDialog`, `PointerMoveGate`, `Util.execDetached/execArgv/alpha/fileUrl/shellQuote`. The layer namespace is `omarchy-menu` so the stock no-animation layer rule applies.
+All from Omarchy 4.0.2 source: property injection of `shell`, `manifest`, `pluginRegistry` (`shell.qml`), `open/close/opened` and `shell call` methods, `PluginRegistry.resolveEnabledId` and `restoreCloneSource` keyed by `omarchy.clonedFrom`, `Color.menu.*`, `Style.font.menuFamily`, `Style.space`, `Style.cornerRadius`, `Style.gapsOut`, `Border.surfaceSpec`, `BorderSurface`, `ConfirmDialog`, `PointerMoveGate`, `Util.execDetached/execArgv/alpha/fileUrl/shellQuote`. The layer namespace is `omarchy-menu` so the stock no-animation layer rule applies.
 
 ## Files
 
-`providers/Files.qml` runs `fd` (in Omarchy's base packages) once per distinct query, bounded by `--max-results 400`, from the home folder, with the query words AND-ed as case-insensitive literal substrings of the path, the last one anchored to the final segment (otherwise one matching folder floods the list with its children); a newer query kills a run still walking, a 3 s watchdog keeps whatever was printed, and results are cached for the length of one summon. `core/Files.js` builds the argv (regex-escaped words after `--and=` and `--`, so nothing is read as a flag), parses the output, re-checks the words against the path below `~` (fd matched the absolute path), scores the candidates with `Match.match` on the file name and the relative path at 0.55 weight with a floor of 12, and keeps the best `limit` (default 10 at the root, 60 in the Files screen). No index lives in the heap: a gitignore-respecting walk of a typical home takes tens of milliseconds, a hidden-inclusive one of 280 k entries about 200 ms. `↵` is `xdg-open`; `Ctrl+↵` is the host's alternate activation (`row.altAction`), here `setsid uwsm-app -- xdg-terminal-exec --dir=…` as Omarchy's own launchers do.
+`providers/Files.qml` runs `fd` outside the UI thread for each distinct query under the home directory. The default fuzzy mode translates each word into an escaped subsequence regex; literal mode keeps the old substring behavior. The final word must match the basename, and preceding words match relative path components. Spaces and slashes separate terms. This fixes `dwnlds`: previously literal candidate generation discarded Downloads before fuzzy ranking ever saw it.
+
+At the root, `~` is the Files provider's declared sigil command (`core/Commands.js`): the host routes the query to Files alone, hands it the text after the sigil in `ctx.command.rest`, and bypasses embeddings. Every other prefix (`:`, `/`, `timer`, `tr`) works the same way, from the same declaration that draws the hint line and the placeholders. `~dwnlds`, `~ dwnlds`, and `~/dwnlds` all work. Bare `~` shows a typing hint without walking the disk. The `searchMode` setting selects `fuzzy` (default), `literal`, or `prefix` (only explicit file search at the root). The Files screen and `~` always use fuzzy search. Existing file/folder/hidden settings still apply; gitignore rules remain respected.
+
+Each walk uses two threads, stops after 400 candidates, and has a three-second watchdog. New queries cancel obsolete walks; a summon caches at most 32 queries. Queries need two characters and are bounded to 128 characters/eight terms. NUL-delimited output preserves unusual filenames, and argv avoids shell interpolation. QML rechecks paths below home and ranks the bounded candidates with `Match.match`, retaining the 0.55 file weight and final host-owned selection learning. The main palette shows its configured limit; `~` and the Files screen show up to 60. There is no persistent filesystem index or model for file search. A broad query can hit the candidate cap before reaching the best match; deeper paths or longer queries help. Slow disks and hidden trees may reach the watchdog and return partial results.
+
+`↵` uses `xdg-open`; `Ctrl+↵` opens a terminal in the selected directory (or a file's parent).
 
 ## Hotkeys
 
@@ -89,3 +110,44 @@ Every provider that owns a tree searches all of it when a query is present: the 
 ## Deferred
 
 Match highlighting in rows and a permanent publishing id.
+
+## Smart Match
+
+`matching/Session.qml` manages one CPU helper, at most one in-flight request and one
+latest queued request. `helpers/matching-start.py` fetches the fixed Model2Vec
+revision (pinned SHA-256 digests, no client library), then execs the compiled engine
+(`matching/engine`, Rust: the BERT WordPiece tokenizer, mean pooling over the
+safetensors embedding table and cosine ranking; the shipped static
+`matching/bin/keystroke-matching` when its manifest matches this machine and the
+source, otherwise built once per source revision with `cargo`). Without cargo it
+provisions the hash-locked Python runtime and execs `matching-worker.py`, which
+speaks the same protocol. Off stops the process immediately, a model change replaces
+it, and two minutes of inactivity unloads it (the engine reloads in about 60 ms).
+Errors retain lexical search and expose a retry in Settings > Matching. See
+`matching/README.md` for storage, installation, protocol and model details.
+
+Per keystroke the host does no catalog work: catalogs are enumerated once per summon,
+scope or configuration change and after a provider's `requery()`, kept with their
+intent descriptions, memoized lexical words/families and, per set of intent
+constraints, the filtered documents and a digest identifying them. The digest keys
+the request so an unchanged catalog is never serialized or re-sent. Frecency keys
+are memoized hashes (item hash, colon, query-context hash) computed once per row
+and once per query, never inside the sort. `tools/profile_palette.py` measures each
+phase offscreen against this machine's real providers.
+
+The host gathers available catalog rows from opted-in providers and root navigation
+rows from remaining bundled providers, applies intent/scope constraints, and sends
+only metadata to the helper. Cache keys include the query, scope, model and catalog.
+Late replies are ignored; removed entries cannot be revived by an old response.
+`core/SmartMatch.js` combines exact/fuzzy scores, bounded typo recovery, app aliases
+and semantic suggestions without promoting them above explicit computed answers.
+Equivalent commands retain the stricter confirmation, and async result reordering
+preserves a user-selected UID. Typed provider arguments keep their case; spoken
+arithmetic normalization is a separate whole-expression parser in `core/Intent.js`.
+
+Curated intent sentences are paired with original titles and MD5 fingerprints of
+source definitions, preventing accidental reuse after ordinary catalog customization.
+These are metadata identity checks, not a security boundary. For menu entries the
+source key is `[action,target,provider].join(String.fromCharCode(31))`; for hotkeys it is dispatcher,
+a unit separator and argument; for apps it is the displayed name. No machine-specific
+command strings are shipped in the fingerprint map. Changed entries use live metadata.

@@ -8,6 +8,12 @@ import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
+# The hotkey's second tap reaches the palette as the shell's hide(): it calls
+# close() and then drops the plugin from its open set, and the panel Loader
+# unloads any plugin outside that set unless its manifest is keepLoaded. Without
+# the flag the tap starts dictation and the window is destroyed a tick later.
+manifest = json.loads((root/'manifest.json').read_text())
+assert manifest.get('keepLoaded') is True, 'manifest.json must set "keepLoaded": true; tap-to-dictate depends on it'
 with tempfile.TemporaryDirectory(prefix='keystroke-palette-') as temp:
     work = Path(temp)
     project = work/'project'
@@ -97,14 +103,14 @@ ShellRoot {
       palette.testVoice.phase = "idle"
       palette.testVoice.transcribed(test.text)
       test.check(palette.opened && !palette.testTransfer.busy && palette.testSearch.text === test.text, "stop alone preserves review")
-      palette.requery()
+      palette.runQuery()
       test.check(palette.current.preview === test.text, "dictation preview contains prose")
       // Normal voice search exposes the same raw prose as a fallback.
       palette.open('{}'); palette.voiceBegin("tap")
       palette.testVoice.partial(test.text)
       palette.testVoice.phase = "idle"
       palette.testVoice.transcribed(test.text)
-      palette.requery()
+      palette.runQuery()
       var found = -1
       for (var i = 0; i < palette.rows.length; i++) if (palette.rows[i].id === "copy-query") found = i
       test.check(found >= 0, "copy fallback exists after normal dictation")
@@ -115,7 +121,7 @@ ShellRoot {
     } else if (test.stage === 2 && !palette.testTransfer.busy) {
       test.check(!palette.opened, "fallback copies and closes normal palette")
       palette.open('{"query":"typed replacement"}')
-      palette.requery()
+      palette.runQuery()
       var copies = palette.rows.filter(function(row) { return row.id === "copy-query" })
       test.check(copies.length === 1 && copies[0].action.text === "typed replacement", "new query forgets prior speech")
       var selected = palette.selected

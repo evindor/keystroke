@@ -47,7 +47,7 @@ Item {
       }
     } catch (e) { out = [] }
     root.entries = out
-    if (root.host) root.host.requery()
+    if (root.host) root.host.requery({ catalog: false, provider: root.provider.id })
   }
 
   function query(ctx) {

@@ -6,11 +6,13 @@ components. Demo rows are deliberate fixtures, not reconstructed UI artwork.
 The production plugin is never changed. See README.md for the live lifecycle.
 """
 import json
+import os
 from pathlib import Path
 import shutil
 
 ROOT = Path(__file__).resolve().parents[2]
-DEST = Path('/tmp/keystroke-showcase-plugin')
+# offscreen.py builds the same fixture in its own work folder.
+DEST = Path(os.environ.get('KEYSTROKE_SHOWCASE_DEST', '/tmp/keystroke-showcase-plugin'))
 DEST.mkdir(exist_ok=True)
 for folder in ('core', 'ui', 'voice', 'codex'):
     shutil.copytree(ROOT / folder, DEST / folder, dirs_exist_ok=True)
@@ -26,6 +28,32 @@ Item {
   property var problems: []
   property var bundled: [{reload: function() {}, routeFor: function() { return {id:"root"} }, provider: {id:"omarchy",name:"Omarchy"}}]
   function rebuild() {}
+}
+''')
+# Smart Match's descriptions are public data; its worker never starts.
+(DEST / 'matching').mkdir(exist_ok=True)
+for name in ('descriptions.json', 'description-keys.json'):
+    shutil.copy2(ROOT / 'matching' / name, DEST / 'matching' / name)
+(DEST / 'matching/Session.qml').write_text('''import QtQuick
+Item {
+  property bool enabled: false
+  property string model: "small"
+  property bool ready: false
+  property bool starting: false
+  property bool failed: false
+  property string status: "Model unloaded"
+  property string error: ""
+  property string requestedKey: ""
+  property string resultKey: ""
+  property var matches: []
+  readonly property bool loaded: false
+  readonly property bool busy: false
+  signal changed()
+  function configure() {}
+  function shutdown() {}
+  function retry() {}
+  function cancelRequest() {}
+  function submit(key, query, rows, catalogKey) {}
 }
 ''')
 (DEST / 'voice/VoiceSession.qml').write_text('''import QtQuick
@@ -52,7 +80,7 @@ Item {
 ''')
 s = (ROOT / 'Keystroke.qml').read_text()
 s = s.replace('import "core/Match.js" as Match', 'import "codex"\nimport "core/Units.js" as Units\nimport "core/Match.js" as Match')
-s = s.replace('Quickshell.env("HOME")', '"/tmp/keystroke-showcase-empty-home"')
+s = s.replace('Quickshell.env("HOME")', json.dumps(os.environ.get('KEYSTROKE_SHOWCASE_HOME', '/tmp/keystroke-showcase-empty-home')))
 s = s.replace('  function runQuery() {', '  function runQuery() { return;')
 s = s.replace('  function activate(alternate) {', '  function activate(alternate) { return;')
 s = s.replace('  function perform(effect, row) {', '  function perform(effect, row) { return;')
@@ -72,6 +100,7 @@ s = s.replace('  function open(payloadJson) {', '''  Calculator { id: demoCalcul
     property string activity: ""
     property var settings: ({model:"gpt-5.6-luna",fast:true})
     function dismiss() {}
+    function approvalDetail(approval) { return "" }
     function answer() { return messages.length > 1 ? messages[1].text : "" }
   }
   Component { id: demoConversation; ConversationView { session: demoSession } }

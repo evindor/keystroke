@@ -1,0 +1,35 @@
+{
+  "name": "Timer",
+  "version": "1.2.1",
+  "author": "Arseniy Zarechnev",
+  "description": "Countdown timers with a sound, a notification and a countdown in the bar: timer 10m tea",
+  "apiVersion": 1,
+  "icon": "󰔛",
+  "color": "#e5c07b",
+  "license": "MIT",
+  "commands": [
+    {
+      "id": "timer",
+      "prefix": "timer",
+      "title": "Set a timer",
+      "summary": "A countdown with a notification when it ends",
+      "args": [
+        {
+          "name": "duration",
+          "hint": "10m, 1h30m, 0:45, or a bare number of minutes"
+        },
+        {
+          "name": "name",
+          "hint": "a label for the notification",
+          "optional": true,
+          "rest": true
+        }
+      ],
+      "examples": [
+        "timer 10m tea",
+        "timer 1h30m bread",
+        "timer 90"
+      ]
+    }
+  ]
+}

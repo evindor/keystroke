@@ -1,0 +1,7 @@
+{
+ "machine": "x86_64",
+ "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+ "sha256": "aa25b7849ac2a556fd2ec2faf9a8a32800dfe6795a841e62a38ffe1be7f2e1ee",
+ "source": "034fc6d9fa03190a",
+ "target": "x86_64-unknown-linux-gnu"
+}

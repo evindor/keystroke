@@ -13,9 +13,9 @@ Item {
     query: function(ctx) {
       if (ctx.scope && ctx.scope !== "dictation") return []
       if (!ctx.scope) {
-        var score = ctx.query ? Match.match(ctx.query, "Dictate to Clipboard", "dictation speech voice transcribe paste microphone") : 25
+        var score = ctx.query ? Match.match(ctx.query, "Dictate to Clipboard", "dictation speech voice transcribe paste microphone") : 23
         var rows = score ? [{ id: "open", title: "Dictate to Clipboard", subtitle: "Speak · Enter copies · Ctrl+Enter pastes", icon: "󰍬",
-          score: score, order: 3, verb: "Dictate", remember: true, action: { type: "dictate" } }] : []
+          score: score, order: 5, verb: "Dictate", remember: true, action: { type: "dictate" } }] : []
         // Search may normalize a spoken command; copy the original prose.
         var raw = String(ctx.rawQuery === undefined ? ctx.query || "" : ctx.rawQuery)
         if (raw.trim()) rows.push({ id: "copy-query", title: "Copy to Clipboard", subtitle: "Enter copies · Ctrl+Enter copies and pastes", icon: "󰅌",

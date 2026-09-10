@@ -21,6 +21,7 @@ Item {
     description: "Providers, appearance and the config file",
     settings: [],
     query: function(ctx) { return root.query(ctx) },
+    catalog: function(ctx) { return SettingsTree.catalog(root.current(), ctx.scope) },
   })
 
   function model() {
@@ -28,21 +29,22 @@ Item {
     for (var i = 0; i < entries.length; i++) {
       var e = entries[i]
       if (e.key === "settings") continue
-      var schemas = e.provider.settings || []
+      var schemas = e.settingsSchema || e.provider.settings || []   // the reserved prefix setting comes first for a provider with commands
       out.push({ key: e.key, name: e.provider.name, description: e.provider.description || "", icon: e.provider.icon || "", iconFont: e.provider.iconFont || "",
-                 iconSource: e.provider.iconSource || "", color: e.provider.color || "", source: e.source, pluginId: e.pluginId || "", enabled: h.providerEnabled(e), schemas: schemas,
+                 iconSource: e.provider.iconSource || "", color: e.provider.color || "", source: e.source, extensionId: e.extensionId || "",
+                 dir: e.manifest ? e.manifest.dir : "", local: !!(e.manifest && e.manifest.source === "local"), loaded: e.loaded !== false, enabled: h.providerEnabled(e), schemas: schemas,
                  values: Settings.values(h.config, ["providers", e.key], schemas) })
     }
-    return { configPath: h.configPath, paletteSchema: h.paletteSchema, paletteValues: h.paletteValues(), voice: h.voiceModel(), entries: out, problems: h.registry.problems }
+    return { configPath: h.configPath, paletteSchema: h.paletteSchema, paletteValues: h.paletteValues(), voice: h.voiceModel(), matching: h.matchingModel(), entries: out, problems: h.registry.problems }
   }
 
   // Rebuilt only when the config or the registry changes; every keystroke
   // reuses the same nodes and breadcrumb strings.
   function current() {
     var h = root.host
-    var stamp = [h.config, h.registry.entries, h.registry.problems, h.voiceStamp]
+    var stamp = [h.config, h.registry.entries, h.registry.problems, h.voiceStamp, h.matchingStamp]
     var old = root.treeStamp
-    if (root.tree && old.length === 4 && old[0] === stamp[0] && old[1] === stamp[1] && old[2] === stamp[2] && old[3] === stamp[3]) return root.tree
+    if (root.tree && old.length === 5 && old[0] === stamp[0] && old[1] === stamp[1] && old[2] === stamp[2] && old[3] === stamp[3] && old[4] === stamp[4]) return root.tree
     root.tree = SettingsTree.build(root.model())
     root.treeStamp = stamp
     return root.tree

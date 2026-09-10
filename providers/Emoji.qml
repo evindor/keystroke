@@ -18,6 +18,10 @@ Item {
     color: "#e8c575",
     description: "Search by name, or type : followed by a feeling",
     prefix: ":",
+    commands: [
+      { id: "emoji", prefix: ":", title: "Emoji", summary: "Find an emoji by name and copy it",
+        args: [{ name: "feeling", hint: "a name or a feeling: smile, cat, party", rest: true }], examples: [":smile", ":party"] }
+    ],
     settings: [],
     query: function(ctx) { return root.query(ctx) }
   })
@@ -36,12 +40,13 @@ Item {
   function query(ctx) {
     if (ctx.scope && ctx.scope !== "emoji") return []
     if (!ctx.scope && !ctx.query) return [navRow(22, "Find the right feeling")]
-    var prefixed = ctx.query.charAt(0) === ":"
+    // The host strips the declared prefix (ctx.command); the bare ":" check keeps older hosts working.
+    var prefixed = !!ctx.command || ctx.query.charAt(0) === ":"
     if (!ctx.scope && !prefixed) {
       var s = Match.match(ctx.query, "Emoji Picker", "smile emoticon")
       return s ? [navRow(s, "Type : followed by a feeling")] : []
     }
-    var q = prefixed ? ctx.query.slice(1).trim() : ctx.query.trim()
+    var q = ctx.command ? ctx.command.rest.trim() : prefixed ? ctx.query.slice(1).trim() : ctx.query.trim()
     var found = Emoji.search(root.emojis, q, 80)
     var rows = []
     for (var i = 0; i < found.length; i++) {

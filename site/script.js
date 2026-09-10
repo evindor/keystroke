@@ -6,16 +6,18 @@ var labels = {
   apps: 'Applications', clipboard: 'Clipboard history', files: 'File search', codex: 'Codex inside Keystroke',
   voice: 'Voice control', calculator: 'Calculator', converter: 'Temperature conversion', extensions: 'Extensions',
   colors: 'Colors', timer: 'Timer extension', fuzzy: 'Fuzzy settings search', emoji: 'Emoji', settings: 'Settings',
-  dictation: 'Dictate to Clipboard', units: 'Unit conversion', timezone: 'Time zones', 'extension-detail': 'Manage a provider'
+  dictation: 'Dictate to Clipboard', units: 'Unit conversion', timezone: 'Time zones', 'extension-detail': 'An extension\u2019s page',
+  commands: 'Commands explain themselves', translate: 'Translate extension', 'hotkeys-search': 'Hotkeys'
 }
 document.querySelectorAll('[data-image]').forEach(function (element) {
   element.addEventListener('click', function (event) {
     if (typeof dialog.showModal !== 'function') return
     event.preventDefault()
     previousFocus = element
-    lightboxImage.src = 'assets/screenshots/' + element.dataset.image + '.png'
-    lightboxImage.alt = element.querySelector('img').alt
-    lightboxTitle.textContent = labels[element.dataset.image] || 'Keystroke'
+    var image = element.querySelector('img')
+    lightboxImage.src = image.getAttribute('src')   // the page's own path, so the guide in guide/ resolves ../assets
+    lightboxImage.alt = image.alt
+    lightboxTitle.textContent = element.dataset.label || labels[element.dataset.image] || 'Keystroke'
     dialog.showModal()
     document.body.style.overflow = 'hidden'
   })

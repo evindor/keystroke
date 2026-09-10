@@ -58,6 +58,7 @@ Item {
         description: "Confirm shutdown, reboot, logout, removal and config resets" }
     ],
     query: function(ctx) { return root.query(ctx) },
+    catalog: function(ctx) { return root.catalog(ctx) },
     opened: function() { root.evaluateGuards() }
   })
 
@@ -75,7 +76,7 @@ Item {
     root.rowsLoaded = true
     root.lastEnteredMenu = ""
     root.evaluateGuards()
-    if (root.host) root.host.requery()
+    if (root.host) root.host.requery({ provider: root.provider.id })
   }
 
   function reload() {
@@ -141,7 +142,7 @@ Item {
       }
       root.whenResults = nextWhen
       root.checkedResults = nextChecked
-      if (root.host) root.host.requery()
+      if (root.host) root.host.requery({ provider: root.provider.id })
       if (root.guardsPending) Qt.callLater(function() { root.evaluateGuards() })
     }
   }
@@ -241,7 +242,7 @@ Item {
     onExited: {
       if (providerProc.revision === root.providerRevision) {
         root.mergeProviderRows(providerProc.collected, providerProc.menuId, providerProc.providerKey)
-        if (root.host) root.host.requery()
+        if (root.host) root.host.requery({ provider: root.provider.id })
       }
       root.startNextProvider()
     }
@@ -261,7 +262,18 @@ Item {
     return { kind: "menu", id: entry ? id : "root", label: entry ? (entry.title || entry.label) : "" }
   }
 
-  function isVisible(entry) { return MenuModel.isVisible(root.items, root.itemOrder, root.whenResults, entry) }
+  // A menu is visible when any descendant is: that walk is quadratic over the
+  // model, so the answer is kept until the items or the guard results change.
+  property var visibleCache: ({})
+  onItemsChanged: root.visibleCache = ({})
+  onItemOrderChanged: root.visibleCache = ({})
+  onWhenResultsChanged: root.visibleCache = ({})
+  function isVisible(entry) {
+    if (!entry) return false
+    var hit = root.visibleCache[entry.id]
+    if (hit !== undefined) return hit
+    return (root.visibleCache[entry.id] = MenuModel.isVisible(root.items, root.itemOrder, root.whenResults, entry))
+  }
 
   function isDestructive(id) {
     return root.destructiveIds[id] === true || id.indexOf("remove.") === 0 || id.indexOf("update.config.") === 0
@@ -312,8 +324,39 @@ Item {
       section: "Omarchy", verb: verb, tier: "item", score: score, order: entry.order,
       accessory: entry.checked && root.checkedResults[entry.id] ? "✓" : "",
       remember: true, action: action, previewDetail: root.searchInfo(entry.id).path,
+      path: root.searchInfo(entry.id).path, keywords: root.searchInfo(entry.id).keywords, description: entry.description,
+      descriptionKey: [entry.action, entry.target, entry.provider].join("\u001f"),
       confirm: entry.kind === "action" && confirmDestructive && root.isDestructive(entry.id) ? "Run “" + entry.label + "”?" : ""
     }
+  }
+
+  function catalogVisible(entry, depth) {
+    if (!entry || (depth || 0) >= 32) return false
+    var current = entry, visited = 0
+    while (current && visited++ < 32) {
+      if (current.when && root.whenResults[current.id] !== true) return false
+      current = root.item(current.parent)
+    }
+    if (current) return false
+    if (entry.kind === "action" || entry.provider) return true
+    var target = entry.kind === "link" ? entry.target : entry.id
+    for (var i = 0; i < root.itemOrder.length; i++) {
+      var child = root.item(root.itemOrder[i])
+      if (child && child.parent === target && root.catalogVisible(child, (depth || 0) + 1)) return true
+    }
+    return false
+  }
+
+  function catalog(ctx) {
+    if (!root.rowsLoaded) return []
+    var active = ctx.sub && root.item(ctx.sub) ? ctx.sub : "root", rows = []
+    for (var i = 0; i < root.itemOrder.length; i++) {
+      var entry = root.item(root.itemOrder[i])
+      if (!entry || entry.id === "root" || !root.catalogVisible(entry)) continue
+      if (active !== "root" && !MenuModel.isDescendantOf(root.items, entry.id, active)) continue
+      rows.push(root.rowFor(entry, root.relativeTo(entry.id, active).parent || entry.description, 1, ctx.settings.confirmDestructive !== false))
+    }
+    return rows
   }
 
   function query(ctx) {

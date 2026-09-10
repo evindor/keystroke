@@ -55,13 +55,13 @@ Item {
     }
     onExited: {
       root.inflight = ""
-      if (root.host) root.host.requery()
+      if (root.host) root.host.requery({ catalog: false, provider: root.provider.id })
       if (root.queued) { var next = root.queued; root.queued = ""; root.startHelper(next.split("\n")[0], next.split("\n")[1]) }
     }
   }
 
   Timer { id: helperTimeout; interval: 1000; onTriggered: if (helper.running) helper.signal(9) }
-  Timer { id: liveRefresh; interval: root.liveMaxAge; repeat: true; running: root.liveShown && root.host !== null; onTriggered: root.host.requery() }
+  Timer { id: liveRefresh; interval: root.liveMaxAge; repeat: true; running: root.liveShown && root.host !== null; onTriggered: root.host.requery({ catalog: false, provider: root.provider.id }) }
 
   function startHelper(q, zone) {
     var key = q + "\n" + zone
