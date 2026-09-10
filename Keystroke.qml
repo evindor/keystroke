@@ -166,6 +166,14 @@ Item {
     for (var i = 0; i < providerRegistry.entries.length; i++) if (providerRegistry.entries[i].key === key) return providerRegistry.entries[i]
     return null
   }
+  function keepEnabledScope() {
+    if (!root.scope) return
+    var entry = root.registryEntry(root.scope.split("/")[0])
+    if (!entry || root.providerEnabled(entry)) return
+    root.scope = ""
+    root.scopeTitle = ""
+    root.statusMessage = entry.provider.name + " is disabled in Keystroke Settings"
+  }
   function applyConfigText(text) {
     var parsed = Settings.parse(text)
     root.configError = parsed.error
@@ -505,6 +513,7 @@ Item {
     } else {
       root.scope = ""; root.scopeTitle = ""
     }
+    root.keepEnabledScope()
     search.text = payload && payload.query ? String(payload.query) : ""
     root.resetSelection()
     root.applyRows([])
