@@ -141,7 +141,7 @@ function enableEffect(id, value) {
 function enableConfirm(e) { return "Turn on " + e.name + "?" }
 function enableDetail(e) {
   if (e.local) return "This is a local folder in " + e.dir + " that nobody has reviewed. It will run inside your shell with your permissions. Run it at your own risk, and check its code first."
-  return "This extension was automatically checked and reviewed before it shipped with Keystroke, and it runs inside your shell with your permissions. Nonetheless, run it at your own risk. It's recommended to check the extension code first (Open source on this screen)."
+  return "This extension was automatically checked and reviewed before it shipped with Keystroke, and it runs inside your shell with your permissions. Nonetheless, run it at your own risk. It's recommended to check the extension code first."
 }
 
 // ------------------------------------------------------------------ setup

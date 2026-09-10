@@ -34,7 +34,7 @@
   question), rendered offscreen with the Timer text. A first version carried
   a link to the source folder; it was removed because opening it moves focus
   away from the palette, which cannot survive that, so the note now says the
-  code runs at the user's own risk and points at the Open source row. The
+  code runs at the user's own risk and recommends checking it first. The
   Enabled rows on the Extensions screen and under Settings carry
   `confirmDetail` (unit-tested; the offscreen harness checks the local probe
   names its own folder).
