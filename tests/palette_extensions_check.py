@@ -79,6 +79,7 @@ ShellRoot {
  property int stage: 0
  property int failures: 0
  property var probeService: null
+ property real menuWidth: 0
  function check(ok, msg) { if (!ok) { failures++; console.log("FAIL", msg) } else console.log("ok", msg) }
  function keys() { return palette.registry.entries.map(function(e) { return e.key }) }
  function entry(key) { return palette.registry.entries.filter(function(e) { return e.key === key })[0] || null }
@@ -107,7 +108,8 @@ ShellRoot {
    function unregisterClickTarget(item) { }
    function moduleWidgets(id) { return [widget] }
  }
- BarWidget { id: widget; bar: fakeBar }
+ // In a window, so the Row's positioner polish runs and the widget's size follows its buttons, as in the bar.
+ Window { visible: true; width: 400; height: 30; BarWidget { id: widget; bar: fakeBar } }
  function widgetTexts() {
    var out = [], layout = widget.children[0]
    for (var i = 0; i < layout.children.length; i++) { var c = layout.children[i]; if (c && c.text !== undefined && c.visible) out.push(String(c.text)) }
@@ -156,12 +158,15 @@ ShellRoot {
      test.check(row("Start a 10 min timer: tea") !== null, "timer on: the shipped extension answers: " + titles().join(" | "))
      // Start it through the service's own activate (the palette's would also send a desktop notification).
      test.check(palette.barList.length === 0 && widgetTexts().length === 1, "nothing in the bar before a timer starts: " + JSON.stringify(widgetTexts()))
+     test.check(widget.implicitWidth >= 12 && widget.implicitHeight === 30, "the menu button alone gives the widget its size: " + widget.implicitWidth + "x" + widget.implicitHeight)
+     var menuWidth = widget.implicitWidth
      var timerService = palette.registry.services["timer"].instance
      var effect = timerService.activate(row("Start a 10 min timer: tea"), { host: palette, settings: palette.providerSettings("timer"), alternate: false })
      test.check(effect && effect.type === "compound", "starting a timer returns the notify and close effect")
      test.check(palette.barList.length === 1 && /^󰔛 (9:59|10:00)$/.test(palette.barList[0].text), "the countdown is on the bar list right after the start: " + JSON.stringify(palette.barList))
      test.check(palette.barItems.timer && palette.barItems.timer.payload.scope === "timer" && palette.barItems.timer.tooltip.indexOf("tea · 10 min · ends at ") === 0, "the bar item carries the Timers payload and a tooltip: " + JSON.stringify(palette.barItems.timer))
      test.check(widgetTexts().length === 2 && widgetTexts()[1] === palette.barList[0].text, "BarWidget shows the countdown after the menu button: " + JSON.stringify(widgetTexts()))
+     test.menuWidth = widget.implicitWidth
      widget.openItem(widget.items[0])
      test.check(fakeBar.last === "omarchy-shell shell summon omarchy.menu '{\\"scope\\":\\"timer\\",\\"title\\":\\"Timers\\"}'", "pressing the countdown summons the Timers screen: " + fakeBar.last)
      palette.setBarItem("calculator", { text: "x" })
@@ -174,6 +179,10 @@ ShellRoot {
      palette.open(JSON.stringify({ scope: "extensions", title: "Extensions" }))
      test.stage = 5; return
    case 5:   // the Extensions screen lists all of them with their state
+     if (test.menuWidth > 0) {   // the Row positions the new button on the next pass
+       test.check(widget.implicitWidth > test.menuWidth + 12 && widget.implicitHeight === 30, "the countdown widens the widget: " + widget.implicitWidth + "x" + widget.implicitHeight + " from " + test.menuWidth)
+       test.menuWidth = 0
+     }
      if (palette.pending || !palette.rows.length) return
      test.check(row("Timer") && row("Timer").accessory === "On", "Timer listed as on: " + JSON.stringify(row("Timer") && row("Timer").accessory))
      test.check(row("Broken") && row("Broken").accessory === "Needs attention", "Broken listed as needing attention")

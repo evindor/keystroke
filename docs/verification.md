@@ -74,6 +74,14 @@
   (off is silent even with a custom file, a path with quotes and `$(…)`
   stays a positional parameter) and the bar item (soonest timer first,
   `+n` for the rest, tooltip, payload).
+- Regression found live: the first `BarWidget.qml` anchored its Row to the
+  widget's height while the widget took its implicit height from the Row,
+  and the bar showed no menu button at all (the widget measured 0x0, no
+  error in the shell log). The Row now sizes from the buttons' implicit
+  sizes and nothing reads the widget's size back. The check hosts the
+  widget in a `Window` (positioners lay out on polish, which needs one) and
+  asserts 27x30 with the menu button alone and a wider widget once the
+  countdown is there.
 - Ran: `bin/keystroke check-extensions` (ok), `tests/lint.sh` (no new
   warnings beyond the pre-existing QObject member ones), the 148 QML tests,
   `tests/palette_extensions_check.py` (PASS). Not driven on the live

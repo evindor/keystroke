@@ -40,14 +40,15 @@ BarWidget {
     else root.toggleMenu()
   }
 
+  // The buttons size themselves from the bar (a WidgetButton's implicit
+  // height is the bar's size); the Row adds them up and the widget takes the
+  // Row's size. Nothing here reads the widget's own size back, which would
+  // be a loop that collapses the widget to nothing.
   Row {
     id: layout
-    anchors.top: parent.top
-    anchors.bottom: parent.bottom
 
     WidgetButton {
       id: button
-      height: parent.height
       bar: root.bar
       text: ""
       fontFamily: "omarchy"
@@ -63,7 +64,6 @@ BarWidget {
       model: root.items
       delegate: WidgetButton {
         required property var modelData
-        height: parent ? parent.height : implicitHeight
         bar: root.bar
         visible: !root.vertical && text !== ""
         text: String(modelData.text || "")
