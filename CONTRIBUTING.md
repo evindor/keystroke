@@ -56,7 +56,7 @@ An extension is one folder under `extensions/` with an `extension.json` and a `S
 
 1. Fork and clone this repository. Pick an id: lowercase letters, digits and dashes, not the name of a bundled provider (`calculator`, `files`, …). `extensions/<id>/` is the folder; the id is also the settings section and the scope key.
 2. Write the extension (below). Put it where the palette can see it without reinstalling Keystroke: `ln -s "$PWD/extensions/<id>" ~/.local/share/keystroke/extensions/<id>` (a copy works too). Open the palette: the extension is listed under Extensions with a **local** badge. Turn it on there, confirm, and use it. After you edit code that was already loaded, `omarchy-restart-shell` (the shell's QML cache cannot be cleared on Quickshell 0.3.1).
-3. `bin/keystroke check-extensions extensions/<id>` must pass. Open a pull request against `main` with the checklist from the template filled in. It is reviewed (by a coding agent first, then by the maintainer), merged, and ships with the next Keystroke release; your local copy keeps working in the meantime, and the shipped folder takes over when you delete the local one.
+3. `bin/keystroke check-extensions extensions/<id>` must pass. Open a pull request against `dev` with the checklist from the template filled in. It is reviewed (by a coding agent first, then by the maintainer), merged, and ships with the next Keystroke release; your local copy keeps working in the meantime, and the shipped folder takes over when you delete the local one.
 
 ### 1. Files
 
@@ -135,7 +135,7 @@ The Extensions screen then shows **Run setup**: after a confirmation that quotes
 
 ### 5. Submit it
 
-Open a pull request against `main` with `extensions/<id>` and nothing outside it (a change to Keystroke itself is a separate pull request). Fill in the template: what the extension does with example queries, and the checklist. Review looks for exactly what the checklist says: the folder is self-contained, every process, file, network call and download is listed in the README, nothing runs before the user turns the extension on, nothing runs on every keystroke that the README does not explain, and the code is yours or attributed. Bump `version` in `extension.json` for every user-visible change in later pull requests; there is no separate publishing step, the next Keystroke release carries it.
+Open a pull request against `dev` (the branch the next release is assembled on; `main` only moves at release time) with `extensions/<id>` and nothing outside it (a change to Keystroke itself is a separate pull request). Fill in the template: what the extension does with example queries, and the checklist. Review looks for exactly what the checklist says: the folder is self-contained, every process, file, network call and download is listed in the README, nothing runs before the user turns the extension on, nothing runs on every keystroke that the README does not explain, and the code is yours or attributed. Bump `version` in `extension.json` for every user-visible change in later pull requests; there is no separate publishing step, the next Keystroke release carries it.
 
 ## Contribute to Keystroke itself
 
