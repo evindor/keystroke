@@ -1,6 +1,6 @@
 {
   "name": "Timer",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Arseniy Zarechnev",
   "description": "Countdown timers with a sound, a notification and a countdown in the bar: timer 10m tea",
   "apiVersion": 1,

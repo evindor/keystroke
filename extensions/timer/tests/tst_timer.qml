@@ -77,8 +77,8 @@ TestCase {
         compare(TimerModel.soundPath({ sound: "off", soundFile: "/x.wav" }, "/home/u"), "")   // off is silent even with a custom file
         compare(TimerModel.soundPath({ sound: "alarm" }, "/home/u"), "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga")
         compare(TimerModel.soundPath({ sound: "chime" }, "/home/u"), "/usr/share/sounds/freedesktop/stereo/complete.oga")
-        compare(TimerModel.soundPath({ sound: "bell" }, "/home/u"), "/usr/share/sounds/freedesktop/stereo/bell.oga")
-        compare(TimerModel.soundPath({ sound: "bell", soundFile: " ~/ding.wav " }, "/home/u"), "/home/u/ding.wav")
+        compare(TimerModel.soundPath({ sound: "drop" }, "/home/u"), "/usr/share/sounds/freedesktop/stereo/bell.oga")
+        compare(TimerModel.soundPath({ sound: "drop", soundFile: " ~/ding.wav " }, "/home/u"), "/home/u/ding.wav")
         compare(TimerModel.soundPath({ sound: "nonsense" }, "/home/u"), "")
         compare(TimerModel.soundPath({}, "/home/u"), "")
         compare(TimerModel.soundArgv({ sound: "off" }, "/home/u"), null)

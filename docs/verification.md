@@ -1,5 +1,11 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Timer 1.2.1: the Bell sound is called Drop (2026-09-10)
+
+- The `sound` option `bell` is renamed `drop` (label Drop), still the
+  freedesktop `bell.oga`; a saved `bell` falls back to the default Chime
+  through the schema validation. Unit tests and `check-extensions` pass.
+
 ## Declared commands: hint line, placeholders, usage (2026-09-10)
 
 - Providers declare their typed triggers (`commands`: prefix, title, summary,

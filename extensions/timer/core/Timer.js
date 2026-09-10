@@ -147,7 +147,7 @@ function navRow(timers, score, scopeKey) {
 // checks the file and the player itself, so a missing sound is silent
 // rather than an error, and the path only ever lands in "$1".
 var SOUND_DIR = "/usr/share/sounds/freedesktop/stereo/"
-var SOUNDS = { chime: SOUND_DIR + "complete.oga", bell: SOUND_DIR + "bell.oga", alarm: SOUND_DIR + "alarm-clock-elapsed.oga" }
+var SOUNDS = { chime: SOUND_DIR + "complete.oga", drop: SOUND_DIR + "bell.oga", alarm: SOUND_DIR + "alarm-clock-elapsed.oga" }
 var SOUND_SCRIPT = 'f="$1"; [ -f "$f" ] || exit 0; ' +
   'if command -v pw-play >/dev/null 2>&1; then exec pw-play -- "$f"; fi; ' +
   'if command -v mpv >/dev/null 2>&1; then exec mpv --really-quiet --no-video -- "$f"; fi; ' +

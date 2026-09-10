@@ -35,9 +35,9 @@ QtObject {
     settings: [
       { key: "defaultMinutes", type: "number", label: "Default length (minutes)", "default": 5, min: 1, max: 720, integer: true,
         description: "Used by `timer tea` when no duration is given" },
-      { key: "sound", type: "enum", label: "Sound when a timer ends", "default": "chime", options: ["off", "chime", "bell", "alarm"],
-        optionLabels: { off: "Off", chime: "Chime", bell: "Bell", alarm: "Alarm" },
-        description: "Chime, Bell and Alarm are the freedesktop sounds in /usr/share/sounds; Custom sound file replaces the chosen one" },
+      { key: "sound", type: "enum", label: "Sound when a timer ends", "default": "chime", options: ["off", "chime", "drop", "alarm"],
+        optionLabels: { off: "Off", chime: "Chime", drop: "Drop", alarm: "Alarm" },
+        description: "Chime, Drop and Alarm are the freedesktop sounds in /usr/share/sounds; Custom sound file replaces the chosen one" },
       { key: "soundFile", type: "string", label: "Custom sound file", "default": "",
         description: "Path to an audio file played instead of the built-in sound; empty uses the choice above" },
       { key: "notify", type: "boolean", label: "Notify when a timer ends", "default": true },

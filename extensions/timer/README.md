@@ -28,7 +28,7 @@ Enter starts the timer and closes the palette. From that moment the soonest time
 Keystroke Settings → Timer:
 
 - **Default length (minutes)**: used when no duration is given. Default 5.
-- **Sound when a timer ends**: Off, Chime (default), Bell or Alarm. The three sounds are the freedesktop sound theme in `/usr/share/sounds/freedesktop/stereo`, which Omarchy has through libcanberra.
+- **Sound when a timer ends**: Off, Chime (default), Drop or Alarm. The three sounds are the freedesktop sound theme in `/usr/share/sounds/freedesktop/stereo`, which Omarchy has through libcanberra.
 - **Custom sound file**: a path to any audio file (`~` is expanded), played instead of the built-in sound while the sound is not Off.
 - **Notify when a timer ends**: on by default.
 - **Show the countdown in the bar**: on by default. Off keeps the bar as it was; the Timers screen still shows the countdowns.
