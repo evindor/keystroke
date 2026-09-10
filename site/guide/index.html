@@ -17,7 +17,7 @@
   <meta property="og:image:alt" content="Keystroke: Raycast for Omarchy, with app launcher, calculator, voice and Codex screenshots">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Learn Keystroke — the usage guide">
-  <meta name="twitter:description" content="Every feature, one page, one thing to try each.">
+  <meta name="twitter:description" content="Every feature of the Keystroke palette on one page, with a screenshot and one thing to try.">
   <meta name="twitter:image" content="https://evindor.github.io/keystroke/assets/social-card.png">
   <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../style.css">
@@ -32,8 +32,8 @@
 <main>
   <section class="guide-hero wrap" aria-labelledby="guide-headline">
     <p class="eyebrow"><span class="status-dot"></span> LEARN KEYSTROKE</p>
-    <h1 id="guide-headline">Everything you can type.<br><span>One page.</span></h1>
-    <p class="hero-copy">Every feature of the palette, with a screenshot, a few lines on how it works, and one thing to try. Read it top to bottom once, or jump to what you need. In Keystroke itself, <strong>Settings → Learn Keystroke</strong> opens this page.</p>
+    <h1 id="guide-headline">How to use Keystroke.<br><span>Every feature, one page.</span></h1>
+    <p class="hero-copy">Each section is one feature: a screenshot, how it works, and one thing to try. Read it once from the top, or jump to what you need. Inside Keystroke, <strong>Settings → Learn Keystroke</strong> opens this page.</p>
     <nav class="toc" aria-label="Guide contents">
       <div><h2>Start here</h2><a href="#start">Open it</a><a href="#keys">Keys to know</a><a href="#launch">Launch apps</a><a href="#omarchy">The Omarchy menu</a><a href="#fuzzy">Fuzzy into submenus</a><a href="#hotkeys">Hotkeys</a></div>
       <div><h2>Answers as you type</h2><a href="#calculator">Calculator</a><a href="#converter">Units and temperatures</a><a href="#timezones">Time zones</a><a href="#colors">Colors</a><a href="#emoji">Emoji</a></div>
@@ -52,8 +52,8 @@
     <div class="topic-copy">
       <span class="feature-number">01 / OPEN IT</span>
       <h3 id="start-title">One key. Everything.</h3>
-      <p><kbd>Super</kbd> + <kbd>Space</kbd> opens the palette in place of the Omarchy menu. Type what you want and the results sort themselves: computed answers first, matches next, the assistants last. <kbd>↵</kbd> runs the highlighted row, <kbd>Esc</kbd> closes. The empty root lists what is inside: applications, the Omarchy menu, clipboard history, calculator, converter, dictation, files, extensions, timers, hotkeys and settings.</p>
-      <p class="try"><b>Try it</b> Press <kbd>Super</kbd> + <kbd>Space</kbd>, type <code>chr</code>, press <kbd>↵</kbd>. Chromium opens. That is the whole idea.</p>
+      <p><kbd>Super</kbd> + <kbd>Space</kbd> opens the palette in place of the Omarchy menu. Type, and the results are ranked: computed answers first, then matches, then the assistants. <kbd>↵</kbd> runs the highlighted row, <kbd>Esc</kbd> closes. The empty root lists what is inside: applications, the Omarchy menu, clipboard history, calculator, converter, dictation, files, extensions, timers, hotkeys and settings.</p>
+      <p class="try"><b>Try it</b> Press <kbd>Super</kbd> + <kbd>Space</kbd>, type <code>chr</code>, press <kbd>↵</kbd>. Chromium opens.</p>
     </div>
     <button class="shot stage warm" data-image="root" data-label="The palette root" aria-label="Enlarge the palette root screenshot"><img src="../assets/screenshots/root.png" width="2560" height="2160" loading="lazy" alt="The empty palette listing Applications, Omarchy Menu, Clipboard History, Calculator, Convert Anything, Dictate to Clipboard and more"><span class="zoom" aria-hidden="true">↗</span></button>
   </section>
@@ -83,7 +83,7 @@
   <section class="topic" id="launch" aria-labelledby="launch-title">
     <div class="topic-copy">
       <span class="feature-number">03 / LAUNCH APPS</span>
-      <h3 id="launch-title">Type a few letters. Open the app.</h3>
+      <h3 id="launch-title">Launch applications</h3>
       <p>Every installed application is a row: by name, by abbreviation, by what its description says. What you launch often rises to the top (frecency, with a two-week half-life), and choosing a result for a query teaches the palette to lift that result the next time you type or say the same thing. Nothing about that is stored as text: only hashed ids in <code>~/.local/state/keystroke/usage.json</code>.</p>
       <p class="try"><b>Try it</b> Type <code>obs</code> and press <kbd>↵</kbd>. Next time, <code>o</code> may be enough. <kbd>Del</kbd> on an app offers to uninstall it.</p>
     </div>
@@ -93,7 +93,7 @@
   <section class="topic" id="omarchy" aria-labelledby="omarchy-title">
     <div class="topic-copy">
       <span class="feature-number">04 / THE OMARCHY MENU</span>
-      <h3 id="omarchy-title">The whole menu, and every route.</h3>
+      <h3 id="omarchy-title">The Omarchy menu, complete</h3>
       <p>Everything the stock menu offers is here, in the same tree: Setup, Style, Install, Update, System and the rest. <kbd>→</kbd> opens a submenu, <kbd>←</kbd> goes back, and inside a submenu the search covers everything below it. Every <code>omarchy menu</code> route keeps working: <code>omarchy menu toggle system</code> opens System, <code>omarchy menu summon reminder-set</code> runs it, and the selection and input pickers Omarchy scripts use are answered by the palette too. Shutdown, reboot, logout, removals and config resets ask first; turn that off in Settings → Omarchy.</p>
       <p class="try"><b>Try it</b> Type <code>syslock</code> and press <kbd>↵</kbd>: that is System → Lock. Type <code>sysshut</code> instead and a question appears; <kbd>Esc</kbd> says no.</p>
     </div>
@@ -106,7 +106,7 @@
   <section class="topic" id="fuzzy" aria-labelledby="fuzzy-title">
     <div class="topic-copy">
       <span class="feature-number">05 / FUZZY INTO SUBMENUS</span>
-      <h3 id="fuzzy-title">Skip the tree. Type through it.</h3>
+      <h3 id="fuzzy-title">Type through submenus</h3>
       <p>From the root, letters may skip whole words of a breadcrumb: <code>prefp</code>, <code>keysepro</code> and <code>setaiprv</code> all land on Keystroke Settings → AI &amp; Web Search → Preferred assistant, <code>prefcla</code> on its Claude choice, <code>sysshut</code> on System → Shutdown. Words can come in any order (<code>ai prov</code>), and descriptions match by word. The same applies to every settings screen, choice and Omarchy submenu.</p>
       <p class="try"><b>Try it</b> Type <code>prefcla</code> and press <kbd>↵</kbd>. Claude is now your preferred assistant. <code>prefcha</code> switches it back.</p>
     </div>
@@ -131,7 +131,7 @@
   <section class="topic" id="calculator" aria-labelledby="calculator-title">
     <div class="topic-copy">
       <span class="feature-number">07 / CALCULATOR</span>
-      <h3 id="calculator-title">Skip the mental math.</h3>
+      <h3 id="calculator-title">Calculate</h3>
       <p>Arithmetic, percentages and functions, computed as you type, with the result as the first row and in the preview. <code>128 * 1.24</code>, <code>15% of 80</code>, <code>sqrt(144) + 2^10</code>. Spoken arithmetic works too: "27 plus 90" becomes <code>27 + 90</code>.</p>
       <p class="try"><b>Try it</b> Type <code>sqrt(144) + 15% of 80</code>. <kbd>↵</kbd> copies <strong>24</strong>.</p>
     </div>
@@ -141,7 +141,7 @@
   <section class="topic" id="converter" aria-labelledby="converter-title">
     <div class="topic-copy">
       <span class="feature-number">08 / UNITS AND TEMPERATURES</span>
-      <h3 id="converter-title">Different units. No friction.</h3>
+      <h3 id="converter-title">Convert units and temperatures</h3>
       <p>Length, mass, volume, speed, data, temperature: <code>2m in feet</code>, <code>72 F to C</code>, <code>5 miles in kilometers</code>, <code>3 kg in lb</code>. The answer is the first row; <kbd>↵</kbd> copies it.</p>
       <p class="try"><b>Try it</b> Type <code>72 F to C</code>.</p>
     </div>
@@ -154,8 +154,8 @@
   <section class="topic" id="timezones" aria-labelledby="timezones-title">
     <div class="topic-copy">
       <span class="feature-number">09 / TIME ZONES</span>
-      <h3 id="timezones-title">Same moment, elsewhere.</h3>
-      <p>A time and a place become your local time, daylight saving included: <code>10 am in London</code>, <code>10am pt</code>, <code>now in tokyo</code>, <code>3pm est</code>. The preview spells out both ends.</p>
+      <h3 id="timezones-title">Convert time zones</h3>
+      <p>A time and a place, converted to your local time with daylight saving taken into account: <code>10 am in London</code>, <code>10am pt</code>, <code>now in tokyo</code>, <code>3pm est</code>. The preview spells out both ends.</p>
       <p class="try"><b>Try it</b> Type <code>now in tokyo</code>.</p>
     </div>
     <button class="shot stage sage" data-image="timezone" data-label="Time zones" aria-label="Enlarge the time zone screenshot"><img src="../assets/screenshots/timezone.png" width="2560" height="2160" loading="lazy" alt="10 am in London converted to 12:00 EEST"><span class="zoom" aria-hidden="true">↗</span></button>
@@ -164,7 +164,7 @@
   <section class="topic" id="colors" aria-labelledby="colors-title">
     <div class="topic-copy">
       <span class="feature-number">10 / COLORS</span>
-      <h3 id="colors-title">Colors, translated.</h3>
+      <h3 id="colors-title">Convert colors, or pick one from the screen</h3>
       <p>Paste a hex color and get the other forms: <code>#ff6644</code> (or <code>ff6644</code>, or <code>#f64</code>) shows HEX, RGB and HSL with a swatch. <strong>Pick a Color</strong> samples any pixel on the screen through hyprpicker and copies it in your preferred format (Settings → Colors).</p>
       <p class="try"><b>Try it</b> Type <code>#ff6644</code>, move to <strong>hsl</strong>, press <kbd>↵</kbd>.</p>
     </div>
@@ -174,8 +174,8 @@
   <section class="topic" id="emoji" aria-labelledby="emoji-title">
     <div class="topic-copy">
       <span class="feature-number">11 / EMOJI</span>
-      <h3 id="emoji-title">A little more expression.</h3>
-      <p><code>:</code> followed by a name or a feeling: <code>:rocket</code>, <code>:smile</code>, <code>:party</code>. Only emoji answer a <code>:</code> query, so the list is never crowded. <kbd>↵</kbd> copies the character.</p>
+      <h3 id="emoji-title">Type any emoji</h3>
+      <p><code>:</code> followed by a name or a feeling: <code>:rocket</code>, <code>:smile</code>, <code>:party</code>. Only emoji answer a <code>:</code> query, so nothing else gets in the list. <kbd>↵</kbd> copies the character.</p>
       <p class="try"><b>Try it</b> Type <code>:rocket</code> and press <kbd>↵</kbd>. Paste it anywhere.</p>
     </div>
     <button class="shot stage plum" data-image="emoji" data-label="Emoji" aria-label="Enlarge the Emoji screenshot"><img src="../assets/screenshots/emoji.png" width="2560" height="2160" loading="lazy" alt=":rocket finds the rocket emoji with a large preview"><span class="zoom" aria-hidden="true">↗</span></button>
@@ -186,7 +186,7 @@
   <section class="topic" id="clipboard" aria-labelledby="clipboard-title">
     <div class="topic-copy">
       <span class="feature-number">12 / CLIPBOARD HISTORY</span>
-      <h3 id="clipboard-title">Copied. Never lost.</h3>
+      <h3 id="clipboard-title">Search the clipboard history</h3>
       <p>Omarchy's own clipboard history, searchable, with the full text or the image in the preview. <kbd>↵</kbd> copies an entry back. History stays out of the global search: open <strong>Clipboard History</strong> first, then type.</p>
       <p class="try"><b>Try it</b> Type <code>clip</code>, press <kbd>↵</kbd>, then type a word you copied earlier today.</p>
     </div>
@@ -196,7 +196,7 @@
   <section class="topic" id="files" aria-labelledby="files-title">
     <div class="topic-copy">
       <span class="feature-number">13 / FILES AND FOLDERS</span>
-      <h3 id="files-title">That file. Right there.</h3>
+      <h3 id="files-title">Find files and folders</h3>
       <p>Files and folders under your home join the results from two characters on, found with <code>fd</code>, and abbreviations work: <code>dwnlds</code> finds Downloads. <code>~</code> searches only files: <code>~dcmnts rpt</code> is every report under Documents. <kbd>↵</kbd> opens the file with its default app; <kbd>Ctrl</kbd>+<kbd>↵</kbd> opens a terminal in its folder. Hidden entries are optional and gitignore rules are respected. Settings → Files chooses whether files mix into the main palette fuzzily, literally, or only with <code>~</code>.</p>
       <p class="try"><b>Try it</b> Type <code>~dcmnts rpt</code>. Press <kbd>Ctrl</kbd>+<kbd>↵</kbd> to land in that folder in a terminal.</p>
     </div>
@@ -209,7 +209,7 @@
   <section class="topic" id="smart-match" aria-labelledby="smart-match-title">
     <div class="topic-copy">
       <span class="feature-number">14 / SMART MATCH</span>
-      <h3 id="smart-match-title">Say what you mean.</h3>
+      <h3 id="smart-match-title">Match by meaning</h3>
       <p>A small embedding model, running locally on the CPU, supplements exact and fuzzy search with action descriptions: it keeps launch, install and remove distinct, forgives typos, and offers Chromium for "launch Chrome" when Chrome is absent. Settings → Matching chooses <strong>Off</strong>, <strong>Only voice</strong> or <strong>Voice and text</strong> (the default), and the model, Small (2M) or Large (8M). The first query downloads the model once (8 MB, pinned digest); after that everything is offline, and the runtime unloads after two idle minutes. Ordinary search never waits for it.</p>
       <p class="try"><b>Try it</b> Type <code>launch chrome</code> on a machine without Chrome. Chromium is offered.</p>
     </div>
@@ -231,7 +231,7 @@
   <section class="topic" id="dictation" aria-labelledby="dictation-title">
     <div class="topic-copy">
       <span class="feature-number">16 / DICTATE TO CLIPBOARD</span>
-      <h3 id="dictation-title">Get the words out.</h3>
+      <h3 id="dictation-title">Dictate to the clipboard</h3>
       <p>A prose-only recording: speak, read the transcript, then <kbd>↵</kbd> copies it and closes, <kbd>Ctrl</kbd>+<kbd>↵</kbd> pastes it into the window you came from. After any typed or spoken query, <strong>Copy to Clipboard</strong> under <em>Continue with</em> does the same with the original text. <code>bin/keystroke dictate</code> opens this screen and starts recording, for a bind of your own.</p>
       <p class="try"><b>Try it</b> Type <code>dict</code>, press <kbd>↵</kbd>, tap the hotkey, speak a sentence, then <kbd>Ctrl</kbd>+<kbd>↵</kbd>.</p>
     </div>
@@ -241,7 +241,7 @@
   <section class="topic" id="assistants" aria-labelledby="assistants-title">
     <div class="topic-copy">
       <span class="feature-number">17 / ASSISTANTS</span>
-      <h3 id="assistants-title">Hand any query on.</h3>
+      <h3 id="assistants-title">Send a query to an assistant</h3>
       <p>Whatever you typed or said, <em>Continue with</em> offers it to Codex, Claude, ChatGPT and Google, with the prompt already in the target's composer: the Claude or Codex desktop app, the browser (<code>claude.ai</code>, <code>chatgpt.com</code>), or a terminal running the CLI. Nothing goes through the clipboard. Settings → AI &amp; Web Search picks the preferred assistant, the destination, and whether the browser sends immediately.</p>
       <p class="try"><b>Try it</b> Type a question, press <kbd>↓</kbd> to <strong>Ask Claude</strong>, press <kbd>↵</kbd>.</p>
     </div>
@@ -251,7 +251,7 @@
   <section class="topic" id="codex" aria-labelledby="codex-title">
     <div class="topic-copy">
       <span class="feature-number">18 / CODEX INSIDE KEYSTROKE</span>
-      <h3 id="codex-title">A little question. A full conversation.</h3>
+      <h3 id="codex-title">Ask Codex inside the palette</h3>
       <p>Select <strong>Ask Codex here</strong>, or type <code>? </code> before a question, and the answer streams inside the palette. <kbd>↵</kbd> sends a follow-up, <kbd>Shift</kbd>+<kbd>↵</kbd> adds a line, your voice hotkey fills the composer, <strong>Stop</strong> interrupts, <kbd>Ctrl</kbd>+<kbd>↵</kbd> continues in the Codex app or CLI. <strong>Codex → Recent questions</strong> resumes a conversation. It uses your own <code>codex login</code> (Codex CLI 0.153.2) and one local app-server that shuts down after ten idle minutes. Settings → Codex picks the model, Fast or Standard, the destination and a working folder.</p>
       <p class="try"><b>Try it</b> Type <code>? how do I find the biggest folders here</code> and press <kbd>↵</kbd>.</p>
     </div>
@@ -263,7 +263,7 @@
   <section class="topic" id="settings" aria-labelledby="settings-title">
     <div class="topic-copy">
       <span class="feature-number">19 / SETTINGS</span>
-      <h3 id="settings-title">One file. Every screen searchable.</h3>
+      <h3 id="settings-title">One config file, every setting searchable</h3>
       <p>Everything lives in <code>~/.config/omarchy/keystroke.json</code>, hand-editable and hot-reloaded. The screens are generated from each provider's settings, so every screen, setting and choice is one row you can reach from the root by typing through its breadcrumb. <kbd>Ctrl</kbd>+<kbd>,</kbd> opens Settings; <kbd>Ctrl</kbd>+<kbd>K</kbd> opens the settings of whatever is selected. Each provider can be turned off. <strong>Learn Keystroke</strong> opens this page.</p>
       <p class="try"><b>Try it</b> Type <code>dens comf</code> and press <kbd>↵</kbd>: the palette switches to the comfortable density at once.</p>
     </div>
@@ -273,7 +273,7 @@
   <section class="topic" id="appearance" aria-labelledby="appearance-title">
     <div class="topic-copy">
       <span class="feature-number">20 / APPEARANCE</span>
-      <h3 id="appearance-title">Feels like your desktop.</h3>
+      <h3 id="appearance-title">Density, accent and animations</h3>
       <p>Colors, fonts, radius and spacing come from the active Omarchy theme and follow it when it changes. On top of that: density (compact or comfortable), accent (theme, ember, violet or mint), result previews on or off, animations (off, snappy or fluid) and the window transition (instant, fade or slide up).</p>
       <p class="try"><b>Try it</b> Type <code>anim fluid</code>, press <kbd>↵</kbd>, then move through a submenu.</p>
     </div>
@@ -283,7 +283,7 @@
   <section class="topic" id="bar" aria-labelledby="bar-title">
     <div class="topic-copy">
       <span class="feature-number">21 / THE BAR BUTTON</span>
-      <h3 id="bar-title">A button in the bar, and what sits next to it.</h3>
+      <h3 id="bar-title">The bar button</h3>
       <p>Keystroke ships the menu button as a bar widget: it takes the stock button's place, or goes first on the left when installed from a checkout (<code>omarchy bar move evindor.keystroke left --index 0</code> puts it there otherwise). Extensions can put a small item right after it: the Timer's countdown lives there until the sound plays, and pressing it opens the Timers screen. Removing the button from the bar also disables the menu; keep the plugin under <code>plugins[]</code> in <code>shell.json</code> if you want the palette without the button.</p>
       <p class="try"><b>Try it</b> Start a timer, then look left in the bar.</p>
     </div>
@@ -295,7 +295,7 @@
   <section class="topic" id="commands" aria-labelledby="commands-title">
     <div class="topic-copy">
       <span class="feature-number">22 / COMMANDS EXPLAIN THEMSELVES</span>
-      <h3 id="commands-title">Type a prefix. Read the rest.</h3>
+      <h3 id="commands-title">Typed commands and their arguments</h3>
       <p>Some things are quicker to type than to pick: <code>timer</code>, <code>tr</code>, <code>:</code>, <code>~</code>, <code>/</code>. The moment a prefix is recognised, the line under the field names the action and the argument you are on (<em>Set a timer · duration: 10m, 1h30m, 0:45…</em>), and the arguments still to type appear after the caret as <code>&lt;duration&gt; [name]</code>, vanishing as you fill them. <kbd>Tab</kbd> moves to the next argument. Every prefix can be renamed in the provider's settings (<code>tm</code> instead of <code>timer</code>), and a typed command is exclusive: only its owner answers.</p>
       <p class="try"><b>Try it</b> Type <code>timer </code> and stop. Read the line. Then finish it: <code>10m tea</code>, <kbd>↵</kbd>.</p>
     </div>
@@ -305,7 +305,7 @@
   <section class="topic" id="help" aria-labelledby="help-title">
     <div class="topic-copy">
       <span class="feature-number">23 / WHAT CAN I TYPE?</span>
-      <h3 id="help-title">The list of every prefix.</h3>
+      <h3 id="help-title">Every command, listed</h3>
       <p><code>/</code> lists every command the enabled providers declare, with its usage line and what the arguments mean; <code>/tr</code> filters the list, and <kbd>↵</kbd> types the prefix for you. Do not remember a prefix? Type the name: <code>transl</code> suggests Translate, and <kbd>Tab</kbd> types <code>tr </code>. The same row sits at the bottom of the empty root as <strong>What can I type?</strong></p>
       <p class="try"><b>Try it</b> Type <code>/</code>. Then type <code>transl</code> and press <kbd>Tab</kbd>.</p>
     </div>
@@ -318,7 +318,7 @@
   <section class="topic" id="extensions" aria-labelledby="extensions-title">
     <div class="topic-copy">
       <span class="feature-number">24 / EXTENSIONS</span>
-      <h3 id="extensions-title">Off until you say so.</h3>
+      <h3 id="extensions-title">Extensions are off until you turn them on</h3>
       <p>Extensions ship inside Keystroke, one folder each, and reach everyone through a reviewed pull request. Installing or updating Keystroke never runs their code: an extension that is off is not even compiled. Type <code>ext</code> and open <strong>Extensions</strong>: the list shows each one with its version and state, <kbd>↵</kbd> opens its page, <kbd>Ctrl</kbd>+<kbd>↵</kbd> turns one off. Turning one on asks first: it was checked and reviewed before it shipped, it runs in your shell with your permissions, read its code if you want to. One that fails to load says <strong>Needs attention</strong> with the reason. A folder in <code>~/.local/share/keystroke/extensions</code> is picked up too, for one you are writing.</p>
       <p class="try"><b>Try it</b> Type <code>ext</code>, press <kbd>↵</kbd>, open <strong>Translate</strong>, press <kbd>↵</kbd> on <strong>Enabled</strong>, confirm. The status line tells you what to type next.</p>
     </div>
@@ -331,7 +331,7 @@
   <section class="topic" id="extension-page" aria-labelledby="extension-page-title">
     <div class="topic-copy">
       <span class="feature-number">25 / AN EXTENSION'S PAGE</span>
-      <h3 id="extension-page-title">Usage first. Examples you can run.</h3>
+      <h3 id="extension-page-title">An extension's page: usage and examples</h3>
       <p>Each extension's page starts with its usage line and every argument explained, then examples: <kbd>↵</kbd> on <code>timer 10m tea</code> types it at the root, ready to run. Below sit the <strong>Prefix</strong> (rename it here), the <strong>Enabled</strong> switch, <strong>Settings</strong>, <strong>Run setup</strong> when an extension needs a one-off step (it runs in a visible terminal, never in the background) and <strong>Open source</strong>, the extension's folder on GitHub.</p>
       <p class="try"><b>Try it</b> Open <strong>Extensions → Timer</strong>, move to <code>timer 1h30m bread</code>, press <kbd>↵</kbd>, then <kbd>↵</kbd> again.</p>
     </div>
@@ -341,7 +341,7 @@
   <section class="topic" id="timer" aria-labelledby="timer-title">
     <div class="topic-copy">
       <span class="feature-number">26 / TIMER</span>
-      <h3 id="timer-title">Make time for focus.</h3>
+      <h3 id="timer-title">Countdown timers</h3>
       <p><code>timer 10m tea</code>, <code>timer 1h30m bread</code>, <code>timer 90</code> (minutes), <code>timer tea</code> (the default length). <kbd>↵</kbd> starts it and closes the palette; the countdown sits in the bar next to the menu button, <strong>Timers</strong> at the root lists what is running (<kbd>↵</kbd> cancels one after asking), and when it ends a sound plays (chime by default; drop, alarm, a file of your own, or off) and a notification arrives. Timers keep running after the palette closes because the extension's service outlives the window. Timer is also the reference extension: small enough to read in one sitting.</p>
       <p class="try"><b>Try it</b> Type <code>timer 25m focus</code> and press <kbd>↵</kbd>.</p>
     </div>
@@ -354,7 +354,7 @@
   <section class="topic" id="translate" aria-labelledby="translate-title">
     <div class="topic-copy">
       <span class="feature-number">27 / TRANSLATE</span>
-      <h3 id="translate-title">Say it in another language.</h3>
+      <h3 id="translate-title">Translate text</h3>
       <p>Google Translate without an account: <code>tr bonjour</code> detects the language and translates into your first target; <code>tr fr good morning</code> picks a target by code or name; <code>bonjour to english</code> needs no prefix at all. The translation is the first row (<kbd>↵</kbd> copies, <kbd>Ctrl</kbd>+<kbd>↵</kbd> pastes into the app you came from), the reverse translation sits under it as a check, and every other target you configured follows. <strong>Open in the editor</strong> shows all of them for longer text, with dictation. When text is selected as the palette opens, <strong>Translate the selection</strong> is offered at the root. Targets, source language, default action and a proxy are in Settings → Translate; the target picker on the Translate screen lists every language.</p>
       <p class="try"><b>Try it</b> Type <code>tr bonjour</code>. Then <code>how are you in spanish</code>.</p>
     </div>
@@ -367,9 +367,9 @@
   <section class="topic build" id="build" aria-labelledby="build-title">
     <div class="topic-copy">
       <span class="feature-number">28 / WRITE YOUR OWN</span>
-      <h3 id="build-title">Your next feature could be yours.</h3>
+      <h3 id="build-title">Write an extension</h3>
       <p>An extension is a folder with an <code>extension.json</code> (name, version, the commands it answers to) and a <code>Service.qml</code> exposing a provider with <code>query(ctx)</code>. It can declare patterns for the shapes of text it answers, carry its own icon, show a view of its own over the palette, keep state that outlives the window and put an item in the bar. Copy <a href="https://github.com/evindor/keystroke/tree/main/extensions/timer">extensions/timer</a>, follow <a href="https://github.com/evindor/keystroke/blob/main/CONTRIBUTING.md#build-an-extension">the step-by-step guide</a>, drop the folder into <code>~/.local/share/keystroke/extensions</code> to use it at once, and open a pull request to ship it to everyone. The contract is <a href="https://github.com/evindor/keystroke/blob/main/docs/providers.md">docs/providers.md</a>.</p>
-      <p class="try"><b>Try it</b> <code>cp -r extensions/timer ~/.local/share/keystroke/extensions/mine</code>, rename it in <code>extension.json</code>, open the palette: it is listed, off, waiting for you.</p>
+      <p class="try"><b>Try it</b> <code>cp -r extensions/timer ~/.local/share/keystroke/extensions/mine</code>, rename it in <code>extension.json</code>, open the palette: it is listed, off, ready to turn on.</p>
     </div>
   </section>
 
