@@ -20,7 +20,7 @@ jobs:
       - name: Install Qt QML tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qt6-declarative-dev-tools qml6-module-qttest qml6-module-qtquick
+          sudo apt-get install -y --no-install-recommends qt6-declarative-dev-tools qml6-module-qttest qml6-module-qtquick qml6-module-qtqml-workerscript
       - name: Check every extension folder
         # Quickshell is not packaged for Ubuntu, so qmllint runs without it and
         # only errors fail the job; the unit tests import QtQuick and QtTest only.
