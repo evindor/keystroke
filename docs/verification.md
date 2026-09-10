@@ -1,5 +1,23 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Disabled provider routes (2026-09-09)
+
+- Reproduced on Omarchy 4.0.3-1 with Keystroke 1.3.0: an `omarchy-menu
+  toggle apps` binding opened the Applications scope while
+  `providers.applications.enabled` was false. The route was accepted before
+  provider filtering removed Applications, leaving a generic empty state;
+  Backspace returned to the populated root palette.
+- Direct routes now verify their target after resolving it. A disabled target
+  falls back to root and reports that the provider is disabled in Keystroke
+  Settings; enabled routes retain their existing scoped behaviour.
+- `tests/palette_route_check.py` drives the real palette offscreen and covers
+  both states. It fails against `v1.3.0` at the disabled-route assertion and
+  passes on this tree. Full `bin/keystroke test` passes: 149 QML tests and all
+  integration checks, including the new palette route check. `bin/keystroke
+  validate` and `git diff --check` pass; qmllint reports only the existing
+  metadata warnings. The patched plugin was not installed over the user's
+  release copy and the fallback was not exercised in a live shell.
+
 ## Release 1.3.0 (2026-09-10)
 
 - Root cause of "installed extension never appears": omarchy-shell gives a
