@@ -1,5 +1,6 @@
 """Public sample data only. Rendered by Keystroke's actual QML components."""
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -45,5 +46,5 @@ F['emoji']['rows'][0]['verb'] = 'Copy emoji'
 for fixture in F.values():
     for r in fixture.get('rows',[]):
         if 'verb_override' in r: r['verb']=r.pop('verb_override')
-Path('/tmp/keystroke-showcase-fixtures.json').write_text(json.dumps(F,ensure_ascii=False,indent=2))
+Path(os.environ.get('KEYSTROKE_SHOWCASE_FIXTURES', '/tmp/keystroke-showcase-fixtures.json')).write_text(json.dumps(F,ensure_ascii=False,indent=2))
 print(f'{len(F)} public fixtures')

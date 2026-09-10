@@ -81,7 +81,7 @@ TestCase {
         var root = SettingsTree.rows(t.nodes, "", "")
         compare(titles(root), ["Keystroke Settings"])
         compare(root[0].score, 20)
-        compare(titles(SettingsTree.rows(t.nodes, "settings", "")), ["Appearance", "Open config file", "AI & Web Search", "Clipboard History", "Hello", "broken"])
+        compare(titles(SettingsTree.rows(t.nodes, "settings", "")), ["Appearance", "Open config file", "Learn Keystroke", "AI & Web Search", "Clipboard History", "Hello", "broken"])
         compare(titles(SettingsTree.rows(t.nodes, "settings/ai", "")), ["Enabled", "Preferred assistant", "Open conversations in", "Send immediately in the browser"])
         var hello = SettingsTree.rows(t.nodes, "settings/hello", "")
         compare(hello[0].title, "Enabled")
@@ -156,6 +156,15 @@ TestCase {
         compare(t.screens["settings/voice/keys"], undefined)
         t = SettingsTree.build(model())                                              // no voice model at all: nothing changes
         compare(titles(SettingsTree.rows(t.nodes, "settings", "")).slice(0, 2), ["Appearance", "Open config file"])
+    }
+    function test_learn_keystroke_opens_the_guide_from_anywhere() {
+        var rows = search("", "learn")
+        compare(rows[0].title, "Learn Keystroke")
+        compare(rows[0].subtitle, "Keystroke Settings")
+        compare(rows[0].action.type, "url")
+        compare(rows[0].action.url, "https://evindor.github.io/keystroke/guide/")
+        compare(search("", "guide")[0].title, "Learn Keystroke")
+        compare(search("settings", "help")[0].title, "Learn Keystroke")
     }
     function test_unrelated_queries_find_nothing() {
         compare(search("", "chrome").length, 0)

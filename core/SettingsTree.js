@@ -15,6 +15,7 @@
 // build() lists those under `screens` for the provider to render.
 
 var ROOT_TITLE = "Keystroke Settings"
+var GUIDE_URL = "https://evindor.github.io/keystroke/guide/"
 var GEAR = "󰒓"
 
 function titleCase(s) { s = String(s); return s.charAt(0).toUpperCase() + s.slice(1) }
@@ -124,6 +125,11 @@ function build(model) {
   }
   nodes.push(node("settings", rootParts.concat(["Open config file"]), { id: "config", subtitle: String(model.configPath || ""), icon: "", section: "Keystroke",
     verb: "Open file", order: 2, keywords: "json", description: "edit", action: { type: "edit" } }))
+  // The usage guide on the website: every feature, key, prefix and extension
+  // with a screenshot. Reachable from the root by name ("learn", "guide").
+  nodes.push(node("settings", rootParts.concat(["Learn Keystroke"]), { id: "learn", subtitle: "The usage guide in your browser: every feature, key and prefix, with screenshots", icon: "󰋗",
+    section: "Keystroke", verb: "Open guide", order: 3, lift: 1, keywords: "guide help docs manual tutorial", description: "learn how to use keystroke usage guide documentation help",
+    action: { type: "url", url: GUIDE_URL } }))
   var entries = model.entries || []
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i]

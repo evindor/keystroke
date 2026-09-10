@@ -2,7 +2,32 @@
 
 These tools render the production Keystroke QML UI with public demo content.
 They are developer tools, not a production capture API. They do not modify
-Keystroke itself or launch a second Quickshell process.
+Keystroke itself.
+
+## The offscreen way (default)
+
+```sh
+python3 tools/showcase/offscreen.py              # every scene → site/assets/screenshots/
+python3 tools/showcase/offscreen.py commands help   # a few, by name
+```
+
+`offscreen.py` never touches the desktop. It runs the real `Keystroke.qml`,
+with every bundled provider and the shipped extensions, under Quickshell's
+offscreen platform, scaled 4x so the 640x540 card becomes the 2560x2160 PNG
+`site/check.py` expects. The palette lives in a fake HOME (demo files, a demo
+clipboard history, `keystroke.json` with Timer and Translate on, and a link
+to `~/.local/state/omarchy/current` so the captures wear the desktop's
+current theme), with a fake `curl` that answers Translate from a table, a
+`wl-paste` that finds no selection, and a fake `OMARCHY_PATH` whose
+`omarchy-menu-keybindings` prints demo binds. Every row on screen is what
+the providers compute. The three states the real palette cannot reach
+offline (the Applications list, a Codex conversation, a live recording) come
+from the fixture palette below, run through the same offscreen window. The
+Timer's countdown in the bar is the real `BarWidget.qml` against a fake bar,
+saved as `bar-timer.png`. Set `KEYSTROKE_SHOWCASE_DEBUG=1` to see
+Quickshell's log. Review the PNGs before publishing.
+
+## The fixture palette (staged states, and the live-shell way)
 
 ## Why a temporary plugin
 
@@ -38,6 +63,8 @@ python3 tools/showcase/capture.py
 Capture temporarily brings an overlay into view and rescans plugins. Review the
 fixture source and generated PNGs before publishing. Do not substitute user data.
 PNG output: `site/assets/screenshots/`, 2560 x 2160 on the reference desktop.
+`prepare.py` honours `KEYSTROKE_SHOWCASE_DEST` and `KEYSTROKE_SHOWCASE_HOME`,
+`fixtures.py` honours `KEYSTROKE_SHOWCASE_FIXTURES`; `offscreen.py` uses those.
 These are screenshot fixtures, not an end-to-end functional test of the providers.
 The product's actual behavior checks live in `tests/`.
 
