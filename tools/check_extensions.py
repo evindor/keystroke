@@ -94,8 +94,20 @@ def check(folder, qt_mode, reserved):
             fail(f"setup script {run} is not executable")
         if isinstance(setup, dict) and not isinstance(setup.get("summary", ""), str):
             fail("setup.summary must be a string")
+    commands = m.get("commands")
+    if commands is not None:
+        if not isinstance(commands, list):
+            fail("commands must be an array")
+        else:
+            for i, c in enumerate(commands):
+                if not isinstance(c, dict) or not isinstance(c.get("prefix"), str) or not c["prefix"].strip() or " " in c["prefix"].strip():
+                    fail(f"commands[{i}] needs a one-word prefix")
+                elif not isinstance(c.get("title"), str) or not c["title"].strip():
+                    fail(f"commands[{i}] needs a title")
+                elif any(not isinstance(a, dict) or not isinstance(a.get("name"), str) or not a["name"].strip() for a in c.get("args", [])):
+                    fail(f"commands[{i}]: every argument needs a name")
     for key in m:
-        if key not in {"name", "version", "author", "description", "apiVersion", "icon", "color", "homepage", "entry", "license", "setup"}:
+        if key not in {"name", "version", "author", "description", "apiVersion", "icon", "color", "homepage", "entry", "license", "setup", "commands"}:
             fail(f"unknown field {key} in extension.json")
     if not (folder / "README.md").is_file():
         fail("README.md is missing")

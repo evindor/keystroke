@@ -116,7 +116,8 @@ ShellRoot {
      test.svc = s.instance
      test.svc.omarchyPath = "''' + str(work / "omarchy") + '''"
      var p = entry("translate").provider
-     test.check(p.patterns.length === 2 && p.settings.length === 7 && !!p.view && typeof p.dismiss === "function", "provider declares patterns, settings, a view and dismiss")
+     test.check(p.patterns.length === 1 && p.settings.length === 7 && !!p.view && typeof p.dismiss === "function", "provider declares a pattern, settings, a view and dismiss")
+     test.check(entry("translate").commands.length === 1 && entry("translate").commands[0].prefix === "tr" && entry("translate").settingsSchema[0].key === "prefix", "the command from extension.json is compiled with the prefix setting in front")
      test.check(test.svc.iconSource.indexOf("assets/icon.svg") > 0, "icon resolved next to the service: " + test.svc.iconSource)
      test.check(palette.registry.problems.length === 0, "no problems: " + JSON.stringify(palette.registry.problems))
      palette.open(JSON.stringify({ query: "tr hello world" }))

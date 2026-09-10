@@ -11,13 +11,13 @@ import "voice"
 import "core"
 import "core/Match.js" as Match
 import "core/Frecency.js" as Frecency
-import "core/Files.js" as FileSearch
 import "core/Settings.js" as Settings
 import "core/VoiceBindings.js" as VoiceBindings
 import "core/Intent.js" as Intent
 import "core/Patterns.js" as Patterns
 import "core/SmartMatch.js" as SmartMatch
 import "core/Motion.js" as Motion
+import "core/Commands.js" as Commands
 import "matching" as Matching
 
 // Keystroke: an extension-first command palette that replaces the Omarchy
@@ -160,7 +160,68 @@ Item {
     return row
   }
   function paletteValues() { return root.paletteSettings }
-  function settingsFor(entry) { return Settings.values(root.config, ["providers", entry.key], entry.provider.settings || []) }
+  function settingsFor(entry) { return Settings.values(root.config, ["providers", entry.key], entry.settingsSchema || entry.provider.settings || []) }
+
+  // ---------------------------------------------------------------- commands
+  // The typed triggers every enabled provider declares (core/Commands.js),
+  // with the user's prefixes applied. The index is rebuilt when the registry
+  // or the config changes. The typed text is matched live on every keystroke
+  // for the hint line, the ghost placeholders and the sheen, and again in
+  // runQuery, which routes the query to the command's owner.
+  property var commandIndex: ({ items: [], conflicts: [], entries: null, config: null })
+  function commandItems() {
+    var ix = root.commandIndex
+    if (ix.entries === providerRegistry.entries && ix.config === root.config) return ix.items
+    var providers = []
+    for (var i = 0; i < providerRegistry.entries.length; i++) {
+      var e = providerRegistry.entries[i]
+      if (!e.commands || !e.commands.length || !root.providerEnabled(e)) continue
+      var p = e.provider
+      providers.push({ key: e.key, name: p.name, icon: p.icon || "", iconFont: p.iconFont || "", iconSource: p.iconSource || "", tint: p.color || "",
+                       commands: e.commands, override: root.settingsFor(e).prefix })
+    }
+    var built = Commands.buildIndex(providers)
+    root.commandIndex = { items: built.items, conflicts: built.conflicts, entries: providerRegistry.entries, config: root.config }
+    return built.items
+  }
+  property var activeCommand: null          // the live match for the typed text at the root
+  property string commandGhost: ""          // placeholders after the caret
+  property string commandHint: ""           // the line under the search field
+  function commandMatch(text) {
+    if (root.dmenuActive || root.dictationMode || root.scope) return null
+    return Commands.match(root.commandItems(), text)
+  }
+  function updateCommandLive() {
+    var m = root.opened ? root.commandMatch(search.text) : null
+    var prev = root.activeCommand
+    root.activeCommand = m
+    root.commandGhost = Commands.ghost(m, search.text)
+    root.commandHint = Commands.hintLine(m)
+    if (m && (!prev || prev.key !== m.key || prev.prefix !== m.prefix)) sheen.play(search.text.length - search.text.replace(/^\s+/, "").length + m.prefix.length)
+  }
+  // The "query" effect: put text in the search field at the root and stay
+  // open. The "/" screen, an extension's Usage rows and Tab use it.
+  function typeQuery(text) {
+    var wasDeep = !!root.scope || root.providerViewActive
+    root.closeProviderView()
+    root.history = []
+    root.scope = ""; root.scopeTitle = ""
+    search.text = String(text || "")
+    search.cursorPosition = search.text.length
+    root.resetSelection()
+    root.applyRows([])
+    root.runQuery()
+    search.forceActiveFocus()
+    if (wasDeep) root.slideLevel(-1)
+  }
+  // Tab: a command row types its prefix; a bare prefix gets its space so the
+  // placeholders show; anything else is left alone.
+  function completeCommand() {
+    var row = root.current
+    if (row && row.action && row.action.type === "query" && !row.disabled) { root.perform(row.action, row); return }
+    var m = root.activeCommand
+    if (m && !m.command.sigil && m.rest === "" && !/\s$/.test(search.text)) { search.text = search.text + " "; search.cursorPosition = search.text.length; root.edited() }
+  }
   // Bundled providers are on unless turned off; extensions are off until turned on.
   function providerEnabled(entry) { return !!entry && Settings.isEnabled(root.config, ["providers", entry.key], entry.source === "bundled") }
   function registryEntry(key) {
@@ -636,6 +697,7 @@ Item {
   function edited() {
     root.confirmPending = null
     root.resetSelection()
+    root.updateCommandLive()
     debounce.restart()
   }
   function setQuery(text) { clipboardTransfer.cancel(); root.voiceCancel(); search.text = String(text || ""); root.edited(); return "ok" }
@@ -731,8 +793,12 @@ Item {
     if (root.dmenuActive) { root.applyRows(root.dmenuRows()); root.pending = false; root.afterRows(); return }
     root.generation++
     var raw = root.voiceRawText || search.text, sc = root.scope
-    var filePrefix = !root.dictationMode && (!sc || sc === "files") && FileSearch.prefixed(raw)
-    var smart = !root.dictationMode && !filePrefix && SmartMatch.enabled(root.matchingSettings.mode, !!root.voiceRawText)
+    // A typed command routes the query to its owner alone, with ctx.command
+    // and a boost: the user named the provider, so nothing else answers.
+    var command = !root.dictationMode && !sc ? Commands.match(root.commandItems(), raw) : null
+    root.updateCommandLive()
+    var exclusive = !!(command && command.exclusive)
+    var smart = !root.dictationMode && !exclusive && SmartMatch.enabled(root.matchingSettings.mode, !!root.voiceRawText)
     var req = SmartMatch.request(raw)
     // Provider queries keep case and arguments (paths, units, extension input).
     // Command rewrites belong to catalog matching; only whole arithmetic is substituted.
@@ -741,15 +807,15 @@ Item {
     var owner = sc.split("/")[0]
     var sub = sc.indexOf("/") >= 0 ? sc.slice(owner.length + 1) : ""
     var collected = [], errors = [], pend = false, matchedPatterns = ({})
-    var cacheKey = [q, root.voiceRawText || search.text, sc, root.dictationMode ? "d" : ""].join("\u001f")
+    var cacheKey = [q, root.voiceRawText || search.text, sc, root.dictationMode ? "d" : "", command ? command.key + ":" + command.prefix : ""].join("\u001f")
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var entry = providerRegistry.entries[i]
       if (!root.providerEnabled(entry)) continue
-      if (filePrefix && entry.key !== "files") continue
+      if (exclusive && entry.key !== command.key) continue
       if (sc && owner !== entry.key) continue
       var cached = root.providerCache[entry.key]
       if (!cached || cached.key !== cacheKey) {
-        cached = root.queryProvider(entry, q, sc, sub)
+        cached = root.queryProvider(entry, q, sc, sub, command && command.key === entry.key ? command : null)
         cached.key = cacheKey
         root.providerCache[entry.key] = cached
       }
@@ -783,18 +849,24 @@ Item {
 
   // One provider's rows for one query: normalized, bounded, with whether it
   // asked for a later refresh and which declared patterns matched.
-  function queryProvider(entry, q, sc, sub) {
+  function queryProvider(entry, q, sc, sub, command) {
     var result = { rows: [], pending: false, patterns: null, error: "" }
     // Declared patterns run before query(): the provider learns which shapes
-    // matched, and the largest boost lifts every row it returns this time.
+    // matched, and the largest boost lifts every row it returns this time. A
+    // typed command does the same and hands the provider the text after its
+    // prefix, so the provider never parses the prefix (the user may rename it).
     var patterns = Patterns.evaluate(entry.patterns, q)
     if (patterns.matched.length) result.patterns = patterns.matched
+    var boost = Math.max(patterns.boost, command ? Commands.BOOST : 0)
     var ctx = { query: q, rawQuery: root.voiceRawText || search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
-                patterns: patterns, pending: function() { result.pending = true }, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
+                patterns: patterns, command: command ? { id: command.command.id, prefix: command.prefix, rest: command.rest, args: command.command.args } : null,
+                pending: function() { result.pending = true }, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
+    // The default matcher sees the text after a recognised prefix, not the prefix itself.
+    var matchText = command ? command.rest : q
     try {
       var out = entry.provider.query(ctx) || []
       for (var r = 0; r < out.length && r < 400; r++) {
-        var row = root.normalize(out[r], entry, q, patterns.boost)
+        var row = root.normalize(out[r], entry, matchText, boost)
         if (row) result.rows.push(row)
       }
     } catch (e) {
@@ -1044,11 +1116,17 @@ Item {
       return
     }
     if (type === "dictation-copy") { clipboardTransfer.submit(effect.text, effect.paste); return }
+    if (type === "query") { root.typeQuery(effect.text); return }
     if (type === "navigate") { root.navigate(effect.scope, effect.title || row.title); return }
     if (type === "setting") {
       try {
         root.saveConfig(Settings.withValue(root.config, effect.path, effect.key, effect.value, effect.schema))
         root.statusMessage = "Saved"
+        // Turning a provider on: say what to type, once, where the user is looking.
+        if (effect.key === "enabled" && effect.value === true && effect.path[0] === "providers") {
+          var turned = root.registryEntry(effect.path[1])
+          if (turned && turned.commands && turned.commands.length) root.statusMessage = Commands.enabledNotice(turned.name, turned.commands, root.settingsFor(turned).prefix)
+        }
         if (root.scope.split("/").length > 2 && effect.schema && effect.schema.type === "enum") root.goBack()
         else root.requery()
       } catch (e) { root.errorMessage = String(e.message || e) }
@@ -1090,6 +1168,7 @@ Item {
   function inspect() {
     var appEntries = root.appLibrary ? root.appLibrary.sortedEntries("") : []
     return JSON.stringify({ opened: root.opened, mode: root.mode, view: root.activeProviderKey, scope: root.scope, query: search.text, count: root.rows.length,
+      command: root.activeCommand ? { key: root.activeCommand.key, prefix: root.activeCommand.prefix, rest: root.activeCommand.rest } : null, hint: root.commandHint, ghost: root.commandGhost,
       titles: root.rows.map(function(r) { return r.title }), selected: root.selected, pending: root.pending, patterns: root.lastPatterns,
       current: { uid: root.current.uid || "", icon: root.current.icon || "", iconSource: root.current.iconSource || "", badge: root.current.badge || "", tier: root.current.tier || "" },
       modelCount: resultModel.count, providers: providerRegistry.entries.map(function(e) { return e.key }), problems: providerRegistry.problems, bar: root.barList,
@@ -1207,6 +1286,36 @@ Item {
           history: voice.history
             foreground: root.foreground
         }
+        // The sheen: one soft highlight sweeping across the prefix the moment
+        // the field recognises a command. Under the text, confined to the
+        // prefix, timed by the animation tier (off: nothing).
+        Item {
+          id: sheen
+          anchors.fill: search
+          visible: sweep.running
+          property real span: 0
+          function play(prefixLength) {
+            if (!root.motion.sheen || !search.text) return
+            span = Math.max(Style.space(24), search.positionToRectangle(Math.min(prefixLength, search.text.length)).x + Style.space(6))
+            sweep.restart()
+          }
+          Item {
+            x: -Style.space(4); y: 0; width: sheen.span + Style.space(4); height: parent.height
+            clip: true
+            Rectangle {
+              id: sweepBar
+              y: Style.space(4); height: parent.height - Style.space(8); width: sheen.span
+              radius: Style.space(4)
+              gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 0.5; color: Util.alpha(root.accent, 0.32) }
+                GradientStop { position: 1.0; color: "transparent" }
+              }
+            }
+          }
+          NumberAnimation { id: sweep; target: sweepBar; property: "x"; from: -sheen.span; to: sheen.span + Style.space(4); duration: root.motion.sheen; easing.type: Easing.InOutQuad }
+        }
         TextInput {
           id: search
           anchors.left: glyph.right
@@ -1234,6 +1343,23 @@ Item {
             font: parent.font
             visible: !parent.text && !parent.preeditText && !voice.active
             elide: Text.ElideRight
+          }
+          // Ghost placeholders: the arguments still to type after a recognised
+          // command, drawn after the caret in the field's own font.
+          Text {
+            // The caret rectangle is updated after the layout, unlike a call
+            // to positionToRectangle at binding time; the ghost only shows
+            // with the caret at the end, so it is the end of the text.
+            x: parent.cursorRectangle.x + parent.cursorRectangle.width + Style.space(1)
+            width: Math.max(0, parent.width - x)
+            height: parent.height
+            verticalAlignment: Text.AlignVCenter
+            text: root.commandGhost
+            textFormat: Text.PlainText
+            color: Util.alpha(root.foreground, 0.38)
+            font: parent.font
+            elide: Text.ElideRight
+            visible: !!root.commandGhost && !parent.preeditText && !voice.active && parent.cursorPosition === parent.text.length
           }
           onTextEdited: { clipboardTransfer.cancel(); root.voiceCancel(); root.edited() }
           Keys.priority: Keys.BeforeItem
@@ -1264,6 +1390,8 @@ Item {
             var atEnd = cursorPosition === text.length
             if (event.key === Qt.Key_Escape) { root.cancel(); event.accepted = true }
             else if (ctrl && event.key === Qt.Key_U) { text = ""; root.edited(); event.accepted = true }
+            else if (event.key === Qt.Key_Tab && !root.dmenuActive) { root.completeCommand(); event.accepted = true }
+            else if (event.key === Qt.Key_Backtab) { event.accepted = true }
             else if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_N)) { root.select(1); event.accepted = true }
             else if (event.key === Qt.Key_Up || (ctrl && event.key === Qt.Key_P)) { root.select(-1); event.accepted = true }
             else if (event.key === Qt.Key_PageDown) { root.selectPage(6); event.accepted = true }
@@ -1299,7 +1427,11 @@ Item {
         Text { anchors.baseline: brand.baseline; text: root.scope ? "›" : "/"; textFormat: Text.PlainText; color: Util.alpha(root.foreground, 0.35); font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
         Text {
           anchors.baseline: brand.baseline
-          text: root.scope ? root.scopeTitle : search.text ? "Search results" : "Apps, commands, answers"
+          width: Math.max(0, crumbs.parent.width - crumbs.x * 2 - brand.width - Style.space(30))
+          elide: Text.ElideRight
+          // The hint line: a recognised command names its action and the
+          // argument the caret is on; the empty root says how to list them.
+          text: root.scope ? root.scopeTitle : root.commandHint ? root.commandHint : search.text ? "Search results" : "Apps, commands, answers · / lists what you can type"
           textFormat: Text.PlainText
           color: root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
         }

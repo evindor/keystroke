@@ -70,6 +70,11 @@ TestCase {
         compare(T.retryQuery("translate fr helo", T.parse("translate fr helo", false), "hello"), "translate fr hello")
         compare(T.retryQuery("helo to french", T.parse("helo to french", false), "hello"), "hello to fr")
         compare(T.retryQuery("helo", T.parse("helo", true), "hello"), "hello")
+        // The host stripped the prefix: the rest parses as prefixed text, and the retry keeps the user's prefix.
+        compare(T.parse("fr good morning", false, true), { text: "good morning", to: "fr", explicit: true, prefixed: true, natural: false })
+        compare(T.parse("", false, true), { text: "", to: "", explicit: false, prefixed: true, natural: false })
+        compare(T.parse("bonjour to german", false, true).natural, true)
+        compare(T.retryQuery("xl helo", T.parse("helo", false, true), "hello", "xl"), "xl hello")
     }
 
     function test_patterns_are_linear_and_match_the_examples() {
@@ -78,8 +83,8 @@ TestCase {
             verify(p.regex.length < 400, p.id + " is short")
             verify(re.test(p.example), p.id + " matches its example")
         }
-        var prefix = new RegExp(T.PATTERNS[0].regex, "i"), target = new RegExp(T.PATTERNS[1].regex, "i")
-        verify(prefix.test("tr bonjour") && prefix.test("TRANSLATE x") && !prefix.test("tr") && !prefix.test("trap"))
+        compare(T.PATTERNS.length, 1)   // the prefix is a declared command in extension.json, recognised by the host
+        var target = new RegExp(T.PATTERNS[0].regex, "i")
         verify(target.test("bonjour to english") && target.test("hi in fr") && !target.test("to english") && !target.test("bonjour to"))
     }
 

@@ -64,8 +64,10 @@ var SETTINGS = [
     description: "Passed to curl as --proxy, e.g. http://proxy.example.com:8080" }
 ]
 
+// The prefix ("tr", renameable) is declared as a command in extension.json;
+// the host recognises it and hands over the rest. The natural trailing form
+// is a pattern, since it has no prefix.
 var PATTERNS = [
-  { id: "prefix", regex: "^\\s*(?:tr|translate)\\s+\\S", flags: "i", boost: 20, example: "tr bonjour", description: "Translates the rest of the line" },
   { id: "target", regex: "\\S\\s+(?:to|in|into)\\s+[a-zA-Z][a-zA-Z-]+\\s*$", flags: "i", boost: 14, example: "bonjour to english", description: "Translates into a named language" }
 ]
 
@@ -137,11 +139,13 @@ function sourceCode(settings) {
 
 // ---------------------------------------------------------------- query
 // { text, to, explicit, prefixed, natural } or null when the query is not a
-// translation request. `scoped` treats the whole query as the text.
-function parse(query, scoped) {
+// translation request. `scoped` treats the whole query as the text;
+// `stripped` says the host already removed the prefix (ctx.command.rest).
+function parse(query, scoped, stripped) {
   var q = String(query || "").trim()
-  var lower = q.toLowerCase(), rest = q, prefixed = false
-  if (!scoped) {
+  var lower = q.toLowerCase(), rest = q, prefixed = !!stripped
+  if (stripped && !q) return { text: "", to: "", explicit: false, prefixed: true, natural: false }
+  if (!scoped && !stripped) {
     for (var i = 0; i < PREFIXES.length; i++) {
       var p = PREFIXES[i]
       if (lower === p) return { text: "", to: "", explicit: false, prefixed: true, natural: false }
@@ -165,11 +169,13 @@ function parse(query, scoped) {
 function clamp(text) { return String(text || "").trim().slice(0, MAX_CHARS) }
 
 // The query to type for a spelling correction, in the shape the user used.
-function retryQuery(query, req, corrected) {
+// prefix: the command prefix the host recognised (the user may have renamed it).
+function retryQuery(query, req, corrected, prefix) {
   if (req.natural) return corrected + " to " + req.to
   if (!req.prefixed) return corrected
-  var lower = String(query || "").trim().toLowerCase(), prefix = lower.indexOf("translate ") === 0 ? "translate " : "tr "
-  return prefix + (req.explicit ? req.to + " " : "") + corrected
+  var lower = String(query || "").trim().toLowerCase()
+  var p = prefix ? prefix + " " : lower.indexOf("translate ") === 0 ? "translate " : "tr "
+  return p + (req.explicit ? req.to + " " : "") + corrected
 }
 
 // ------------------------------------------------------------ transport
@@ -331,14 +337,14 @@ function ellipsis(text, n) { var t = String(text || "").replace(/\s+/g, " ").tri
 function arrow(from, to) { return languageName(from) + " → " + languageName(to) }
 
 // ctx: { query, scope, key, iconSource, settings, targets, matched, selection, canSpeak, now, blockedUntil,
-//        lookup(text, from, to), busy(text, from, to) }
+//        lookup(text, from, to), busy(text, from, to), req (a parsed request, when the host stripped the prefix), prefix }
 function rows(ctx) {
   var key = ctx.key, scoped = ctx.scope === key
   if (ctx.scope && ctx.scope !== key) return ctx.scope === key + "/targets" ? pickerRows(ctx) : []
   var base = { icon: ICON, iconSource: ctx.iconSource, section: NAME }
   function row(fields) { var r = {}; for (var k in base) r[k] = base[k]; for (var f in fields) r[f] = fields[f]; return r }
-  var out = [], q = String(ctx.query || "")
-  var req = parse(q, scoped)
+  var out = [], q = String(ctx.query || ""), prefix = ctx.prefix || "tr"
+  var req = ctx.req !== undefined ? ctx.req : parse(q, scoped)
   var settings = ctx.settings || defaults()
   var from = sourceCode(settings)
 
@@ -357,7 +363,7 @@ function rows(ctx) {
 
   if (!req.text) {
     if (ctx.selection) { out.push(selectionRow(ctx, row, "view")); out.push(selectionRow(ctx, row, "copy")); out.push(selectionRow(ctx, row, "paste")) }
-    out.push(row({ id: "hint", title: scoped ? "Type text to translate" : "Type text after tr", subtitle: "Into " + ctx.targets.map(languageName).join(", ") + " · tr fr bonjour picks a language",
+    out.push(row({ id: "hint", title: scoped ? "Type text to translate" : "Type text after " + prefix, subtitle: "Into " + ctx.targets.map(languageName).join(", ") + " · " + prefix + " fr bonjour picks a language",
                    tier: "item", score: 2, order: 50, disabled: true, verb: "", action: { type: "noop" } }))
     if (scoped) out.push(targetsRow(ctx, row))
     return out
@@ -398,7 +404,7 @@ function rows(ctx) {
   }
   if (view.correction) {
     out.push(row({ id: "translate/correction", title: "Did you mean: " + view.correction.text, subtitle: view.correction.auto ? "Google translated the corrected spelling" : "Translate the corrected spelling instead",
-                   tier: "item", score: 70, order: 10, verb: "Retry", action: { type: "translate-retry", query: retryQuery(q, req, view.correction.text), text: view.correction.text } }))
+                   tier: "item", score: 70, order: 10, verb: "Retry", action: { type: "translate-retry", query: retryQuery(q, req, view.correction.text, ctx.prefix), text: view.correction.text } }))
   }
   if (main.text) {
     out.push(row({ id: "translate/editor", title: "Open in the editor", subtitle: "Every target language, with the reverse translation", tier: "item", score: 60, order: 20, verb: "Open",

@@ -19,10 +19,13 @@ var MAX_QUERY = 128
 
 function prefixed(query) { return /^\s*~/.test(String(query || "")) }
 
-function request(query, settings, scoped) {
-  var explicit = prefixed(query)
-  var q = String(query || "").trim()
-  if (explicit) q = q.slice(1).replace(/^\//, "").trim()
+// rest: the text after the declared prefix when the host recognised it
+// (ctx.command.rest), so a renamed prefix works; otherwise a leading ~ counts.
+function request(query, settings, scoped, rest) {
+  var viaCommand = rest !== undefined && rest !== null
+  var explicit = viaCommand || prefixed(query)
+  var q = String(viaCommand ? rest : query || "").trim()
+  if (explicit) q = (viaCommand ? q : q.slice(1)).replace(/^\//, "").trim()
   return { query: q, explicit: explicit,
     enabled: scoped || explicit || settings.searchMode !== "prefix",
     settings: Object.assign({}, settings, { fuzzy: scoped || explicit || settings.searchMode !== "literal" }) }

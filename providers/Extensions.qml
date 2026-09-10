@@ -32,10 +32,12 @@ Item {
     var reg = registry()
     if (!reg) return []
     var cfg = root.host ? root.host.config : null
-    var list = Extensions.list(reg.entries, function(id) { return Settings.isEnabled(cfg, ["providers", id], false) }, reg.problems)
+    var h = root.host
+    var list = Extensions.list(reg.entries, function(id) { return Settings.isEnabled(cfg, ["providers", id], false) }, reg.problems,
+                               function(id) { var en = h ? h.registryEntry(id) : null; return en ? h.settingsFor(en).prefix : "" })
     // A loaded provider adds the examples of the query shapes it declares.
     for (var i = 0; i < list.length; i++) {
-      var entry = root.host ? root.host.registryEntry(list[i].id) : null
+      var entry = h ? h.registryEntry(list[i].id) : null
       if (entry && entry.loaded) list[i].examples = Patterns.examples(entry.patterns).slice(0, 6)
     }
     return list

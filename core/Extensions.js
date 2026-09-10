@@ -1,5 +1,6 @@
 .pragma library
 .import "Match.js" as Match
+.import "Commands.js" as Commands
 
 // Extensions: third-party providers that ship inside Keystroke itself, one
 // folder each under extensions/ (reviewed and merged through pull requests,
@@ -73,6 +74,9 @@ function parseManifest(body) {
               apiVersion: m.apiVersion, icon: safeString(m.icon, 8), color: safeString(m.color, 32), homepage: safeString(m.homepage, 512),
               entry: safeString(m.entry || "Service.qml", 200), license: safeString(m.license, 40) }
   if (m.setup && typeof m.setup === "object") out.setup = { run: safeString(m.setup.run, 200), summary: safeString(m.setup.summary, 300) }
+  // Commands are kept as declared and compiled by the registry (core/Commands.js),
+  // which reports what does not compile; the folder stays usable.
+  if (Array.isArray(m.commands)) out.commands = m.commands.slice(0, Commands.MAX_COMMANDS)
   return out
 }
 
@@ -91,6 +95,7 @@ function validate(id, body, taken) {
     if (!m.setup || typeof m.setup !== "object" || typeof m.setup.run !== "string" || !insideFolder(m.setup.run))
       return { message: "setup.run must be a script inside the extension folder" }
   }
+  if (m.commands !== undefined && !Array.isArray(m.commands)) return { message: "commands must be an array" }
   return null
 }
 
@@ -104,13 +109,14 @@ function serviceUrl(manifest) {
 // for rows (the host skips disabled providers before calling query).
 function placeholder(manifest) {
   return { apiVersion: 1, name: manifest.name || manifest.id, icon: manifest.icon || ICON, color: manifest.color, description: manifest.description,
-           settings: [], query: function() { return [] } }
+           commands: manifest.commands, settings: [], query: function() { return [] } }
 }
 
 // --------------------------------------------------------------- listing
 // One record per extension for the screen. entries: the registry's entries
-// (source "extension"); enabledIn(id): Keystroke's switch; problems: [{ id, message }].
-function list(entries, enabledIn, problems) {
+// (source "extension"); enabledIn(id): Keystroke's switch; problems: [{ id, message }];
+// prefixOf(id): the user's prefix for the extension's first command, "" for the declared one.
+function list(entries, enabledIn, problems, prefixOf) {
   var trouble = ({})
   for (var p = 0; p < (problems || []).length; p++)
     if (problems[p] && !trouble[problems[p].id]) trouble[problems[p].id] = safeString(problems[p].message, 300)
@@ -123,7 +129,7 @@ function list(entries, enabledIn, problems) {
                author: m.author, homepage: m.homepage, dir: m.dir, local: m.source === "local", setup: m.setup || null, loaded: !!e.loaded,
                enabled: enabledIn ? !!enabledIn(m.id) : false, problem: trouble[m.id] || "",
                icon: safeString(p.icon, 8) || m.icon || "", iconFont: safeString(p.iconFont, 80), iconSource: safeString(p.iconSource, 1024),
-               tint: safeString(p.color, 32) || m.color || "", examples: [] })
+               tint: safeString(p.color, 32) || m.color || "", examples: [], commands: e.commands || [], prefix: prefixOf ? String(prefixOf(m.id) || "") : "" })
   }
   out.sort(function(a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1 })
   return out
@@ -206,9 +212,14 @@ function screenRows(query, extensions) {
   return rows
 }
 
-// One extension's screen.
+// One extension's screen. Usage comes first: what to type, what the
+// arguments mean, examples that run when activated, and the prefix row.
 function detailRows(query, e) {
-  var rows = []
+  var rows = Commands.usageRows(e.commands || [], e.prefix, "settings/" + e.id), icons = iconOf(e)
+  for (var u = 0; u < rows.length; u++) {
+    rows[u].order = rows[u].order - 1000
+    if (rows[u].id !== "usage/prefix") { rows[u].icon = icons.icon; rows[u].iconFont = icons.iconFont; rows[u].iconSource = icons.iconSource; rows[u].tint = icons.tint }
+  }
   var on = { id: e.id + "/enabled", title: "Enabled", subtitle: e.enabled ? "Answering queries" : "Off: its code is not loaded",
              icon: "", section: e.name, verb: "Toggle", tier: "item", order: 0, accessory: e.enabled ? "On" : "Off", keywords: "enable disable on off",
              action: enableEffect(e.id, !e.enabled) }
@@ -234,7 +245,8 @@ function detailRows(query, e) {
               icon: ic.icon, iconFont: ic.iconFont, iconSource: ic.iconSource, tint: ic.tint,
               section: "About", verb: "", tier: "item", order: 20, disabled: true, badge: e.local ? "local" : "extension", action: { type: "noop" } })
   if (e.examples && e.examples.length)
-    rows.push({ id: e.id + "/patterns", title: "Answers queries like " + e.examples.join(" · "), subtitle: "Declared patterns lift this extension's results when a query matches",
+    rows.push({ id: e.id + "/patterns", title: (e.commands && e.commands.length ? "Also answers " : "Answers queries like ") + e.examples.join(" · "),
+                subtitle: "Declared patterns lift this extension's results when a query matches",
                 icon: "", section: "About", verb: "", tier: "item", order: 21, disabled: true, keywords: "patterns examples", action: { type: "noop" } })
   var q = String(query || "").trim()
   if (!q) for (var i = 0; i < rows.length; i++) if (rows[i].score === undefined) rows[i].score = 1

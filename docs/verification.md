@@ -1,5 +1,51 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Declared commands: hint line, placeholders, usage (2026-09-10)
+
+- Providers declare their typed triggers (`commands`: prefix, title, summary,
+  positional args with hints, examples) in `extension.json` or on the provider
+  object; `core/Commands.js` compiles them, builds the index with the user's
+  prefixes (`providers.<id>.prefix`, a reserved setting listed first on the
+  settings screen), matches the query (longest prefix wins, sigils attach and
+  are exclusive), computes the placeholders after the caret and the hint line,
+  and builds the rows for the `/` screen, the name suggestions and an
+  extension's Usage section. The host routes a matched query to its owner with
+  `ctx.command = { id, prefix, rest, args }` and a boost of 20, asks no other
+  provider (a typed command is exclusive; this generalises the old `~` special
+  case and keeps other providers' fuzzy matches on the prefix out of the
+  list), scores rows against the rest, adds the `query`
+  effect, Tab completion, the sheen over a recognised prefix (Motion tier
+  `sheen`), and says what to type when an extension is turned on. Emoji,
+  Files, Timer and Translate migrated to `ctx.command.rest` with their old
+  checks kept as fallbacks; Translate's prefix pattern is gone.
+- `tests/tst_commands.qml` (12 tests): compile and its rejections, prefix
+  rules, usage strings, the index and conflicts, matching (case, whitespace,
+  sigils, longest prefix), placeholders following the caret including the
+  rest argument, the ghost with a leading space after a bare prefix, the hint
+  line, help and suggestion rows, usage rows and the enable notice.
+  `tests/tst_extensions.qml` covers commands in the manifest and the Usage
+  rows on the detail screen. All 161 palette unit tests pass; both extension
+  checks pass.
+- `tests/palette_commands_check.py` (real `Keystroke.qml` offscreen, fake
+  curl): the empty root's row and index; `tr` recognised live with hint and
+  ghost before any query runs; Tab adding the space; the ghost and hint
+  following the caret through `tr fr ` and `tr fr hello`; `timer 10m tea`
+  routed through `ctx.command`; `tm 10m tea` after renaming the prefix in
+  keystroke.json; `:smi` answered by Emoji alone; `/` listing every command
+  with the renamed prefix and `/tr` filtering; `trans` suggesting Translate
+  and Tab typing `tr `; the Translate screen starting with `tr [to] <text>`,
+  a runnable `tr bonjour`, the Prefix row; the Timer screen showing
+  `tm <duration> [name]` while off and the enable notice naming it; the Prefix
+  setting under Keystroke Settings › Timer. With `KEYSTROKE_CAPTURE_DIR` set it
+  saves PNGs of the ghost, the `/` screen and a Usage screen; all three were
+  looked at. `palette_extensions_check.py`, `palette_matching_check.py` (its
+  fixture now declares the `~` command), route, shortcut, motion, dictation,
+  catalog, files, applications, hotkeys and the Translate check all pass.
+- Not exercised: the sheen on the desktop (transient; offscreen it runs
+  through the same NumberAnimation), typing on a real keyboard (the check
+  drives `setQuery` and `completeCommand`), calpad (external; its `=` keeps
+  working through its own pattern until it declares a command).
+
 ## Translate extension (2026-09-10)
 
 - `extensions/translate` ports the Raycast google-translate extension onto

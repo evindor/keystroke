@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "../core/Patterns.js" as Patterns
+import "../core/Commands.js" as Commands
 import "../core/Settings.js" as Settings
 import "../core/Extensions.js" as ExtensionsModel
 
@@ -17,7 +18,7 @@ import "../core/Extensions.js" as ExtensionsModel
 Item {
   id: root
   property var host: null
-  property var entries: []     // [{ key, provider, source, extensionId, name, patterns, manifest, loaded }]
+  property var entries: []     // [{ key, provider, source, extensionId, name, patterns, commands, settingsSchema, manifest, loaded }]
   property var problems: []    // [{ id, message }]
   property var manifests: ({}) // extension id → manifest (extension.json plus id, dir, source)
   readonly property string home: Quickshell.env("HOME")
@@ -37,17 +38,28 @@ Item {
   AiWeb { id: aiWeb; host: root.host }
   Codex { id: codex; host: root.host }
   Extensions { id: extensions; host: root.host }
+  CommandsProvider { id: commandsProvider; host: root.host }
   SettingsProvider { id: settingsProvider; host: root.host }
 
-  readonly property var bundled: [omarchyMenu, applications, calculator, converter, colors, emoji, clipboard, dictation, files, hotkeys, codex, aiWeb, extensions, settingsProvider]
+  readonly property var bundled: [omarchyMenu, applications, calculator, converter, colors, emoji, clipboard, dictation, files, hotkeys, codex, aiWeb, extensions, commandsProvider, settingsProvider]
   readonly property var reserved: bundled.map(function(b) { return b.provider.id }).concat(["palette", "dmenu", "matching", "voice"])
 
-  // Declared patterns are compiled here, once per rebuild, never per keystroke.
-  // A pattern that does not compile is reported and skipped; the provider loads.
+  // Declared patterns and commands are compiled here, once per rebuild, never
+  // per keystroke. One that does not compile is reported and skipped; the
+  // provider loads. An extension's commands come from its extension.json, so
+  // its usage is known while it is off; a bundled provider declares them on
+  // the provider object. A provider with commands gets the reserved `prefix`
+  // setting in front of its own, so the user can rename the trigger.
   function entry(key, provider, source, extensionId, name, issues, manifest, loaded) {
     var compiled = Patterns.compile(provider.patterns)
     for (var e = 0; e < compiled.errors.length; e++) issues.push({ id: extensionId || key, message: "Pattern " + compiled.errors[e] })
-    return { key: key, provider: provider, source: source, extensionId: extensionId, name: name, patterns: compiled.patterns, manifest: manifest || null, loaded: loaded !== false }
+    var declared = manifest && manifest.commands !== undefined ? manifest.commands : provider.commands
+    var commands = Commands.compile(declared)
+    for (var c = 0; c < commands.errors.length; c++) issues.push({ id: extensionId || key, message: "Command " + commands.errors[c] })
+    var settings = Array.isArray(provider.settings) ? provider.settings : []
+    var schema = commands.commands.length ? [Commands.prefixSchema(commands.commands)].concat(settings) : settings
+    return { key: key, provider: provider, source: source, extensionId: extensionId, name: name, patterns: compiled.patterns,
+             commands: commands.commands, settingsSchema: schema, manifest: manifest || null, loaded: loaded !== false }
   }
 
   function rebuild() {

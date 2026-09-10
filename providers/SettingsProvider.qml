@@ -29,7 +29,7 @@ Item {
     for (var i = 0; i < entries.length; i++) {
       var e = entries[i]
       if (e.key === "settings") continue
-      var schemas = e.provider.settings || []
+      var schemas = e.settingsSchema || e.provider.settings || []   // the reserved prefix setting comes first for a provider with commands
       out.push({ key: e.key, name: e.provider.name, description: e.provider.description || "", icon: e.provider.icon || "", iconFont: e.provider.iconFont || "",
                  iconSource: e.provider.iconSource || "", color: e.provider.color || "", source: e.source, extensionId: e.extensionId || "",
                  dir: e.manifest ? e.manifest.dir : "", local: !!(e.manifest && e.manifest.source === "local"), loaded: e.loaded !== false, enabled: h.providerEnabled(e), schemas: schemas,

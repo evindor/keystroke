@@ -63,8 +63,10 @@ function readDuration(text, bareIsMinutes) {
 }
 
 // { seconds, label, prefixed } or null when the query is not a timer request.
-function parse(query, defaultMinutes) {
-  var p = stripPrefix(query)
+// stripped: the query is already the text after the prefix (the host
+// recognised the declared command, whatever the user renamed it to).
+function parse(query, defaultMinutes, stripped) {
+  var p = stripped ? { rest: String(query || "").trim(), prefixed: true } : stripPrefix(query)
   if (!p.prefixed && !p.rest) return null
   var d = readDuration(p.rest, p.prefixed)
   if (d) {
@@ -106,10 +108,10 @@ function make(seconds, label, now) {
 
 function remaining(timer, now) { return (timer.endsAt - now) / 1000 }
 
-// Rows for the palette. scoped: the extension's own screen.
-function rows(query, timers, settings, now, scoped, scopeKey) {
+// Rows for the palette. scoped: the extension's own screen; stripped: see parse().
+function rows(query, timers, settings, now, scoped, scopeKey, stripped) {
   var out = [], i
-  var req = parse(query, settings.defaultMinutes)
+  var req = parse(query, settings.defaultMinutes, stripped)
   if (req) {
     var title = "Start a " + describe(req.seconds) + " timer" + (req.label ? ": " + req.label : "")
     out.push({ id: "start", title: title, subtitle: "Ends at " + endsAt(now, req.seconds) + (req.defaulted ? " · default length, add e.g. 10m to change it" : ""),

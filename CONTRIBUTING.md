@@ -62,7 +62,7 @@ An extension is one folder under `extensions/` with an `extension.json` and a `S
 
 ```
 extensions/<id>/
-├── extension.json    name, version, author, description, apiVersion 1, icon, color; optional entry, homepage, license, setup
+├── extension.json    name, version, author, description, apiVersion 1, icon, color; optional commands, entry, homepage, license, setup
 ├── Service.qml       QtObject { property var shell; property var extension; readonly property var provider: ({ … }) }
 ├── core/Model.js     pure functions: parse the query, build rows, build argv
 ├── tests/tst_*.qml   qmltestrunner tests for core/ (run by check-extensions)
@@ -75,11 +75,13 @@ extensions/<id>/
 {
   "name": "Thing", "version": "1.0.0", "author": "Your Name",
   "description": "One line for the Extensions screen: thing 42",
-  "apiVersion": 1, "icon": "󰀻", "color": "#8bceb4", "license": "MIT"
+  "apiVersion": 1, "icon": "󰀻", "color": "#8bceb4", "license": "MIT",
+  "commands": [{ "id": "thing", "prefix": "thing", "title": "Do the thing", "summary": "One line",
+                 "args": [{ "name": "what", "hint": "what to do it to", "rest": true }], "examples": ["thing 42"] }]
 }
 ```
 
-Rules, all enforced by `bin/keystroke check-extensions`: the five required fields are non-empty strings and `apiVersion` is the number 1; `entry` (default `Service.qml`) is a `.qml` file inside the folder; nothing in the folder is a symlink; no file is named `manifest.json` (an extension is not an Omarchy plugin); no `import` reaches outside the folder; `README.md` exists; a declared `setup.run` exists and is executable; qmllint reports no error; `tests/tst_*.qml` pass. Keep the folder self-contained: everything it needs is in it, or fetched by its setup script.
+Rules, all enforced by `bin/keystroke check-extensions`: the five required fields are non-empty strings and `apiVersion` is the number 1; each entry of `commands` has a one-word `prefix`, a `title` and named `args`; `entry` (default `Service.qml`) is a `.qml` file inside the folder; nothing in the folder is a symlink; no file is named `manifest.json` (an extension is not an Omarchy plugin); no `import` reaches outside the folder; `README.md` exists; a declared `setup.run` exists and is executable; qmllint reports no error; `tests/tst_*.qml` pass. Keep the folder self-contained: everything it needs is in it, or fetched by its setup script.
 
 ### 2. The provider object
 
@@ -96,7 +98,9 @@ readonly property var provider: ({
 })
 ```
 
-`ctx` carries `query`, `rawQuery`, `scope` (`""` at the root, your id inside your own screen, `<id>/<sub>` deeper), `settings` (validated against your schema), `patterns` (`{ matched: [ids], boost }` for the patterns you declared), `pending()`, `host`, `shell`, `appLibrary`, `omarchyPath`. Your scope key is your id (`root.extension.id`): return `{type:"navigate", scope: extension.id, title: "Thing"}` to open your screen, and answer only when `ctx.scope` is empty or yours.
+`ctx` carries `query`, `rawQuery`, `scope` (`""` at the root, your id inside your own screen, `<id>/<sub>` deeper), `settings` (validated against your schema), `command` (`{ id, prefix, rest, args }` when the query starts with one of your declared commands, `null` otherwise), `patterns` (`{ matched: [ids], boost }` for the patterns you declared), `pending()`, `host`, `shell`, `appLibrary`, `omarchyPath`. Your scope key is your id (`root.extension.id`): return `{type:"navigate", scope: extension.id, title: "Thing"}` to open your screen, and answer only when `ctx.scope` is empty or yours.
+
+**Commands** are how a user learns what to type. Declare the trigger word, the action and the arguments in `extension.json` (`commands`, see the JSON above) and the host does the rest: it recognises the prefix, hands you the text after it as `ctx.command.rest`, shows the action and the meaning of the current argument on the line under the search field, draws the remaining placeholders after the caret, completes the prefix with Tab when someone types the command's name, lists it on the `/` screen, and puts a Usage section with runnable examples at the top of your extension's screen. The user can rename the prefix (the reserved `prefix` setting), so **read `ctx.command.rest` and never parse the prefix yourself**; keep your own check only as a fallback for older hosts. `extensions/timer` and `extensions/translate` both do this.
 
 **Patterns** are how an extension gets ranked for the shapes of text it understands without knowing about every other provider: declare each shape as a regular expression with a `boost`, and when one matches the query the host adds the largest boost to the score of every row you return and tells you which ids matched (`ctx.patterns.matched`). Use them to offer a `fallback` row (the *Continue with* section, where the assistant hand-offs sit at scores 2 to 5) only when a shape matched, with a base score of 1: matched, your row lands above the hand-offs; unmatched, return nothing. Give each pattern an `example`; the Extensions screen shows them. Never answer every query: a provider that puts a row under everything the user types is the first thing a reviewer will send back.
 

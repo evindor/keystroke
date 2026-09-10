@@ -19,6 +19,8 @@ Extensions ship with Keystroke switched off. Type `ext`, open **Extensions → T
 | `10 min tea` · `45s` | works without the prefix when a unit is present, ranked as an ordinary item |
 | `countdown …` · `remind me in …` | aliases for `timer` |
 
+`timer` is the extension's declared prefix: typing it shows *Set a timer · duration: …* under the search field and the `<duration> [name]` placeholders after the caret, `/` lists it with every other command, and Settings → Timer → **Prefix** renames it (`tm 10m tea`). The aliases above keep working whatever the prefix is.
+
 Enter starts the timer and closes the palette. From that moment the soonest timer counts down in the bar, right after the Keystroke menu button (`󰔛 9:59`, with `+1` when another is running behind it); hovering shows its label and end time, and pressing it opens the Timers screen. **Timers** at the palette root (or the running timer rows themselves) opens the same list: each row shows the remaining time and Enter cancels it after a confirmation. When a timer ends the chime sounds and you get an Omarchy notification.
 
 ## Settings

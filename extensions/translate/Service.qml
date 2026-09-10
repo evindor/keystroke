@@ -214,8 +214,11 @@ QtObject {
     if (settings.speak && !speakProbed) { speakProbed = true; speakProbe.running = true }
     var scoped = ctx.scope === key
     if (ctx.scope && !scoped && ctx.scope !== key + "/targets") return []
-    var matched = !!(ctx.patterns && ctx.patterns.matched && ctx.patterns.matched.length)
-    var req = ctx.scope && !scoped ? null : Translate.parse(ctx.query, scoped)
+    // The host recognises the declared prefix and hands over the rest (ctx.command);
+    // the natural "bonjour to english" form arrives through the declared pattern.
+    var command = ctx.command || null
+    var matched = !!command || !!(ctx.patterns && ctx.patterns.matched && ctx.patterns.matched.length)
+    var req = command ? Translate.parse(command.rest, false, true) : ctx.scope && !scoped ? null : Translate.parse(ctx.query, scoped)
     var now = Date.now()
     if (req && req.text.length >= Translate.MIN_CHARS && (scoped || matched)) {
       var next = { text: req.text, from: Translate.sourceCode(settings), to: req.to }
@@ -223,7 +226,8 @@ QtObject {
       if (blockedUntil <= now && needs(Translate.needed(next, targets, settings, lookup, false))) ctx.pending()
     } else if (!scoped || !req || !req.text) setSubject(null, false)
     return Translate.rows({ query: ctx.query, scope: ctx.scope, key: key, iconSource: iconSource, settings: settings, targets: targets, matched: matched,
-                            selection: selection, canSpeak: canSpeak, now: now, blockedUntil: blockedUntil, lookup: lookup, busy: busy })
+                            selection: selection, canSpeak: canSpeak, now: now, blockedUntil: blockedUntil, lookup: lookup, busy: busy,
+                            req: ctx.scope && !scoped ? undefined : req, prefix: command ? command.prefix : "" })
   }
 
   function activate(row, ctx) {

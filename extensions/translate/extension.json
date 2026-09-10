@@ -6,5 +6,30 @@
   "apiVersion": 1,
   "icon": "󰗊",
   "color": "#61afef",
-  "license": "MIT"
+  "license": "MIT",
+  "commands": [
+    {
+      "id": "translate",
+      "prefix": "tr",
+      "title": "Translate",
+      "summary": "Translate text into your target languages",
+      "args": [
+        {
+          "name": "to",
+          "hint": "a language code or name; leave it out to use your targets",
+          "optional": true
+        },
+        {
+          "name": "text",
+          "hint": "what to translate",
+          "rest": true
+        }
+      ],
+      "examples": [
+        "tr bonjour",
+        "tr fr good morning",
+        "bonjour to english"
+      ]
+    }
+  ]
 }

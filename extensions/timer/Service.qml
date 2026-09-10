@@ -109,7 +109,9 @@ QtObject {
     var scoped = ctx.scope === root.key
     if (ctx.scope && !scoped) return []
     root.now = Date.now()
-    return TimerModel.rows(ctx.query, root.timers, ctx.settings, root.now, scoped, root.key)
+    // The host hands over the text after the declared prefix; the aliases in Timer.js still work without it.
+    var viaCommand = !!ctx.command
+    return TimerModel.rows(viaCommand ? ctx.command.rest : ctx.query, root.timers, ctx.settings, root.now, scoped, root.key, viaCommand)
   }
 
   function activate(row, ctx) {

@@ -26,6 +26,8 @@ Rows for a translation:
 - **Did you mean …**: Google's spelling correction; Enter retries with it.
 - **Open in the editor**, **Open in Google Translate**, and **Speak** when playback is on and `mpv` is installed.
 
+`tr` is the extension's declared prefix: typing it shows *Translate · to: …* under the search field and the `[to] <text>` placeholders after the caret, `/` lists it with every other command, and Settings → Translate → **Prefix** renames it. The natural form (`bonjour to english`) needs no prefix at all.
+
 Two-letter codes that are also English words (`it`, `is`, `no`, `so`, `to`, `hi`, …) are not read as targets, so `tr it is raining` translates the sentence; write `tr italian …` for Italian.
 
 **The selection.** When the palette opens with text selected (or, failing that, on the clipboard), the root lists **Translate the selection**: Enter opens the editor with it, Ctrl+Enter copies its translation. `tr` alone and the Translate screen add **Copy the translated selection** and **Paste the translated selection**, which close the palette at once and deliver with a notification when the answer lands. Turn this off with *Offer the selected text* if you do not want the palette reading the selection when it opens.
