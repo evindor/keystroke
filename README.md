@@ -46,7 +46,7 @@ Requires Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). Like every Omarchy plugin,
 </tr>
 </table>
 
-- **Type anything**: apps, Omarchy commands, `sqrt(144) + 15% of 80`, `2m in feet`, `32 F to C`, `10am pt`, `10 am in London`, `now in tokyo`, `#ff6644`, `:smile`, `readme`, `timer 10m tea`.
+- **Type anything**: apps, Omarchy commands, `sqrt(144) + 15% of 80`, `2m in feet`, `32 F to C`, `10am pt`, `10 am in London`, `now in tokyo`, `#ff6644`, `:smile`, `readme`, `timer 10m tea`, `tr bonjour`.
 - **Fuzzy everywhere, into submenus.** From the root, `prefp`, `keysepro` and `setaiprv` all land on Keystroke Settings › AI & Web Search › Preferred assistant, `prefcla` on its Claude choice, `sysshut` on System › Shutdown. Letters may skip whole words of the breadcrumb, words can come in any order (`ai prov`), descriptions match by word. Inside a submenu the same search covers everything below it.
 - **Answers first.** Computed results appear as answer rows with a preview; matches next; Google and the assistants last.
 - **Files and folders** under `~` join the results from two characters on. Fuzzy abbreviations work: `dwnlds` finds Downloads, and `~dcmnts rpt` searches only files and folders for reports under Documents. `~` always selects fuzzy file search; Settings → Files → **Search in the main palette** offers **Fuzzy** (default), **Literal**, or **Only with ~**. Hidden entries are optional; gitignore rules remain respected. `↵` opens the result; `Ctrl+↵` opens a terminal there. At most ten results mix into the main palette; `~` and the Files screen show up to sixty.

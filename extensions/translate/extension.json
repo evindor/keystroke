@@ -1,0 +1,10 @@
+{
+  "name": "Translate",
+  "version": "1.0.0",
+  "author": "Arseniy Zarechnev",
+  "description": "Google Translate without an account: tr bonjour, bonjour to english",
+  "apiVersion": 1,
+  "icon": "󰗊",
+  "color": "#61afef",
+  "license": "MIT"
+}

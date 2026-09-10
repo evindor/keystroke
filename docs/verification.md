@@ -1,5 +1,44 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Translate extension (2026-09-10)
+
+- `extensions/translate` ports the Raycast google-translate extension onto
+  the in-repo extension system: keyless calls to the translate.google.com
+  page endpoint through `curl` (no `tk` token: verified not validated for
+  `client=dict-chrome-ex`), `tr bonjour` / `tr fr …` / `… to english`
+  grammar as `patterns`, the same-language fallback and the reverse
+  translation, a target picker scope instead of 250-option enums, an editor
+  view with dictation, selection rows that deliver after the palette closed,
+  a 350 ms debounce, a session cache, superseded requests killed, HTTP 429
+  backed off for a minute. Paste goes through wl-copy plus Shift+Insert like
+  the palette's own dictation.
+- `tests/tst_translate.qml` (14 tests, offline): language resolution and the
+  ambiguous-code rule, the grammar, the pattern examples, curl argv (GET,
+  POST past 2 KB, proxy, no token, user text never in a command string), the
+  parser over nine bodies captured from the live endpoint on 2026-09-10
+  (`tests/Fixtures.js`: phrase, Japanese romanisation, single-word
+  dictionary, spelling correction, auto-correction, same language,
+  Ukrainian, multi-sentence, 2.7 KB POST), the request chain after the
+  detected language lands, ordering and fallback, view blocks, rows at the
+  root, in scope, with answers, with a correction, the picker, the settings
+  schema. `bin/keystroke check-extensions extensions/translate` passes.
+- `extensions/translate/tests/palette_check.py` drives the real
+  `Keystroke.qml` offscreen with a fake `curl`, `wl-paste`, `wl-copy`,
+  `wtype` and notification script on PATH: off until switched on; `tr hello
+  world` yields the answer row, the reverse row and the follow-ups from
+  exactly three requests in order (auto→en, auto→fr, fr→en); the editor view
+  opens with the text; the root offers the selection; the scoped screen's
+  "Copy the translated selection" closes the palette and wl-copy receives
+  "Good day" with a notification; a 429 shows the back-off row; the picker
+  adds German through a setting the service picks up; turning the extension
+  off destroys the service. With `KEYSTROKE_CAPTURE_DIR` set it also saves
+  PNGs of the rows, the view, the scoped screen and the picker; all four were
+  looked at.
+- Live endpoint probes (curl, this machine): GET and POST both HTTP 200 with
+  the indices documented in the spec; `translate_tts` streams audio/mpeg. Not
+  exercised live: the palette on the desktop (per practice, offscreen only),
+  Shift+Insert paste into a real app, `mpv` playback, dictation into the
+  editor, the `setQuery` retry of a spelling correction.
 ## Timer sound and a countdown in the bar (2026-09-10)
 
 - Host API, optional under API 1: `host.setBarItem(id, { text, tooltip,
