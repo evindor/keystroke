@@ -202,13 +202,14 @@ function rows(conversion, cache, status, query, nowMs) {
     var value = result(conversion, pair.rate)
     if (!value) return []
     var detail = "1 " + conversion.base + " = " + rateText(pair.rate) + " " + conversion.quote
-    var stale = overdue(cache.fetchedAt, nowMs)
-    var source = status && status.error && stale ? "Refresh failed: " + status.error : "Frankfurter (ECB reference rates)"
+    var failed = !!(status && status.error && overdue(cache.fetchedAt, nowMs))
+    // The pane shows the first lines: the rate, its date and when it was
+    // fetched (with the failure, if a refresh is due and did not happen).
     var row = { id: "conversion", title: value, subtitle: detail + " · rates from " + dateText(pair.date), icon: ICON, section: NAME,
                 verb: "Copy result", tier: "answer", score: 195,
                 preview: value, previewLabel: "CURRENCY",
-                previewDetail: String(query || "") + "\n" + detail + "\nRates from " + dateText(pair.date) + "\n" + fetchedText(cache.fetchedAt, nowMs)
-                               + "\n" + source + "\nCtrl+Enter copies the number alone",
+                previewDetail: detail + "\nRates from " + dateText(pair.date) + "\n" + fetchedText(cache.fetchedAt, nowMs) + (failed ? " · refresh failed" : "")
+                               + "\nFrankfurter (ECB reference rates)" + (failed ? "\n" + status.error : "") + "\nCtrl+Enter copies the number alone",
                 action: { type: "copy", text: value }, altAction: { type: "copy", text: (conversion.amount * pair.rate).toFixed(2) } }
     if (conversion.explicit) row.currencyTarget = conversion.quote
     return [row]

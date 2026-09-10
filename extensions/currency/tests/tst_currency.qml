@@ -147,6 +147,8 @@ TestCase {
     compare(failed[0].title, "Exchange rates unavailable")
     verify(failed[0].subtitle.indexOf("curl exited with code 6") === 0)
     var stale = Currency.rows(Currency.parse("100 usd to try"), table, { fetching: false, error: "curl exited with code 6" }, "100 usd to try", now + 3 * 86400000)
-    verify(stale[0].previewDetail.indexOf("Refresh failed: curl exited with code 6") > 0)
+    verify(stale[0].previewDetail.indexOf("refresh failed\n") > 0 && stale[0].previewDetail.indexOf("curl exited with code 6") > 0)
+    verify(out[0].previewDetail.indexOf("refresh failed") < 0)
+    compare(out[0].previewDetail.split("\n").slice(0, 2), ["1 USD = 50 TRY", "Rates from 10 Sep 2026"])
   }
 }
