@@ -113,13 +113,13 @@ TestCase {
     }
 
     function test_parse_responses() {
-        var short = T.parseResponse(F.SHORT)
-        compare(short.text, "Bonjour le monde")
-        compare(short.source, "en")
-        compare(short.confirmed, "en")
-        compare(short.pronunciation, "")
-        compare(short.dictionary, [])
-        compare(short.correction, null)
+        var brief = T.parseResponse(F.SHORT)
+        compare(brief.text, "Bonjour le monde")
+        compare(brief.source, "en")
+        compare(brief.confirmed, "en")
+        compare(brief.pronunciation, "")
+        compare(brief.dictionary, [])
+        compare(brief.correction, null)
         var ja = T.parseResponse(F.JAPANESE)
         compare(ja.text, "おはよう")
         compare(ja.pronunciation, "Ohayō")
