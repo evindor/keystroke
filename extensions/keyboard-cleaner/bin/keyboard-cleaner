@@ -31,9 +31,12 @@ MAX_SECONDS = 300
 # reach the compositor before the keyboard goes quiet.
 GRACE_SECONDS = 0.5
 # Virtual keyboards (fcitx, wtype) never touch a wiped keyboard, and the
-# power and sleep buttons stay as the way out of a stuck block.
+# power and sleep buttons stay as the way out of a stuck block. The name list
+# covers the kernels that call them that; SKIP_FRAGMENTS covers the rest
+# (Apple SMC calls its power and lid events one device).
 SKIP_PREFIXES = ("hl-virtual",)
 SKIP_NAMES = {"power-button", "sleep-button"}
+SKIP_FRAGMENTS = ("powerbutton", "sleepbutton", "powerlid", "lidswitch")
 
 
 def safe_name(name: object) -> bool:
@@ -43,19 +46,41 @@ def safe_name(name: object) -> bool:
     return not any(ord(c) < 32 or c == "\x7f" for c in name)
 
 
-def usable(name: object) -> bool:
-    """A discovered device worth blocking: safe, real, and not an escape hatch."""
-    return safe_name(name) and not name.startswith(SKIP_PREFIXES) and name not in SKIP_NAMES
+def normalize(name: str) -> str:
+    """A device name reduced to letters and digits, for cross-list matching.
+
+    Hyprland reports one physical device differently in each list, so an exact
+    string match never fires on Apple hardware:
+
+        keyboards: apple-smc-power/lid-events
+        switches:  Apple SMC power/lid events
+    """
+    return "".join(c for c in name.lower() if c.isalnum())
+
+
+def usable(name: object, switches: object = ()) -> bool:
+    """A discovered device worth blocking: safe, real, and not an escape hatch.
+
+    A device Hyprland lists under `switches` is a power or lid button whatever
+    its name, and stays on so there is always a way out of a block.
+    """
+    if not safe_name(name) or name.startswith(SKIP_PREFIXES) or name in SKIP_NAMES:
+        return False
+    normalized = normalize(name)
+    if any(fragment in normalized for fragment in SKIP_FRAGMENTS):
+        return False
+    return normalized not in {normalize(s) for s in (switches or []) if isinstance(s, str)}
 
 
 def select_devices(devices: dict, keep_pointer: bool) -> list[str]:
     """Keyboard names, plus mouse and touchpad names unless keep_pointer."""
     kinds = ["keyboards"] if keep_pointer else ["keyboards", "mice"]
+    switches = [d.get("name") for d in devices.get("switches") or [] if isinstance(d, dict)]
     names: list[str] = []
     for kind in kinds:
         for device in devices.get(kind) or []:
             name = device.get("name") if isinstance(device, dict) else None
-            if usable(name) and name not in names:
+            if usable(name, switches) and name not in names:
                 names.append(name)
     return names
 

@@ -50,6 +50,25 @@ class SelectionTests(unittest.TestCase):
     def test_empty_listing(self):
         self.assertEqual(helper.select_devices({}, keep_pointer=False), [])
 
+    def test_switches_are_skipped_whatever_their_name(self):
+        # Hyprland lists one physical device in two spellings — Apple SMC's
+        # power and lid events appear as `apple-smc-power/lid-events` under
+        # keyboards and `Apple SMC power/lid events` under switches — so a
+        # block must leave it alone however it is spelled.
+        apple = {
+            "keyboards": [{"name": "apple-spi-keyboard"}, {"name": "apple-smc-power/lid-events"}],
+            "mice": [{"name": "apple-spi-trackpad"}],
+            "switches": [{"name": "Apple SMC power/lid events"}],
+        }
+        self.assertEqual(helper.select_devices(apple, keep_pointer=False),
+                         ["apple-spi-keyboard", "apple-spi-trackpad"])
+        self.assertEqual(helper.select_devices(apple, keep_pointer=True), ["apple-spi-keyboard"])
+
+    def test_power_and_lid_names_are_skipped_by_fragment(self):
+        for skipped in ("apple-smc-power/lid-events", "Power Button", "sleep-button", "lid-switch"):
+            self.assertFalse(helper.usable(skipped), skipped)
+        self.assertTrue(helper.usable("apple-spi-keyboard"))
+
 
 class LuaTests(unittest.TestCase):
     def test_plain_name(self):

@@ -39,7 +39,7 @@ Values live under `providers.keyboard-cleaner` in `~/.config/omarchy/keystroke.j
 
 Hyprland can switch an input device off at runtime: `hyprctl eval 'hl.device({ name = "…", enabled = false })'` makes the compositor drop that device's events, and it is the same call Omarchy's own touchpad toggle makes. `bin/keyboard-cleaner` lists the devices with `hyprctl devices -j`, switches each keyboard (and, unless the setting says otherwise, each mouse and touchpad) off, waits, and switches them back on. No device files are opened and no group membership is needed. The setting is not persisted, so a Hyprland reload or restart brings every device back even if the helper were killed outright.
 
-The helper skips virtual keyboards (fcitx, wtype) and leaves the power and sleep buttons alone, so they remain a way out. It waits half a second before switching anything off so the Enter that started it is released cleanly. It restores every device when the time is up, on SIGTERM, SIGINT or SIGHUP, and on any error, and turning the extension off during a block restores input at once.
+The helper skips virtual keyboards (fcitx, wtype) and leaves every power and lid button alone — the ones named `power-button`/`sleep-button` and anything Hyprland lists as a switch, whatever the kernel calls it — so they remain a way out. It waits half a second before switching anything off so the Enter that started it is released cleanly. It restores every device when the time is up, on SIGTERM, SIGINT or SIGHUP, and on any error, and turning the extension off during a block restores input at once.
 
 ## Limits and dependencies
 
