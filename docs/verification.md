@@ -1,5 +1,14 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.4.1 (2026-09-11)
+
+- Documentation only: `site/guide/index.html` copy pass (32 replacements:
+  every heading except the four kept on purpose, the hero, two asides) after
+  the user's review of 1.4.0's guide. `manifest.json` 1.4.0 → 1.4.1; no other
+  file under the plugin changes. `python3 site/check.py` passes (2 pages, 199
+  references, 35 screenshots); `tst_settingstree` and the full QML suite are
+  unchanged from the 1.4.0 run. Not exercised: nothing new to exercise.
+
 ## Release 1.4.0 (2026-09-11)
 
 - Release tree: 1.3.0 plus the in-repo extensions, the Translate extension,
