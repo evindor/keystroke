@@ -99,8 +99,8 @@ function voiceNodes(nodes, screens, rootParts, voice) {
 }
 
 // model: { configPath, paletteSchema, paletteValues, voice,
-//          entries: [{ key, name, description, icon, iconFont, iconSource, color, source, pluginId, enabled, schemas, values }],
-//          problems: [{ pluginId, message }] }
+//          entries: [{ key, name, description, icon, iconFont, iconSource, color, source, extensionId, dir, local, loaded, enabled, schemas, values }],
+//          problems: [{ id, message }] }
 function build(model) {
   var nodes = [], screens = ({})
   var rootParts = [ROOT_TITLE]
@@ -128,29 +128,31 @@ function build(model) {
     var e = entries[i]
     var parts = rootParts.concat([e.name])
     var scope = "settings/" + e.key
-    var community = e.source === "community"
-    var origin = community ? "Plugin " + e.pluginId : "Bundled"
+    var extension = e.source === "extension"
+    var origin = extension ? (e.local ? "Local extension" : "Extension") : "Bundled"
     nodes.push(node("settings", parts, { id: e.key, subtitle: (e.enabled ? "Enabled" : "Disabled") + " · " + origin + (e.description ? " · " + e.description : ""),
-      icon: e.icon || "⌘", iconFont: e.iconFont || "", iconSource: e.iconSource || "", tint: e.color || "", section: "Providers", order: 10 + i, badge: community ? "plugin" : "",
+      icon: e.icon || "⌘", iconFont: e.iconFont || "", iconSource: e.iconSource || "", tint: e.color || "", section: "Providers", order: 10 + i, badge: extension ? (e.local ? "local" : "extension") : "",
       keywords: e.key, description: e.description || "", action: navigate(scope, e.name) }))
     var path = ["providers", e.key]
     // Labelled "Enabled" rather than "Enable provider": the row sits on the
     // provider's own screen and its breadcrumb names the provider, and the
     // word "provider" would otherwise shadow settings that carry it as a key.
     var enabledSchema = { key: "enabled", type: "boolean", label: "Enabled",
-                          description: community ? "Runs plugin code in your shell with your permissions" : "Include this provider in Keystroke" }
+                          description: extension ? "Runs the extension's code in your shell with your permissions" : "Include this provider in Keystroke" }
+    // Turning an extension on runs its code: that asks first, as the Extensions screen does.
     nodes.push(node(scope, parts.concat([enabledSchema.label]), { id: e.key + "/enabled", subtitle: enabledSchema.description, verb: "Toggle", order: -1, lift: 1,
       accessory: e.enabled ? "On" : "Off", keywords: "enabled", description: "enable disable toggle on off " + enabledSchema.description,
+      confirm: extension && !e.enabled ? "Turn on " + e.name + "? It runs the code in " + (e.dir || "its folder") + " inside your shell, with your permissions." : "",
       action: settingAction(path, "enabled", !e.enabled, enabledSchema) }))
-    if (community)
-      nodes.push(node(scope, parts.concat(["Manage extension"]), { id: e.key + "/provenance", subtitle: "Plugin " + e.pluginId + " · update, load or remove it",
-        icon: "󰏓", verb: "Open", order: 900, badge: "plugin", listOnly: true, keywords: e.pluginId, action: navigate("extensions/" + e.pluginId, e.name) }))
+    if (extension)
+      nodes.push(node(scope, parts.concat(["Manage extension"]), { id: e.key + "/provenance", subtitle: (e.loaded ? "Loaded from " : "Off · ") + (e.dir || e.extensionId),
+        icon: "󰏓", verb: "Open", order: 900, badge: e.local ? "local" : "extension", listOnly: true, keywords: e.extensionId, action: navigate("extensions/" + e.extensionId, e.name) }))
     schemaNodes(nodes, screens, path, e.schemas || [], e.values || {}, scope, parts, e.key)
   }
   var problems = model.problems || []
   for (var p = 0; p < problems.length; p++)
-    nodes.push(node("settings", rootParts.concat([problems[p].pluginId]), { id: "problem/" + problems[p].pluginId, subtitle: problems[p].message, icon: "󰀦",
-      section: "Plugins needing attention", verb: "", order: 500 + p, disabled: true, badge: "plugin", description: "plugin problem " + problems[p].message,
+    nodes.push(node("settings", rootParts.concat([problems[p].id]), { id: "problem/" + problems[p].id, subtitle: problems[p].message, icon: "󰀦",
+      section: "Extensions needing attention", verb: "", order: 500 + p, disabled: true, badge: "extension", description: "extension problem " + problems[p].message,
       action: { type: "noop" } }))
   return { nodes: nodes, screens: screens }
 }

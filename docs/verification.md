@@ -1,5 +1,38 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Extensions ship inside Keystroke (2026-09-10)
+
+- Extensions moved from separate Omarchy plugins (git-installed into
+  `~/.config/omarchy/plugins`, discovered from a hosted index and the
+  marketplace catalog) to folders under `extensions/` in this repository,
+  reviewed through pull requests, plus `~/.local/share/keystroke/extensions`
+  for local work. `core/Extensions.js` shrank from the install/update/remove
+  job protocol to the folder scan, the listing and the screen rows;
+  `providers/Extensions.qml` from 292 lines to 75. `extensions/timer` is the
+  ported keystroke-timer, key `timer`; `examples/` and `extensions/index.json`
+  are gone.
+- Security property verified offscreen (`tests/palette_extensions_check.py`,
+  real `Keystroke.qml`): with no switch in keystroke.json, three extensions
+  are listed but `registry.services` is empty and a broken `Service.qml` is
+  not reported, because it was never compiled; after `providers.<id>.enabled:
+  true` the probe is created with `extension` (id, dir, source) and
+  `omarchyPath` injected and answers `probe tea`, the shipped timer answers
+  `timer 10m tea`, the broken one is reported with the QML error; turning the
+  switch off destroys the service and the listing stays. The Enabled row of
+  an extension that is off carries a confirmation naming its folder.
+- `tests/tst_extensions.qml` (12 tests): scan parsing and every rejection
+  message, local-over-builtin replacement, placeholder entries, listing,
+  screen and detail rows, the setup argv with single-quoted arguments, scope
+  ids. `tests/tst_settingstree.qml` updated to the extension entry shape.
+- `tools/check_extensions.py` (`bin/keystroke check-extensions`) passes on
+  `extensions/timer`: extension.json fields, folder-local imports resolved
+  by path, no symlinks, no manifest.json, README, qmllint, qmltestrunner.
+  `.github/workflows/extensions.yml` runs it with `--qt auto` on pull
+  requests; that job was not executed here (no CI run from a worktree).
+- Not exercised: the Run setup row against a real terminal (no shipped
+  extension declares one; the argv is unit-tested), and the live palette
+  (the patched plugin was not installed over the user's copy).
+
 ## Disabled provider routes (2026-09-09)
 
 - Reproduced on Omarchy 4.0.3-1 with Keystroke 1.3.0: an `omarchy-menu

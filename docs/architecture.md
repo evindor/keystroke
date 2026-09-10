@@ -9,12 +9,11 @@ omarchy-shell
        ├─ providers/Registry.qml
        │    ├─ bundled: OmarchyMenu, Applications, Calculator, Converter, Colors,
        │    │           Emoji, Clipboard, Files, Hotkeys, Codex, AiWeb, Extensions, SettingsProvider
-       │    └─ community: Service.qml of every ~/.config/omarchy/plugins folder whose manifest
-       │                  carries "x-keystroke", created and injected here (omarchy-shell hands
-       │                  a third-party plugin only its own manifest and service)
-       ├─ providers/Extensions.qml   install/update/remove/toggle community providers through
-       │                             Omarchy's plugin scripts; discovery from extensions/index.json
-       │                             and the marketplace catalog (core/Extensions.js)
+       │    └─ extensions: Service.qml of every folder under extensions/ (ships with Keystroke) and
+       │                   ~/.local/share/keystroke/extensions (local work), created here only once
+       │                   the user turns it on; off means never compiled
+       ├─ providers/Extensions.qml   the Extensions screen: switches, setup scripts in a visible
+       │                             terminal, source links (core/Extensions.js)
        ├─ core/*.js   Match (fuzzy matcher + tiers), Patterns (provider-declared query shapes), SettingsTree, Frecency, Settings, VoiceBindings, Intent, Calculator, Units, Colors, Emoji, AiTargets, Files, Extensions
        ├─ omarchy/MenuModel.js   vendored stock menu model (parse, merge, routes, guards)
        ├─ voice/VoiceSession.qml   voxtype recording lifecycle, optional live transcript and audio levels

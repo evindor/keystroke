@@ -1,280 +1,167 @@
 .pragma library
 .import "Match.js" as Match
 
-// Extensions: community providers as installable Omarchy plugins, managed
-// from inside the palette. Pure functions over the plugin folder scan, the
-// Keystroke extension index, the marketplace catalog and the output of the
-// git/omarchy commands the provider runs. providers/Extensions.qml owns the
-// processes and providers/Registry.qml the services; everything that decides
-// what to show or run lives here so it can be unit-tested.
+// Extensions: third-party providers that ship inside Keystroke itself, one
+// folder each under extensions/ (reviewed and merged through pull requests,
+// like Raycast's extensions repository), plus any folder the user drops into
+// ~/.local/share/keystroke/extensions to develop one. Every extension is off
+// until the user turns it on; an extension that is off is never compiled or
+// instantiated, so a fresh install runs none of this code.
 //
-// Scopes: extensions (the screen) › extensions/<plugin id> (one extension)
+// Pure functions over the folder scan and the palette's rows live here so
+// they can be unit-tested; providers/Registry.qml owns the scan process and
+// the service instances, providers/Extensions.qml the screen.
+//
+// Scopes: extensions (the screen) › extensions/<id> (one extension)
 
 var KEY = "extensions"
 var ICON = "󰏓"
-var INDEX_URL = "https://raw.githubusercontent.com/evindor/keystroke/main/extensions/index.json"
-var CATALOG_URL = "https://plugins.omarchy.org/catalog.json"
-var MARKER = "x-keystroke"
+var FILE = "extension.json"
+var ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
+var SOURCE_URL = "https://github.com/evindor/keystroke/tree/main/extensions/"
+var GUIDE_URL = "https://github.com/evindor/keystroke/blob/main/CONTRIBUTING.md#build-an-extension"
 
 function navigate(scope, title) { return { type: "navigate", scope: scope, title: title } }
-function op(name, fields) { var a = { type: "ext", op: name }; for (var k in fields || {}) a[k] = fields[k]; return a }
-
 function safeString(v, limit) { return String(v === undefined || v === null ? "" : v).replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, limit || 400) }
+function pathOf(url) { return String(url || "").replace(/^file:\/\//, "").replace(/\/$/, "") }
+function localDir(home) { return home + "/.local/share/keystroke/extensions" }
 
-// A git URL the plugin CLI accepts as-is. Bare owner/repo shorthands are
-// expanded to GitHub; anything that could be read as a git option is refused
-// (omarchy-git-url-check does the same before cloning).
-function gitUrl(text) {
-  var t = safeString(text, 512)
-  if (!t || t.charAt(0) === "-" || /\s/.test(t)) return ""
-  if (/^https:\/\/[A-Za-z0-9.-]+\/[^\s]+$/.test(t)) return t
-  // A local repository, for developing an extension: file:///absolute/path (omarchy-git-url-check clones the file transport).
-  if (/^file:\/\/\/[^\s]+$/.test(t) && t.indexOf("/../") < 0 && !/\/\.\.$/.test(t)) return t
-  if (/^git@[A-Za-z0-9.-]+:[^\s]+$/.test(t)) return t
-  if (/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9._-]+$/.test(t)) return "https://github.com/" + t.replace(/\.git$/, "") + ".git"
-  return ""
+// A path inside the extension folder: relative, no `..`, no leading slash.
+function insideFolder(p) {
+  var s = String(p || "")
+  return !!s && s.charAt(0) !== "/" && s.split("/").indexOf("..") < 0 && s.split("/").indexOf("") < 0
 }
 
-function repoSlug(url) {
-  var m = /github\.com[:\/]([^\/\s]+\/[^\/\s]+?)(?:\.git)?\/?$/.exec(String(url || ""))
-  return m ? m[1].toLowerCase() : String(url || "").toLowerCase()
-}
+// ------------------------------------------------------------------ scan
+// One record per extension.json, NUL-terminated: the source on the first
+// line, the folder on the second, the file after them. The built-in folder
+// comes first, the local one after it, so a local folder with the same id
+// replaces the shipped one (that is how an author iterates on an extension
+// that already ships). The glob skips dot folders.
+var SCAN_SCRIPT = 'emit() { for m in "$2"/*/extension.json; do [ -f "$m" ] || continue; printf "%s\\n%s\\n" "$1" "${m%/extension.json}"; cat "$m"; printf "\\0"; done; }; ' +
+  'emit builtin "$1"; emit local "$2"'
+function scanArgv(builtinDir, localDir) { return ["bash", "-c", SCAN_SCRIPT, "keystroke-extensions-scan", builtinDir, localDir] }
 
-// The Keystroke index: { version: 1, extensions: [ { id, name, description, author, repo, tags } ] }
-function parseIndex(text) {
-  var data
-  try { data = JSON.parse(String(text || "")) } catch (e) { return [] }
-  if (!data || data.version !== 1 || !Array.isArray(data.extensions)) return []
-  var out = []
-  for (var i = 0; i < data.extensions.length; i++) {
-    var e = data.extensions[i]
-    if (!e || typeof e !== "object") continue
-    var id = safeString(e.id, 120).toLowerCase(), repo = gitUrl(e.repo)
-    if (!id || !repo) continue
-    out.push({ id: id, name: safeString(e.name, 80) || id, description: safeString(e.description, 300), author: safeString(e.author, 80),
-               repo: repo, tags: Array.isArray(e.tags) ? e.tags.map(function(t) { return safeString(t, 30) }).filter(Boolean) : [], source: "index" })
-  }
-  return out
-}
-
-// The marketplace catalog (plugins.omarchy.org/catalog.json) does not carry
-// manifests, so a Keystroke extension is recognised by naming itself one:
-// "keystroke" in the id, name or tags, or a description that speaks of
-// Keystroke the palette ("for Keystroke", "Keystroke extension") rather than
-// of key presses ("one keystroke away").
-function namesKeystroke(p) {
-  var id = String(p.id || "").toLowerCase(), name = String(p.name || "").toLowerCase()
-  if (id.indexOf("keystroke") >= 0 || name.indexOf("keystroke") >= 0) return true
-  var tags = Array.isArray(p.tags) ? p.tags : []
-  for (var i = 0; i < tags.length; i++) if (String(tags[i]).toLowerCase() === "keystroke") return true
-  var d = String(p.description || "")
-  return /\b(for|extends|inside|into|in|with|the)\s+keystroke\b(?!s)/i.test(d) || /\bkeystroke\s+(extension|provider|palette|command palette|menu)\b/i.test(d)
-}
-
-function parseCatalog(text) {
-  var data
-  try { data = JSON.parse(String(text || "")) } catch (e) { return [] }
-  var plugins = data && Array.isArray(data.plugins) ? data.plugins : []
-  var out = []
-  for (var i = 0; i < plugins.length; i++) {
-    var p = plugins[i]
-    if (!p || typeof p !== "object" || p.sourceType === "builtin") continue
-    if (!namesKeystroke(p)) continue
-    var repo = gitUrl(p.repo)
-    if (!repo || p.installAvailable === false) continue
-    out.push({ id: safeString(p.id, 120).toLowerCase(), name: safeString(p.name, 80) || p.id, description: safeString(p.description, 300),
-               author: safeString(p.author, 80), repo: repo, tags: Array.isArray(p.tags) ? p.tags.slice(0, 5) : [], source: "marketplace",
-               verified: p.verificationStatus === "verified" })
-  }
-  return out
-}
-
-// One list to discover from: the index first, the marketplace filling in what
-// the index does not know, keyed by plugin id and then by repository.
-function discover(indexEntries, catalogEntries) {
-  var out = [], seenId = ({}), seenRepo = ({})
-  var all = (indexEntries || []).concat(catalogEntries || [])
-  for (var i = 0; i < all.length; i++) {
-    var e = all[i], slug = repoSlug(e.repo)
-    if (seenId[e.id] || seenRepo[slug]) continue
-    seenId[e.id] = true; seenRepo[slug] = true
-    out.push(e)
-  }
-  return out
-}
-
-// Installed extensions: every folder under the plugins directory whose
-// manifest carries the marker, as the scan found them (parseScan).
-// enabledIn(id): Keystroke's switch (keystroke.json); problems: the
-// registry's [{ pluginId, message }], the first of which per id is shown;
-// git: { id: { head, remote, remoteHead } } from the last update check.
-function installed(manifests, enabledIn, git, problems) {
-  var trouble = ({})
-  for (var p = 0; p < (problems || []).length; p++)
-    if (problems[p] && !trouble[problems[p].pluginId]) trouble[problems[p].pluginId] = safeString(problems[p].message, 300)
-  var out = []
-  for (var id in manifests || {}) {
-    var m = manifests[id]
-    if (!m || typeof m !== "object" || !m[MARKER] || typeof m[MARKER] !== "object") continue
-    var g = git && git[id] ? git[id] : null
-    out.push({ id: id, name: safeString(m.name, 80) || id, version: safeString(m.version, 64), description: safeString(m.description, 300),
-               author: safeString(m.author, 80), homepage: safeString(m.homepage, 512), apiVersion: m[MARKER].apiVersion,
-               enabled: enabledIn ? !!enabledIn(id) : true, problem: trouble[id] || "",
-               git: g ? g.git !== false : true, remote: g ? g.remote : "", checked: !!(g && g.fetched),
-               updateAvailable: !!(g && g.head && g.remoteHead && g.head !== g.remoteHead) })
-  }
-  out.sort(function(a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1 })
-  return out
-}
-
-// Fields a loaded provider adds to its installed entry: its own glyph, image
-// icon and accent replace the generic extension icon on every row about it,
-// and the examples of its declared patterns become a line of the About section.
-function decorate(e, provider, examples) {
-  if (!provider || typeof provider !== "object") return e
-  e.icon = safeString(provider.icon, 8)
-  e.iconFont = safeString(provider.iconFont, 80)
-  e.iconSource = safeString(provider.iconSource, 1024)
-  e.tint = safeString(provider.color, 32)
-  e.examples = Array.isArray(examples) ? examples.slice(0, 6) : []
-  return e
-}
-function iconOf(e) { return { icon: e.icon || ICON, iconFont: e.iconFont || "", iconSource: e.iconSource || "", tint: e.tint || "" } }
-
-// ------------------------------------------------------------------ commands
-
-function pluginsDir(home) { return home + "/.config/omarchy/plugins" }
-function bin(omarchyPath, name) { return omarchyPath + "/bin/" + name }
-
-// Never --enable: Keystroke loads the service itself, and a plugins[] entry
-// in shell.json would only make omarchy-shell run a second, idle copy.
-function installArgv(omarchyPath, url) { return [bin(omarchyPath, "omarchy-plugin-add"), url, "--yes"] }
-function updateArgv(omarchyPath, id) { return [bin(omarchyPath, "omarchy-plugin-update"), id, "--yes"] }
-// The QML engine keeps the old component cached (Quickshell 0.3.1 has no
-// Qt.clearComponentCache), so an update's new code runs after a shell restart.
-function updatedText(name) { return "Updated " + name + " · omarchy-restart-shell loads its new code" }
-function removeArgv(omarchyPath, id) { return [bin(omarchyPath, "omarchy-plugin-remove"), id, "--yes"] }
-
-// One fetch per git-managed extension; prints `id \t HEAD \t remote HEAD \t remote url`
-// (empty fields for a folder that is not a git checkout) and never merges.
-// Ids come as arguments, never through the script text.
-var CHECK_SCRIPT = 'dir="$1"; shift; for id in "$@"; do d="$dir/$id"; ' +
-  'if [ ! -d "$d/.git" ]; then printf "%s\\t\\t\\t\\n" "$id"; continue; fi; ' +
-  'remote=$(git -C "$d" remote get-url origin 2>/dev/null); head=$(git -C "$d" rev-parse HEAD 2>/dev/null); ' +
-  'if git -C "$d" fetch --quiet origin HEAD 2>/dev/null; then fetched=$(git -C "$d" rev-parse FETCH_HEAD 2>/dev/null); else fetched=""; fi; ' +
-  'printf "%s\\t%s\\t%s\\t%s\\n" "$id" "$head" "$fetched" "$remote"; done'
-
-function checkArgv(home, ids) {
-  return ["env", "GIT_TERMINAL_PROMPT=0", "GIT_SSH_COMMAND=ssh -oBatchMode=yes", "bash", "-c", CHECK_SCRIPT, "keystroke-extensions", pluginsDir(home)].concat(ids || [])
-}
-
-// ------------------------------------------------------------------- scan
-// omarchy-shell shows a third-party plugin only its own manifest and hands
-// out only its own service, so Keystroke reads the plugins directory itself.
-// One record per manifest, NUL-terminated: the path on the first line, the
-// file after it (JSON never contains a raw NUL). The shell glob skips dot
-// folders such as the backups bin/keystroke install leaves behind.
-var SCAN_SCRIPT = 'dir="$1"; for m in "$dir"/*/manifest.json; do [ -f "$m" ] || continue; printf "%s\\n" "$m"; cat "$m"; printf "\\0"; done'
-function scanArgv(home) { return ["bash", "-c", SCAN_SCRIPT, "keystroke-extensions-scan", pluginsDir(home)] }
-
-// { manifests: { id: manifest with __sourceDir }, problems: [{ pluginId, message }] }.
-// Folders without the marker are other Omarchy plugins and are ignored; a
-// marked manifest that cannot be used is reported so the Extensions screen
-// and Settings can say why. The folder name must equal the id: that is what
-// omarchy-plugin-add produces and what update, remove and the git check key on.
-function parseScan(text) {
+// { manifests: { id: manifest }, problems: [{ id, message }] }. A manifest is
+// the parsed extension.json plus `id` (the folder name), `dir` and `source`
+// ("builtin" | "local"). reserved: keys an extension may not take (the bundled
+// provider ids). A folder that cannot be used is reported, never half-loaded.
+function parseScan(text, reserved) {
   var manifests = ({}), problems = []
+  var taken = ({})
+  for (var r = 0; r < (reserved || []).length; r++) taken[reserved[r]] = true
   var records = String(text || "").split("\u0000")
   for (var i = 0; i < records.length; i++) {
-    var rec = records[i], nl = rec.indexOf("\n")
-    if (nl < 0) continue
-    var path = rec.slice(0, nl), body = rec.slice(nl + 1)
-    var dir = path.replace(/\/manifest\.json$/, ""), folder = dir.slice(dir.lastIndexOf("/") + 1)
-    var m
-    try { m = JSON.parse(body) }
-    catch (e) { if (body.indexOf('"' + MARKER + '"') >= 0) problems.push({ pluginId: folder, message: "manifest.json is not valid JSON" }); continue }
-    if (!m || typeof m !== "object" || !m[MARKER] || typeof m[MARKER] !== "object") continue
-    var id = safeString(m.id, 120)
-    if (id !== folder) { problems.push({ pluginId: folder, message: "Folder name must equal the plugin id (" + (id || "missing") + ")" }); continue }
-    m.__sourceDir = dir
+    var rec = records[i], a = rec.indexOf("\n")
+    if (a < 0) continue
+    var b = rec.indexOf("\n", a + 1)
+    if (b < 0) continue
+    var source = rec.slice(0, a), dir = rec.slice(a + 1, b), body = rec.slice(b + 1)
+    var id = dir.slice(dir.lastIndexOf("/") + 1)
+    var problem = validate(id, body, taken)
+    if (problem) { problems.push({ id: id, message: problem.message }); continue }
+    var m = parseManifest(body)
+    m.id = id; m.dir = dir; m.source = source === "local" ? "local" : "builtin"
     manifests[id] = m
   }
   return { manifests: manifests, problems: problems }
 }
 
-// file:// URL of the service entry point, or "" when the manifest declares
-// none or points outside its folder.
-function serviceUrl(manifest) {
-  if (!manifest || typeof manifest !== "object" || !manifest.__sourceDir) return ""
-  var kinds = Array.isArray(manifest.kinds) ? manifest.kinds : []
-  var ep = manifest.entryPoints && typeof manifest.entryPoints === "object" ? manifest.entryPoints.service : ""
-  if (kinds.indexOf("service") < 0 || typeof ep !== "string" || !ep) return ""
-  if (ep.charAt(0) === "/" || ep.split("/").indexOf("..") >= 0) return ""
-  return "file://" + manifest.__sourceDir + "/" + ep
-}
-
-// The manifest an extension sees: its own file, without the host's stamps.
-function publicManifest(manifest) {
-  var copy = JSON.parse(JSON.stringify(manifest || {}))
-  for (var k in copy) if (k.indexOf("__") === 0) delete copy[k]
-  return copy
-}
-
-function parseCheck(text) {
-  var out = ({}), lines = String(text || "").split("\n")
-  for (var i = 0; i < lines.length; i++) {
-    var parts = lines[i].split("\t")
-    if (parts.length < 4 || !parts[0]) continue
-    out[parts[0]] = { git: !!parts[1], head: parts[1], remoteHead: parts[2], remote: parts[3], fetched: !!parts[2] }
-  }
+function parseManifest(body) {
+  var m = JSON.parse(body)
+  var out = { name: safeString(m.name, 80), version: safeString(m.version, 64), author: safeString(m.author, 80), description: safeString(m.description, 300),
+              apiVersion: m.apiVersion, icon: safeString(m.icon, 8), color: safeString(m.color, 32), homepage: safeString(m.homepage, 512),
+              entry: safeString(m.entry || "Service.qml", 200), license: safeString(m.license, 40) }
+  if (m.setup && typeof m.setup === "object") out.setup = { run: safeString(m.setup.run, 200), summary: safeString(m.setup.summary, 300) }
   return out
 }
 
-// omarchy-plugin-add reports what it installed: "Added <id> into <folder>".
-function parseAdded(output) {
-  var m = /(?:^|\n)Added (\S+) into /.exec(String(output || ""))
-  return m ? m[1] : ""
+// null when the folder is usable, else { message }.
+function validate(id, body, taken) {
+  if (!ID_RE.test(id)) return { message: "Folder name must be lowercase letters, digits and dashes" }
+  if (taken && taken[id]) return { message: "The id " + id + " belongs to a bundled provider" }
+  var m
+  try { m = JSON.parse(body) } catch (e) { return { message: FILE + " is not valid JSON" } }
+  if (!m || typeof m !== "object" || Array.isArray(m)) return { message: FILE + " must be an object" }
+  if (m.apiVersion !== 1) return { message: "Needs Keystroke provider API 1, " + FILE + " declares " + JSON.stringify(m.apiVersion === undefined ? null : m.apiVersion) }
+  if (!safeString(m.name, 80)) return { message: FILE + " needs a name" }
+  var entry = m.entry === undefined ? "Service.qml" : m.entry
+  if (typeof entry !== "string" || !insideFolder(entry) || !/\.qml$/.test(entry)) return { message: "entry must be a .qml file inside the extension folder" }
+  if (m.setup !== undefined) {
+    if (!m.setup || typeof m.setup !== "object" || typeof m.setup.run !== "string" || !insideFolder(m.setup.run))
+      return { message: "setup.run must be a script inside the extension folder" }
+  }
+  return null
 }
 
-function fetchArgv(url) { return ["curl", "-fsSL", "--max-time", "20", "--", url] }
-
-// Jobs run detached from the palette: omarchy-plugin-add/update/remove ask
-// the shell to rescan its plugins, and a rescan destroys and recreates every
-// plugin instance, this provider included. The wrapper drops the previous
-// job's result, records the job in <dir>/job.json, runs the command, writes
-// <dir>/result.json (job, exit code, output) and, for anything but a check,
-// tells the user through a notification; whichever provider instance is
-// alive next reads the result. Nothing else deletes result.json: a detached
-// removal could take a newer job's result with it.
-var JOB_SCRIPT = 'dir="$1"; job="$2"; notify="$3"; label="$4"; shift 4; mkdir -p "$dir"; rm -f "$dir/result.json"; printf "%s" "$job" > "$dir/job.json"; ' +
-  '"$@" > "$dir/log" 2>&1; code=$?; ' +
-  'jq -n --arg code "$code" --rawfile log "$dir/log" --argjson job "$job" \'{job: $job, code: ($code | tonumber), output: $log}\' > "$dir/result.tmp" && mv "$dir/result.tmp" "$dir/result.json"; ' +
-  'rm -f "$dir/job.json"; ' +
-  'if [ -n "$label" ] && [ -x "$notify" ]; then if [ "$code" = 0 ]; then "$notify" -g "󰏓" "Keystroke" "$label"; else "$notify" -g "󰀦" "Keystroke" "$label failed: $(tail -n 1 "$dir/log")"; fi; fi'
-
-function jobArgv(dir, job, omarchyPath, argv) {
-  var done = job.kind === "check" ? "" : String(job.done || job.label || "")
-  return ["bash", "-c", JOB_SCRIPT, "keystroke-extension-job", dir, JSON.stringify(job), bin(omarchyPath, "omarchy-notification-send"), done].concat(argv)
+function serviceUrl(manifest) {
+  if (!manifest || !manifest.dir || !insideFolder(manifest.entry)) return ""
+  return "file://" + manifest.dir + "/" + manifest.entry
 }
 
-function parseResult(text) {
-  var data
-  try { data = JSON.parse(String(text || "")) } catch (e) { return null }
-  if (!data || typeof data !== "object" || !data.job || typeof data.job !== "object") return null
-  return { job: data.job, code: Number(data.code), output: String(data.output || "") }
+// The provider entry the registry keeps for an extension that is off or
+// failed to load: enough for Settings and the Extensions screen, never asked
+// for rows (the host skips disabled providers before calling query).
+function placeholder(manifest) {
+  return { apiVersion: 1, name: manifest.name || manifest.id, icon: manifest.icon || ICON, color: manifest.color, description: manifest.description,
+           settings: [], query: function() { return [] } }
+}
+
+// --------------------------------------------------------------- listing
+// One record per extension for the screen. entries: the registry's entries
+// (source "extension"); enabledIn(id): Keystroke's switch; problems: [{ id, message }].
+function list(entries, enabledIn, problems) {
+  var trouble = ({})
+  for (var p = 0; p < (problems || []).length; p++)
+    if (problems[p] && !trouble[problems[p].id]) trouble[problems[p].id] = safeString(problems[p].message, 300)
+  var out = []
+  for (var i = 0; i < (entries || []).length; i++) {
+    var e = entries[i]
+    if (e.source !== "extension" || !e.manifest) continue
+    var m = e.manifest, p = e.provider || {}
+    out.push({ id: m.id, name: safeString(p.name, 80) || m.name || m.id, version: m.version, description: safeString(p.description, 300) || m.description,
+               author: m.author, homepage: m.homepage, dir: m.dir, local: m.source === "local", setup: m.setup || null, loaded: !!e.loaded,
+               enabled: enabledIn ? !!enabledIn(m.id) : false, problem: trouble[m.id] || "",
+               icon: safeString(p.icon, 8) || m.icon || "", iconFont: safeString(p.iconFont, 80), iconSource: safeString(p.iconSource, 1024),
+               tint: safeString(p.color, 32) || m.color || "", examples: [] })
+  }
+  out.sort(function(a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1 })
+  return out
+}
+function iconOf(e) { return { icon: e.icon || ICON, iconFont: e.iconFont || "", iconSource: e.iconSource || "", tint: e.tint || "" } }
+
+// Keystroke's switch is a plain setting effect; the host writes it, the
+// registry loads or destroys the service, and the screen is queried again.
+function enableEffect(id, value) {
+  return { type: "setting", path: ["providers", id], key: "enabled", value: !!value, schema: { key: "enabled", type: "boolean" } }
+}
+function enableConfirm(e) {
+  return "Turn on " + e.name + "? It runs the code in " + e.dir + " inside your shell, with your permissions."
+}
+
+// ------------------------------------------------------------------ setup
+// Setup runs in a visible floating terminal, never in the background: the
+// user asked for it, watches it, and reads its result. The launcher takes
+// one shell string; everything that varies is single-quoted into it.
+function shellQuote(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'" }
+var SETUP_SCRIPT = 'dir="$1"; run="$2"; cd "$dir" || exit 1; echo "Keystroke: running $run in $dir"; echo; "./$run"; code=$?; echo; echo "$run exited with status $code"; exit $code'
+function setupArgv(omarchyPath, e) {
+  var run = e.setup ? e.setup.run : ""
+  if (!run || !insideFolder(run)) return null
+  return [omarchyPath + "/bin/omarchy-launch-floating-terminal-with-presentation",
+          "bash -c " + shellQuote(SETUP_SCRIPT) + " keystroke-setup " + shellQuote(e.dir) + " " + shellQuote(run)]
+}
+function setupConfirm(e) {
+  return "Open a terminal and run " + e.setup.run + " from " + e.dir + "?" + (e.setup.summary ? " " + e.setup.summary : "")
 }
 
 // ---------------------------------------------------------------------- rows
 
-function navRow(score) {
-  return { id: "open", title: "Extensions", subtitle: "Install, update and manage community providers", icon: ICON, section: "Keystroke",
-           verb: "Open", tier: "item", score: score, order: 8, keywords: "plugins store marketplace community install",
-           description: "extensions plugins store marketplace community providers install update", action: navigate(KEY, "Extensions") }
-}
-
-// Keystroke's switch is a plain setting effect; the host writes it and requeries.
-function enableEffect(id, value) {
-  return { type: "setting", path: ["providers", id], key: "enabled", value: !!value, schema: { key: "enabled", type: "boolean" } }
+function navRow(score, counts) {
+  var sub = counts && counts.total ? counts.on + " of " + counts.total + " on" : "Third-party providers that ship with Keystroke"
+  return { id: "open", title: "Extensions", subtitle: sub, icon: ICON, section: "Keystroke",
+           verb: "Open", tier: "item", score: score, order: 8, keywords: "extensions plugins community",
+           description: "extensions plugins community providers turn on off enable disable", action: navigate(KEY, "Extensions") }
 }
 
 function stateText(e) {
@@ -282,97 +169,65 @@ function stateText(e) {
   return e.enabled ? "On" : "Off"
 }
 
-function installedRow(e, scoped) {
-  var state = e.updateAvailable ? "Update available" : stateText(e)
-  var sub = (e.version ? "v" + e.version + " · " : "") + (e.problem ? e.problem : e.enabled ? "Enabled" : "Off in Keystroke") + " · " + e.id
+function listRow(e) {
+  var origin = e.local ? "local folder" : "ships with Keystroke"
+  var sub = (e.version ? "v" + e.version + " · " : "") + (e.problem ? e.problem : e.enabled ? "On · " + origin : "Off · " + origin)
   var ic = iconOf(e)
-  return { id: "installed/" + e.id, title: e.name, subtitle: sub, icon: ic.icon, iconFont: ic.iconFont, iconSource: ic.iconSource, tint: ic.tint,
-           section: "Installed", verb: "Open", tier: "item", order: 0,
-           accessory: state, keywords: e.id, description: e.description, badge: "plugin", path: scoped ? "" : "Extensions › " + e.name,
-           action: navigate(KEY + "/" + e.id, e.name), altAction: enableEffect(e.id, !e.enabled),
-           hint: e.enabled ? "ctrl ↵ turn off" : "ctrl ↵ turn on" }
+  var row = { id: e.id, title: e.name, subtitle: sub, icon: ic.icon, iconFont: ic.iconFont, iconSource: ic.iconSource, tint: ic.tint,
+              section: e.enabled ? "On" : "Available", verb: "Open", tier: "item", order: e.enabled ? 0 : 10,
+              accessory: stateText(e), keywords: e.id + (e.local ? " local" : ""), description: e.description, badge: e.local ? "local" : "extension",
+              action: navigate(KEY + "/" + e.id, e.name) }
+  // Turning an extension on runs its code, so that always goes through the
+  // confirmation on its own screen; turning it off is one key here.
+  if (e.enabled) { row.altAction = enableEffect(e.id, false); row.hint = "ctrl ↵ turn off" }
+  return row
 }
 
-function discoverRow(e, order) {
-  return { id: "discover/" + e.id, title: e.name, subtitle: (e.author ? e.author + " · " : "") + repoSlug(e.repo), icon: "", section: "Discover",
-           verb: "Install", tier: "item", order: order, badge: e.source === "marketplace" ? "marketplace" : "index", keywords: e.id + " " + e.tags.join(" "),
-           description: e.description, preview: e.description || e.name, previewLabel: "EXTENSION", previewDetail: e.repo,
-           confirm: "Install " + e.name + " from " + e.repo + "? It runs unsandboxed in your shell with your permissions.",
-           action: op("install", { id: e.id, name: e.name, url: e.repo }), altAction: { type: "url", url: e.repo }, hint: "ctrl ↵ repository" }
+function guideRow() {
+  return { id: "guide", title: "Write your own", subtitle: "A folder in ~/.local/share/keystroke/extensions runs at once; a pull request ships it to everyone",
+           icon: "", section: "Extend", verb: "Open guide", tier: "item", order: 90, keywords: "guide contribute develop write local",
+           description: "write develop create contribute extension guide local folder pull request", action: { type: "url", url: GUIDE_URL } }
 }
 
-function urlRow(url) {
-  return { id: "install-url", title: "Install from " + url, subtitle: "Clones the repository, validates the manifest, enables the plugin", icon: "",
-           section: "Install", verb: "Install", tier: "answer", score: 100, order: 0,
-           confirm: "Install a plugin from " + url + "? It runs unsandboxed in your shell with your permissions.",
-           action: op("install", { id: "", name: url, url: url }) }
-}
-
-function jobRow(job) {
-  return { id: "job", title: job.label, subtitle: job.detail || "Working…", icon: "", section: "Working", verb: "", tier: "answer", score: 200, order: -10,
-           disabled: true, action: { type: "noop" } }
-}
-
-// The Extensions screen. state: { installed, discover, job, fetching, checked, error, marketplace }
-function screenRows(query, state) {
+// The Extensions screen.
+function screenRows(query, extensions) {
   var q = String(query || "").trim(), rows = [], i
-  if (state.job) rows.push(jobRow(state.job))
-  var url = q ? gitUrl(q) : ""
-  if (url && q.indexOf("/") > 0) rows.push(urlRow(url))
-  var inst = state.installed || [], disc = state.discover || []
-  var installedIds = ({})
-  for (i = 0; i < inst.length; i++) { installedIds[inst[i].id] = true; rows.push(installedRow(inst[i], true)) }
-  if (!q && !inst.length)
-    rows.push({ id: "none", title: "No extensions installed", subtitle: "Pick one below, or type a git URL such as owner/repo", icon: ICON, section: "Installed",
+  for (i = 0; i < extensions.length; i++) rows.push(listRow(extensions[i]))
+  if (!extensions.length)
+    rows.push({ id: "none", title: "No extensions found", subtitle: "Keystroke's extensions folder is empty", icon: ICON, section: "Available",
                 verb: "", tier: "item", score: 1, order: 0, disabled: true, action: { type: "noop" } })
-  var updates = 0
-  for (i = 0; i < inst.length; i++) if (inst[i].updateAvailable) updates++
-  rows.push({ id: "check", title: updates ? "Update all (" + updates + ")" : "Check for updates", subtitle: state.checked ? "Checked " + state.checked : "Fetches every git-managed extension without merging",
-              icon: "", section: "Actions", verb: "Run", tier: "item", order: 1, keywords: "update upgrade check fetch", description: "update upgrade refresh check",
-              action: updates ? op("update-all") : op("check") })
-  rows.push({ id: "refresh", title: "Refresh catalog", subtitle: state.fetching ? "Fetching…" : (state.error ? state.error : "Keystroke index" + (state.marketplace ? " and the Omarchy marketplace" : "")),
-              icon: "", section: "Actions", verb: "Run", tier: "item", order: 2, keywords: "refresh reload catalog index marketplace", description: "refresh reload catalog index marketplace",
-              action: op("refresh") })
-  var n = 0
-  for (i = 0; i < disc.length; i++) {
-    if (installedIds[disc[i].id]) continue
-    rows.push(discoverRow(disc[i], 10 + n++))
-  }
+  rows.push(guideRow())
   if (!q) for (i = 0; i < rows.length; i++) if (rows[i].score === undefined) rows[i].score = 1
   return rows
 }
 
 // One extension's screen.
-function detailRows(query, e, state) {
+function detailRows(query, e) {
   var rows = []
-  if (state && state.job && state.job.id === e.id) rows.push(jobRow(state.job))
-  rows.push({ id: e.id + "/enabled", title: "Enabled", subtitle: "Include this extension's results in Keystroke",
-              icon: "", section: e.name, verb: "Toggle", tier: "item", order: 0, accessory: e.enabled ? "On" : "Off", keywords: "enable disable on off",
-              action: enableEffect(e.id, !e.enabled) })
+  var on = { id: e.id + "/enabled", title: "Enabled", subtitle: e.enabled ? "Answering queries" : "Off: its code is not loaded",
+             icon: "", section: e.name, verb: "Toggle", tier: "item", order: 0, accessory: e.enabled ? "On" : "Off", keywords: "enable disable on off",
+             action: enableEffect(e.id, !e.enabled) }
+  if (!e.enabled) on.confirm = enableConfirm(e)
+  rows.push(on)
   if (e.problem)
     rows.push({ id: e.id + "/problem", title: "Needs attention", subtitle: e.problem, icon: "󰀦", section: e.name, verb: "", tier: "item", order: 1,
                 disabled: true, keywords: "problem error attention", action: { type: "noop" } })
-  rows.push({ id: e.id + "/settings", title: "Settings", subtitle: "Keystroke Settings › " + e.name, icon: "󰒓", section: e.name, verb: "Open", tier: "item", order: 2,
-              action: navigate("settings/" + e.id, e.name) })
-  if (e.git) {
-    rows.push({ id: e.id + "/update", title: e.updateAvailable ? "Update now" : "Check for updates",
-                subtitle: e.updateAvailable ? "Fast-forwards to " + (e.remote || "origin") + " and validates the manifest" : (e.remote || "Git-managed"),
-                icon: "", section: e.name, verb: "Run", tier: "item", order: 3, accessory: e.updateAvailable ? "Update available" : "",
-                keywords: "update upgrade check", action: e.updateAvailable ? op("update", { id: e.id, name: e.name }) : op("check", { id: e.id }) })
-  } else {
-    rows.push({ id: e.id + "/local", title: "Not git-managed", subtitle: "Copied by hand; update it by replacing the folder", icon: "", section: e.name,
-                verb: "", tier: "item", order: 3, disabled: true, action: { type: "noop" } })
-  }
-  if (e.homepage || e.remote)
-    rows.push({ id: e.id + "/repo", title: "Open repository", subtitle: e.homepage || e.remote, icon: "", section: e.name, verb: "Open", tier: "item", order: 4,
-                keywords: "repository github source homepage", action: { type: "url", url: e.homepage || e.remote } })
-  rows.push({ id: e.id + "/remove", title: "Remove", subtitle: "Stops the extension and deletes " + e.id + " from ~/.config/omarchy/plugins", icon: "󰆴", section: e.name,
-              verb: "Remove", tier: "item", order: 9, keywords: "remove uninstall delete",
-              confirm: "Remove " + e.name + "? Its Keystroke settings stay in keystroke.json.", action: op("remove", { id: e.id, name: e.name }) })
+  if (e.setup)
+    rows.push({ id: e.id + "/setup", title: "Run setup", subtitle: e.setup.summary || "Opens a terminal and runs " + e.setup.run, icon: "",
+                section: e.name, verb: "Run", tier: "item", order: 2, keywords: "setup install prepare download build",
+                confirm: setupConfirm(e), action: { type: "extension-setup", id: e.id } })
+  rows.push({ id: e.id + "/settings", title: "Settings", subtitle: e.enabled ? "Keystroke Settings › " + e.name : "Turn the extension on to see its settings",
+              icon: "󰒓", section: e.name, verb: "Open", tier: "item", order: 3, action: navigate("settings/" + e.id, e.name) })
+  if (e.local)
+    rows.push({ id: e.id + "/folder", title: "Open folder", subtitle: e.dir, icon: "", section: e.name, verb: "Open", tier: "item", order: 4,
+                keywords: "folder source directory", action: { type: "exec", argv: ["xdg-open", e.dir] } })
+  else
+    rows.push({ id: e.id + "/source", title: "Open source", subtitle: e.homepage || SOURCE_URL + e.id, icon: "", section: e.name, verb: "Open", tier: "item", order: 4,
+                keywords: "source github repository homepage", action: { type: "url", url: e.homepage || SOURCE_URL + e.id } })
   var ic = iconOf(e)
   rows.push({ id: e.id + "/about", title: e.name + (e.version ? " v" + e.version : ""), subtitle: [e.author, e.description].filter(Boolean).join(" · ") || e.id,
               icon: ic.icon, iconFont: ic.iconFont, iconSource: ic.iconSource, tint: ic.tint,
-              section: "About", verb: "", tier: "item", order: 20, disabled: true, badge: "plugin", action: { type: "noop" } })
+              section: "About", verb: "", tier: "item", order: 20, disabled: true, badge: e.local ? "local" : "extension", action: { type: "noop" } })
   if (e.examples && e.examples.length)
     rows.push({ id: e.id + "/patterns", title: "Answers queries like " + e.examples.join(" · "), subtitle: "Declared patterns lift this extension's results when a query matches",
                 icon: "", section: "About", verb: "", tier: "item", order: 21, disabled: true, keywords: "patterns examples", action: { type: "noop" } })

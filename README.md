@@ -1,6 +1,6 @@
 # Keystroke
 
-A Raycast-style command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin in QML and JavaScript, running inside the existing `omarchy-shell` process, themed by whatever Omarchy theme is active. Type, or speak, what you want: apps, the whole Omarchy menu, calculations, conversions, colors, emoji, clipboard history, files, Codex, and anything a community extension adds. Smart Match, a small embedding model running locally, understands what you mean when the words do not match exactly.
+A Raycast-style command palette that **replaces the Omarchy menu**. One native Omarchy `menu` plugin in QML and JavaScript, running inside the existing `omarchy-shell` process, themed by whatever Omarchy theme is active. Type, or speak, what you want: apps, the whole Omarchy menu, calculations, conversions, colors, emoji, clipboard history, files, Codex, and anything an extension adds. Smart Match, a small embedding model running locally, understands what you mean when the words do not match exactly.
 
 <p align="center"><a href="https://evindor.github.io/keystroke/"><img src="site/assets/social-card.png" alt="Keystroke: Raycast-style power for Omarchy" width="960"></a></p>
 
@@ -81,20 +81,19 @@ is in [the matching runtime documentation](matching/README.md).
 
 ## Extensions
 
-Keystroke is extension-first: anyone can publish a provider as an ordinary Omarchy plugin, and Keystroke installs, updates, enables and removes it from inside the palette.
+Third-party extensions live inside Keystroke itself, one folder each under [extensions/](extensions/), the way the [Raycast extensions repository](https://github.com/raycast/extensions) works: anyone adds a folder, opens a pull request, and once it is reviewed and merged the extension reaches every user with the next Keystroke update. The bundled providers in `providers/` are the vetted core; `extensions/` is where the community adds theirs.
 
 <p align="center"><img src="site/assets/screenshots/extension-detail.png" alt="One extension's screen" width="720"></p>
 
-Type `ext` and open **Extensions**:
+**Every extension is off until you turn it on.** Installing or updating Keystroke never runs code from `extensions/`: an extension that is off is not even compiled. Type `ext` and open **Extensions**:
 
-- **Installed** lists every extension, on or off, with its version. `↵` opens its screen: **Enabled**, **Settings**, **Check for updates** / **Update now**, **Open repository**, **Remove**; one that failed to load shows **Needs attention** with the reason. `Ctrl+↵` on the list row toggles it.
-- **Discover** merges two sources: the curated [Keystroke index](extensions/index.json) and the [Omarchy plugin marketplace](https://plugins.omarchy.org), where an extension is recognised by naming Keystroke in its id, name, description or tags. Both are cached for an hour under `~/.cache/keystroke`; **Refresh catalog** fetches them again.
-- **Any git URL**, `owner/repo` shorthand or `file:///path/to/local.git` typed on the Extensions screen offers an install row.
-- **Check for updates** fetches every git-managed extension without merging; **Update all** appears when something is behind. Updated code runs after the next `omarchy-restart-shell` (the shell's QML cache cannot be cleared on Quickshell 0.3.1); the status line reminds you.
+- The list shows every extension with its version and state. `↵` opens its screen; `Ctrl+↵` on a row that is on turns it off.
+- **Enabled** on an extension's screen asks for confirmation, states the folder whose code will run in your shell with your permissions, and then loads it at once. Turning it off destroys its service. One that failed to load shows **Needs attention** with the QML error.
+- **Run setup** appears only for an extension that declares a setup script (a model to download, something to build). It opens a visible terminal and runs the script in front of you; nothing runs on its own.
+- **Settings** opens the extension's settings screen; **Open source** opens its folder on GitHub.
+- **Write your own** points at the guide. A folder in `~/.local/share/keystroke/extensions/` is picked up next time the palette opens, so you can use an extension you are writing before, or instead of, sending it upstream.
 
-Every install and removal asks for confirmation and states that the code runs unsandboxed in your shell. The work is done by Omarchy's own scripts (`omarchy plugin add --yes`, `omarchy plugin update --yes`, `omarchy plugin remove --yes`), which refuse git transport helpers, validate the manifest and reject symlinks, so the palette and the CLI never disagree. Because the shell reloads all plugins after an install or removal, the palette closes for a moment and a notification confirms the outcome. Keystroke loads extensions itself from `~/.config/omarchy/plugins` (omarchy-shell lets a plugin see only itself), so an extension installed by any route (the palette, `omarchy plugin add`, a copied folder) is on the next time the palette opens, needs no entry in `shell.json`, and is turned off under Extensions → <name>.
-
-**Write one.** An extension is an Omarchy plugin of kind `service` whose manifest carries `"x-keystroke": { "apiVersion": 1 }` and whose `Service.qml` exposes a `provider` object with `query(ctx)`. It can declare the shapes of text it answers as **patterns** (regular expressions with a boost: `price = 10` lifts Calpad's offer above the assistant hand-offs without Calpad knowing about them), carry its own **image icon** on every row about it, and ship a **view** of its own over the palette card. The published references are [keystroke-timer](https://github.com/evindor/keystroke-timer) (a GitHub template: countdown timers with settings, a scoped screen, a service that outlives the palette and unit tests) and [keystroke-calpad](https://github.com/evindor/keystroke-calpad) (patterns, icon, a multi-line calculator session with live results, hand-off to a desktop app); the minimal one is [examples/keystroke-hello](examples/keystroke-hello/). The contract is [docs/providers.md](docs/providers.md); the step-by-step guide for people and coding agents, including publishing to the marketplace and to the index, is [CONTRIBUTING.md](CONTRIBUTING.md).
+**Write one.** An extension is a folder with an `extension.json` (name, version, description, icon, `apiVersion`) and a `Service.qml` exposing a `provider` object with `query(ctx)`. It can declare the shapes of text it answers as **patterns** (regular expressions with a boost: `price = 10` lifts Calpad's offer above the assistant hand-offs without Calpad knowing about them), carry its own **image icon** on every row about it, and ship a **view** of its own over the palette card. The reference is [extensions/timer](extensions/timer/): countdown timers with settings, a scoped screen, a service that outlives the palette and unit tests, small enough to read in one sitting. The contract is [docs/providers.md](docs/providers.md); the step-by-step guide for people and coding agents, from the first folder to the pull request, is [CONTRIBUTING.md](CONTRIBUTING.md#build-an-extension).
 
 <p align="center"><img src="site/assets/screenshots/timer.png" alt="The Timer extension answering timer 25m focus" width="720"></p>
 

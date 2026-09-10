@@ -94,7 +94,7 @@ Item {
     root.slideLevel(1)
   }
   // A view whose provider was removed, unloaded or turned off while it was
-  // showing (a community plugin disabled from the CLI, say) must not linger
+  // showing (an extension turned off from Settings, say) must not linger
   // over the palette with a destroyed context behind it.
   function dropOrphanedView() {
     if (!root.providerViewActive) return
@@ -161,7 +161,8 @@ Item {
   }
   function paletteValues() { return root.paletteSettings }
   function settingsFor(entry) { return Settings.values(root.config, ["providers", entry.key], entry.provider.settings || []) }
-  function providerEnabled(entry) { return Settings.isEnabled(root.config, ["providers", entry.key], true) }
+  // Bundled providers are on unless turned off; extensions are off until turned on.
+  function providerEnabled(entry) { return !!entry && Settings.isEnabled(root.config, ["providers", entry.key], entry.source === "bundled") }
   function registryEntry(key) {
     for (var i = 0; i < providerRegistry.entries.length; i++) if (providerRegistry.entries[i].key === key) return providerRegistry.entries[i]
     return null
@@ -779,7 +780,7 @@ Item {
     // A matched provider pattern lifts rows that already match; it never revives a row the matcher dropped.
     out.score = q && base > 0 && boost > 0 ? base + boost : base
     out.accessory = String(row.accessory || "")
-    out.badge = String(row.badge || (entry.source === "community" ? "plugin" : ""))
+    out.badge = String(row.badge || (entry.source === "extension" ? "extension" : ""))
     out.hint = String(row.hint || "")
     out.disabled = row.disabled === true
     out.remember = row.remember === true
