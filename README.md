@@ -6,7 +6,7 @@ A Raycast-style command palette that **replaces the Omarchy menu**. One native O
 
 **[Explore the feature showcase and installation guide →](https://evindor.github.io/keystroke/)** · **[Read the usage guide: every feature, with a screenshot and one thing to try →](https://evindor.github.io/keystroke/guide/)**
 
-[Release notes: 1.4.0](docs/releases/v1.4.0.md) — extensions ship inside Keystroke, off until you turn them on, with Timer (now ringing and counting down in the bar) and Translate in the box; every typed command explains itself; a usage guide, reachable from Settings → Learn Keystroke. Earlier: [1.3.0](docs/releases/v1.3.0.md), [1.2.1](docs/releases/v1.2.1.md), [1.2.0](docs/releases/v1.2.0.md).
+[Release notes: 1.4.1](docs/releases/v1.4.1.md) — the usage guide reads like a manual. [1.4.0](docs/releases/v1.4.0.md): extensions ship inside Keystroke, off until you turn them on, with Timer (now ringing and counting down in the bar) and Translate in the box; every typed command explains itself; a usage guide, reachable from Settings → Learn Keystroke. Earlier: [1.3.0](docs/releases/v1.3.0.md), [1.2.1](docs/releases/v1.2.1.md), [1.2.0](docs/releases/v1.2.0.md).
 
 Screenshots show the real Omarchy interface with public demo data, rendered offscreen from the real palette by `tools/showcase/offscreen.py`.
 
