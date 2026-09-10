@@ -10,10 +10,12 @@
 //   flashFall  the brightening fading back out
 //   window     the palette appearing and leaving, when the window transition
 //              is Fade or Slide up (Instant ignores the tier for the window)
+//   sheen      the highlight sweeping once across a command prefix when the
+//              search field recognises it
 var TIERS = {
-  off:    { level: 0, slide: 0,  selection: 0,  flashRise: 0,  flashFall: 0,  window: 0 },
-  snappy: { level: 1, slide: 38, selection: 38, flashRise: 14, flashFall: 34, window: 38 },
-  fluid:  { level: 2, slide: 90, selection: 90, flashRise: 20, flashFall: 50, window: 90 }
+  off:    { level: 0, slide: 0,  selection: 0,  flashRise: 0,  flashFall: 0,  window: 0,  sheen: 0 },
+  snappy: { level: 1, slide: 38, selection: 38, flashRise: 14, flashFall: 34, window: 38, sheen: 320 },
+  fluid:  { level: 2, slide: 90, selection: 90, flashRise: 20, flashFall: 50, window: 90, sheen: 520 }
 }
 var DEFAULT_TIER = "snappy"
 

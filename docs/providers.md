@@ -1,25 +1,29 @@
 # Keystroke provider contract (API 1)
 
-A provider supplies rows for a query and effects for activation. Bundled providers ([providers/](../providers/)) and community providers implement the same interface.
+A provider supplies rows for a query and effects for activation. Bundled providers ([providers/](../providers/)) and extensions implement the same interface.
 
-## Community packaging
+## Packaging an extension
 
-An Omarchy plugin of kind `service` whose root object exposes `provider`, with a manifest marker:
+Bundled providers live in [providers/](../providers/) and are instantiated by `providers/Registry.qml`. Third-party providers are **extensions**: one folder each under [extensions/](../extensions/) in this repository (merged through pull requests, so they ship with Keystroke), or under `~/.local/share/keystroke/extensions/` on the user's machine (work in progress, or private). A folder holds an `extension.json` and the QML it names:
 
 ```json
 {
-  "schemaVersion": 1, "id": "you.thing", "name": "Thing", "version": "1.0.0",
-  "kinds": ["service"], "keepLoaded": true,
-  "entryPoints": { "service": "Service.qml" },
-  "x-keystroke": { "apiVersion": 1 }
+  "name": "Thing", "version": "1.0.0", "author": "You", "description": "One line for the Extensions screen",
+  "apiVersion": 1, "icon": "󰀻", "color": "#8bceb4",
+  "entry": "Service.qml",
+  "setup": { "run": "bin/setup", "summary": "Downloads a 40 MB model, verified by SHA-256" }
 }
 ```
 
-Keystroke reads `~/.config/omarchy/plugins/*/manifest.json` itself (`core/Extensions.js`, `scanArgv`/`parseScan`), keeps the manifests that carry `x-keystroke` and whose folder name equals their id, and creates each `entryPoints.service` in its own object tree (`providers/Registry.qml`), injecting `shell`, `manifest` and `omarchyPath` as omarchy-shell would. The scan runs when the palette is created and on every open; a manifest that changed recreates its service, a folder that disappeared destroys it. A recreated service compiles from the QML engine's component cache, which Quickshell 0.3.1 cannot clear (`Qt.clearComponentCache` is undefined there; omarchy-shell guards the call), so code that changed on disk (an update, a hand edit) runs after the next `omarchy-restart-shell`; the update's status line says so. A first install has nothing cached and loads at once. omarchy-shell shows a third-party plugin only its own manifest (`PluginRegistryApi`) and hands out only its own service, which is why the shell's registry is not used and why an extension needs no entry in `shell.json`. A plugin whose service is missing, fails to compile, exposes no `provider`, or declares another `apiVersion` is listed under "Plugins needing attention" in Settings and as **Needs attention** on the Extensions screen instead of loading. An installed extension is on unless turned off (`providers.<id>.enabled: false` in keystroke.json, under Extensions → <name> or Settings → <name>); off keeps the service but sends it no queries. Minimal example: [examples/keystroke-hello](../examples/keystroke-hello/); complete, published example: [keystroke-timer](https://github.com/evindor/keystroke-timer). The step-by-step guide is [CONTRIBUTING.md](../CONTRIBUTING.md).
+`commands` (optional) declares the typed triggers, see *Commands* below; it lives in `extension.json` so the usage is known, and shown, before the extension is turned on. `name`, `version`, `author`, `description` and `apiVersion` (exactly `1`) are required; `icon` (a glyph from Omarchy's icon font) and `color` decorate the extension's rows before its code is loaded; `entry` defaults to `Service.qml` and must be a `.qml` file inside the folder; `homepage` (https) replaces the GitHub link on the extension's screen; `license` is informational; `setup` is only for an extension that needs a one-off step before it can work (see below). The **folder name is the extension's id**: lowercase letters, digits and dashes, distinct from every bundled provider id. It is the registry key, the settings section (`providers.<id>` in `keystroke.json`) and the scope (`<id>`, `<id>/<sub>`).
+
+`providers/Registry.qml` scans both folders (`core/Extensions.js`, `scanArgv`/`parseScan`) when the palette is created and on every open; a local folder with the same id replaces the shipped one. **An extension is off until the user turns it on** (`providers.<id>.enabled: true`), and one that is off is never compiled or instantiated: the registry lists it from `extension.json` alone, with an empty settings schema. Turning it on creates `entry` in its own object tree at once, injecting `shell`, `extension` (the parsed `extension.json` plus `id`, `dir` and `source`, `"builtin"` or `"local"`) and `omarchyPath`, and reads `provider`. Turning it off destroys the object. A folder whose `extension.json` is unusable, and an extension that is on but whose entry fails to compile, exposes no `provider`, or declares another `apiVersion`, is listed under "Extensions needing attention" in Settings and shows **Needs attention** on the Extensions screen. The QML engine caches components by file and Quickshell 0.3.1 cannot clear that cache, so after editing a loaded extension's code run `omarchy-restart-shell`; a first load has nothing cached.
+
+The reference extension is [extensions/timer](../extensions/timer/); the step-by-step guide is [CONTRIBUTING.md](../CONTRIBUTING.md#build-an-extension).
 
 ## Extensions screen
 
-`providers/Extensions.qml` (logic in `core/Extensions.js`) is the in-palette manager for community providers. It lists every installed plugin carrying `x-keystroke` with Keystroke's on/off switch (`providers.<id>.enabled` in keystroke.json). Install, update and remove run Omarchy's scripts as one background job at a time: `omarchy-plugin-add <url> --yes` (never `--enable`: the shell would only run a second, idle copy of the service), `omarchy-plugin-update <id> --yes`, `omarchy-plugin-remove <id> --yes`; each ends with a folder rescan. Update checks are a `git fetch` per extension without merging. Discovery merges two sources, cached for an hour under `~/.cache/keystroke`: the Keystroke index ([extensions/index.json](../extensions/index.json), raw from GitHub; the URL is a setting) and the Omarchy marketplace catalog (`plugins.omarchy.org/catalog.json`), where an extension is recognised by the word *keystroke* in its id, name, description or tags. Any git URL or `owner/repo` shorthand typed on the Extensions screen offers an install row. Every install and removal asks for confirmation first. `tests/extensions_check.py` drives all of it through the real scripts against a local bare repository.
+`providers/Extensions.qml` (logic in `core/Extensions.js`) lists every extension found by the registry with Keystroke's switch. Turning one on goes through a confirmation that says the extension was checked and reviewed before it shipped (or that a local folder was not), that it nonetheless runs at the user's own risk, and that checking its code first is recommended. The same confirmation guards the **Enabled** row under Keystroke Settings. `Ctrl+↵` on a list row that is on turns it off. An extension's own screen starts with a **Usage** section built from its declared commands: the usage line (`tr [to] <text>`), what each argument means, examples that type themselves into the palette when activated, and a **Prefix** row that leads to the reserved `prefix` setting. An extension that declares `setup` gets a **Run setup** row: after a confirmation, the palette closes and `omarchy-launch-floating-terminal-with-presentation` runs the script in a visible terminal from the extension's folder (`setupArgv`); the script's exit status is shown there. Keystroke does not track whether setup has happened; the provider checks for what it needs and says so in its rows. The screen never touches the network: extensions arrive with Keystroke's own updates. `tests/palette_extensions_check.py` drives the real palette offscreen through the whole lifecycle.
 
 ## Provider object
 
@@ -27,7 +31,7 @@ Keystroke reads `~/.config/omarchy/plugins/*/manifest.json` itself (`core/Extens
 readonly property var provider: ({
   apiVersion: 1,
   name: "Thing", icon: "✳", iconFont: "", iconSource: "", color: "#hex", description: "",
-  prefix: "th",                 // optional, documentation only for now
+  commands: [ { id, prefix, title, summary, args: [{ name, hint, optional, rest }], examples } ],   // optional, see Commands
   patterns: [ { id, regex, flags, boost, example, description } ],   // optional, see Patterns
   settings: [ { key, type: "boolean"|"enum"|"number"|"string", label, "default", options, min, max, integer, description } ],
   view: Component { ... },                        // optional, see Provider views
@@ -38,13 +42,13 @@ readonly property var provider: ({
 })
 ```
 
-Bundled providers also carry `id`; community providers are keyed by their plugin id.
+Bundled providers also carry `id`; extensions are keyed by their folder name.
 
 `icon` is a glyph (Omarchy's icon font unless `iconFont` names another); `iconSource` is an optional image URL that replaces the glyph wherever the provider itself is shown: its row on the Extensions screen, its screen's About row, and its entry under Keystroke Settings. Resolve it next to your QML file with `String(Qt.resolvedUrl("assets/icon.svg"))`, and put the same value in your rows' `iconSource` so the result rows carry it too. SVG and PNG both render; keep the glyph as the fallback for the moment before the image loads.
 
 ### ctx
 
-`query` (string), `rawQuery` (full original text before spoken-command normalization), `scope` (`""` at root, or `<key>` / `<key>/<sub>`), `sub`, `generation`, `settings` (validated values for your schema), `patterns` (`{ matched: [ids], boost }` for your declared patterns against this query; `{ matched: [], boost: 0 }` when none matched or none are declared), `pending()` (call when more rows will arrive later), `host` (`host.requery()` re-runs the current query; `host.appLibrary`, `host.omarchyPath`, `host.shell`), `shell`, `appLibrary`, `omarchyPath`.
+`query` (string), `rawQuery` (full original text before spoken-command normalization), `scope` (`""` at root, or `<key>` / `<key>/<sub>`), `sub`, `generation`, `settings` (validated values for your schema, plus `prefix` when you declare commands), `patterns` (`{ matched: [ids], boost }` for your declared patterns against this query; `{ matched: [], boost: 0 }` when none matched or none are declared), `command` (`{ id, prefix, rest, args }` when the query starts with one of your declared commands, with `rest` the text after the prefix; `null` otherwise, and absent on older hosts), `pending()` (call when more rows will arrive later), `host` (`host.requery()` re-runs the current query; `host.appLibrary`, `host.omarchyPath`, `host.shell`), `shell`, `appLibrary`, `omarchyPath`.
 
 `host.requery(options)` accepts `{ catalog: false }` when only your `query` rows changed (the Smart Match catalog is kept) and `provider: "<your id>"` so only your rows are queried again; the other providers' rows for the current query are reused. Calls landing in one event-loop turn run a single query, and none interrupts the typing pause.
 
@@ -69,18 +73,46 @@ Fallback rows (`tier: "fallback"`, the *Continue with* section) are where this m
 
 Return quickly. `query` runs on the UI thread for every keystroke; anything that forks or reads large files must be cached or asynchronous (`Process`/`FileView` in your service, then `host.requery()`).
 
+### Commands
+
+A provider that is triggered by a typed word or sign declares it, so the host can explain it instead of every provider parsing its own prefix:
+
+```js
+commands: [{
+  id: "translate", prefix: "tr", title: "Translate", summary: "Translate text into your target languages",
+  args: [{ name: "to", hint: "a language code or name", optional: true }, { name: "text", hint: "what to translate", rest: true }],
+  examples: ["tr bonjour", "tr fr good morning"]
+}]
+```
+
+An extension declares its commands in `extension.json` (the registry reads them while the extension is off, so the Extensions screen can show its usage before any code loads); a bundled provider declares them on the provider object. `prefix` is one word (letters, digits, dashes, at most 16 characters, matched without regard to case) or a **sigil**: one or two punctuation characters such as `~`, `:` or `/`, which attach to the text with no space. `title` is the action as a verb phrase ("Set a timer"); `summary` one line; `args` are positional, each with a `name` shown as the placeholder and a `hint` shown while the caret is on it and on the Usage rows (one row per argument), `optional: true` for one that may be left out, `rest: true` for the last one when it takes the rest of the line; `examples` are up to four complete queries. At most eight commands per provider; the first one is the one a user can rename.
+
+From that declaration the host does, for every provider alike:
+
+- **Routing.** A query that starts with the prefix goes to the provider alone, with `ctx.command = { id, prefix, rest, args }`, the prefix already removed: the user named the provider, so no other provider is asked and Smart Match stays out. Every row it returns gets a boost of 20, like a matched pattern, and the default matcher scores rows against `rest`, not the prefix. **Read `ctx.command.rest`, never re-parse the prefix**: the user may have renamed it. Keep your old check as a fallback for hosts that do not send `ctx.command`.
+- **The user's prefix.** A provider with commands gets the reserved `prefix` setting (a string, listed first on its settings screen and returned in `ctx.settings.prefix`); the host applies it to the first command. Two enabled providers with the same prefix: the earlier one in registry order answers, the other is skipped for that prefix.
+- **The hint line.** While the query starts with a command, the line under the search field shows the command's `title`, then the name and `hint` of the argument the caret is on ("Translate · to: a language code or name (optional)"); with every argument typed, the `summary`.
+- **Ghost placeholders.** The arguments still to type are drawn after the caret in the field's own font (`[to] <text>`, `<name>` required, `[name]` optional), and disappear one by one as words are typed. A word prefix on its own gets a soft highlight sweeping across it once when it is recognised, timed by the animation tier.
+- **Tab.** A row whose action is `{type: "query"}` types its text; the host offers such a row for a query that matches a command's title ("trans" → *Translate · tr [to] <text>*, hint "tab types tr"). While a command is being typed, Tab is a space: it moves to the next argument (after the bare prefix, after `tr fr`, after `timer 10m`) and does nothing on the last argument.
+- **The `/` screen.** `/` is a sigil command of the bundled Commands provider: it lists every command of every enabled provider with its usage line, `/tr` filters the list, Enter types the prefix. The same list is the *Commands* scope, reachable from the root row **What can I type?**, and the empty root's hint line says so.
+- **Usage on the Extensions screen** (above), and a status line when the user turns an extension on: "Translate is on · type tr [to] <text>, or find it by name".
+
+Commands and patterns coexist: a command is the explicit trigger, a pattern the shape of text with no prefix (`bonjour to english`). Declare both when both apply. A command that does not compile is reported under "Extensions needing attention" and skipped; the provider still loads.
+
 ### Rows
 
 ```js
 { id: "stable-id", title: "…", subtitle: "", icon: "󰀻", iconFont: "", iconSource: "file:///…",
   tint: "#hex", section: "Thing", verb: "Open", tier: "item",  // "answer" | "item" | "fallback"
   score: 100, order: 0, keywords: "ids aliases", path: "Parent › Child › …", description: "prose", accessory: "✓", hint: "↵ copies",
-  disabled: false, remember: false, confirm: "Really?", 
+  disabled: false, remember: false, confirm: "Really?", confirmDetail: "one muted line under the question",
   preview: "text", previewLabel: "RESULT", previewDetail: "…", previewImage: "/path.png", swatch: "#hex",
   action: effect, altAction: effect }
 ```
 
 Legacy `catalog(ctx)` fields are ignored; the local model command classifier has been removed.
+
+`confirm` asks before the effect runs; the optional `confirmDetail` is a muted line under the question. Turning an extension on uses it to say what was checked and that the code runs at the user's own risk. A confirmation never carries a link: opening anything would move focus away from the palette.
 
 `altAction` is optional and runs on `Ctrl+↵` (a row without one runs `action` again). Say what it does in `hint` ("ctrl ↵ terminal"). A provider's `activate(row, ctx)` receives `ctx.alternate === true` for that key so it can compute the effect itself.
 
@@ -88,23 +120,27 @@ Legacy `catalog(ctx)` fields are ignored; the local model command classifier has
 
 ### Effects
 
-`{type:"navigate", scope, title}` · `{type:"exec", argv}` (literal argv, login-shell env) · `{type:"shell", command}` (trusted strings only) · `{type:"copy", text}` · `{type:"url", url}` · `{type:"app", id, name}` (launch via AppLibrary) · `{type:"notify", glyph, headline, body}` · `{type:"setting", path, key, value, schema}` · `{type:"compound", actions}` · `{type:"close"}` (dismiss the palette, nothing else) · `{type:"noop"}` (stay open; pair it with `host.requery()` when your rows changed). The host closes the palette before anything that launches.
+`{type:"navigate", scope, title}` · `{type:"query", text}` (put `text` in the search field at the palette root and stay open: what a command's usage rows and the `/` screen do) · `{type:"exec", argv}` (literal argv, login-shell env) · `{type:"shell", command}` (trusted strings only) · `{type:"copy", text}` · `{type:"url", url}` · `{type:"app", id, name}` (launch via AppLibrary) · `{type:"notify", glyph, headline, body}` · `{type:"setting", path, key, value, schema}` · `{type:"compound", actions}` · `{type:"close"}` (dismiss the palette, nothing else) · `{type:"noop"}` (stay open; pair it with `host.requery()` when your rows changed). The host closes the palette before anything that launches.
 
-A provider's own `activate(row, ctx)` may perform work itself (start a process, mutate its state) and return one of the effects above; private action types are fine as long as `activate` translates them (see `providers/Extensions.qml`). `ctx.host` is the palette: `host.requery()`, `host.statusMessage = "…"`, `host.errorMessage = "…"`, `host.opened`, `host.scope`, `host.config`, `host.registry` (the provider registry: `entries`, `manifests`, `problems`, `scan()`).
+A provider's own `activate(row, ctx)` may perform work itself (start a process, mutate its state) and return one of the effects above; private action types are fine as long as `activate` translates them (see `providers/Extensions.qml`). `ctx.host` is the palette: `host.requery()`, `host.statusMessage = "…"`, `host.errorMessage = "…"`, `host.opened`, `host.scope`, `host.config`, `host.registry` (the provider registry: `entries`, `manifests`, `problems`, `scan()`), `host.providerSettings(id)` (the validated values of one provider's settings, for a service that keeps state between queries; `host.configChanged` fires on every save), `host.setBarItem(id, item)` (below).
+
+### Bar items
+
+A provider with something to show next to the menu button in the bar calls `host.setBarItem(id, { text, tooltip, payload })` with its own key as `id`, and `host.setBarItem(id, null)` to clear it. `text` (up to 40 characters, glyphs from the bar's font are fine) is drawn as a bar button after the menu button by Keystroke's own `BarWidget.qml`; `tooltip` shows on hover; `payload` is what the palette is opened with when the item is pressed (`{ scope: extension.id, title: "Timers" }` opens your screen; `{ query: "…" }` types a query; without one the press toggles the menu). One item per provider: a second call replaces the first, an equal one is ignored. The palette keeps items only for loaded, enabled providers, so an extension's item disappears when it is turned off; clear yours in `Component.onDestruction` all the same. Update the text from your own clock (the Timer extension's once-a-second tick), never per query, and bear in mind the space is shared with every other widget the user put in the bar. Old hosts have no `setBarItem`: guard the call with `typeof host.setBarItem === "function"`.
 
 ## Scopes and settings
 
-Navigating into a provider gives it scope `<key>`; deeper scopes are `<key>/<sub>`. Settings are stored under `providers.<key>` in `~/.config/omarchy/keystroke.json`; the `enabled` key is reserved. Screens are generated from `settings`; no UI code is needed. Every screen, setting and enum choice is also searchable from the palette root through its breadcrumb (Keystroke Settings › <name> › <label> › <choice>); the setting `key` and enum option values count as identifiers, so a key like `provider` makes `prefp` reach a setting labelled "Preferred assistant".
+Navigating into a provider gives it scope `<key>`; deeper scopes are `<key>/<sub>`. Settings are stored under `providers.<key>` in `~/.config/omarchy/keystroke.json`; the `enabled` and `prefix` keys are reserved (`prefix` exists only for a provider that declares commands). Screens are generated from `settings`; no UI code is needed. Every screen, setting and enum choice is also searchable from the palette root through its breadcrumb (Keystroke Settings › <name> › <label> › <choice>); the setting `key` and enum option values count as identifiers, so a key like `provider` makes `prefp` reach a setting labelled "Preferred assistant".
 
 ## Stability
 
-API 1 is frozen once a second community provider ships against it. Changes that add optional fields keep the version; anything else bumps `apiVersion`, and Keystroke keeps loading the previous version for one Omarchy release. Added as optional fields in September 2026, with [keystroke-calpad](https://github.com/evindor/keystroke-calpad) as the second community provider: `patterns`, `iconSource` and `ctx.patterns`, and the documented host surface for provider views. A provider that uses `ctx.patterns` should treat it as absent on older hosts (`ctx.patterns && ctx.patterns.matched.length`).
+API 1 is frozen once a second extension ships against it. Changes that add optional fields keep the version; anything else bumps `apiVersion`, and Keystroke keeps loading the previous version for one Omarchy release. Added as optional fields in September 2026, with [keystroke-calpad](https://github.com/evindor/keystroke-calpad) as the second extension: `patterns`, `iconSource` and `ctx.patterns`, and the documented host surface for provider views; later that month `host.setBarItem` and `host.providerSettings`, for the Timer extension's countdown in the bar, then `commands` (in `extension.json` and on the provider object), `ctx.command`, the reserved `prefix` setting and the `query` effect. A provider that uses `ctx.patterns` should treat it as absent on older hosts (`ctx.patterns && ctx.patterns.matched.length`).
 
 ## Optional provider views (API 1)
 
-A provider may expose `view: Component { ... }` and return `{type: "provider-view", provider: "<registry key>"}` from activation (a community provider's key is its plugin id, `manifest.id`). The host loads the component over the palette card, injects `host`, and calls optional `focusInput()`. A missing/disabled view produces a visible error. Ordinary row-only providers need no changes. Anything the view needs to know about the activation (the typed text, a saved item) goes through the provider: `activate(row, ctx)` stores it on the provider object before returning the effect, and the view reads it from there (`Component { MyView { service: root } }`, where `root` is your `Service.qml`).
+A provider may expose `view: Component { ... }` and return `{type: "provider-view", provider: "<registry key>"}` from activation (an extension's key is its folder name, `extension.id`). The host loads the component over the palette card, injects `host`, and calls optional `focusInput()`. A missing/disabled view produces a visible error. Ordinary row-only providers need no changes. Anything the view needs to know about the activation (the typed text, a saved item) goes through the provider: `activate(row, ctx)` stores it on the provider object before returning the effect, and the view reads it from there (`Component { MyView { service: root } }`, where `root` is your `Service.qml`).
 
-The provider owns view data and asynchronous work; keep durable state outside the loaded component. The view may implement `dismiss()`, `beginVoice()` and `transcript(text, final)`. The host calls dismissal before unloading or navigating and supplies voice snapshots to these optional methods. Dismiss must cancel or detach work without blocking close. The provider must stop its owned resources when disabled; the host also drops a view whose provider is removed, unloaded or turned off while it is showing. See `providers/Codex.qml` and `codex/ConversationView.qml` for the bundled reference and [keystroke-calpad](https://github.com/evindor/keystroke-calpad) for a community one.
+The provider owns view data and asynchronous work; keep durable state outside the loaded component. The view may implement `dismiss()`, `beginVoice()` and `transcript(text, final)`. The host calls dismissal before unloading or navigating and supplies voice snapshots to these optional methods. Dismiss must cancel or detach work without blocking close. The provider must stop its owned resources when disabled; the host also drops a view whose provider is removed, unloaded or turned off while it is showing. See `providers/Codex.qml` and `codex/ConversationView.qml` for the bundled reference, [extensions/translate](../extensions/translate/) for a shipped extension with a view, and [keystroke-calpad](https://github.com/evindor/keystroke-calpad) for a third-party one.
 
 ### What a view may use on `host`
 
@@ -139,9 +175,9 @@ Sizes are the other half of that. The palette sets its rows in `title` and its s
 | `host.fontLabel` | a row subtitle, the status line, the footer | `bodySmall` |
 | `host.fontCaption` | keycaps, the breadcrumb brand | `caption` |
 
-## Installing from a local checkout
+## Developing an extension locally
 
-The Extensions screen accepts `file:///absolute/path/to/repo.git` as well as https and `owner/repo`: Omarchy's plugin scripts clone the `file` transport, which makes a local bare repository the way to try an extension in the real palette before it is published (`git clone --bare <your checkout> /tmp/thing.git`, then type the `file://` URL). Relative paths, plain paths and anything containing `..` are refused.
+Put the folder (or a symlink to it, from a checkout of this repository) under `~/.local/share/keystroke/extensions/<id>`. The registry picks it up the next time the palette opens, lists it with a **local** badge, and, once turned on, runs it exactly as a shipped one; a local folder with the same id as a shipped extension replaces it, which is how you iterate on one that already ships. `bin/keystroke check-extensions <folder>` runs the same checks as the pull request review.
 
 ## Optional Smart Match catalog
 

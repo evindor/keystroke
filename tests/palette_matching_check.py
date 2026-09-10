@@ -107,8 +107,8 @@ ShellRoot {
      palette.setQuery("downlo"); palette.activate(false)
      test.check(palette.rows[0].id==="downloads" && JSON.stringify(palette.usage)!==usageBefore,"Enter flushes pending query before activation")
      palette.registry.entries=[
-       {key:"files",source:"bundled",patterns:[],provider:{name:"Files",settings:[],query:function(ctx){
-         test.check(ctx.query==="~dwnlds","file prefix reaches its provider unchanged")
+       {key:"files",source:"bundled",patterns:[],commands:[{id:"files",prefix:"~",sigil:true,title:"Find files",summary:"",args:[],examples:[]}],provider:{name:"Files",settings:[],query:function(ctx){
+         test.check(ctx.query==="~dwnlds" && ctx.command && ctx.command.rest==="dwnlds","file prefix reaches its provider unchanged, with the rest in ctx.command")
          return [{id:"Downloads",title:"Downloads",score:55,action:{type:"noop"}}]
        }}},
        {key:"fixture",source:"bundled",patterns:[],provider:{name:"Other",settings:[],query:function(){throw Error("tilde must isolate files")}}}

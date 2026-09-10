@@ -29,14 +29,22 @@ class Page(HTMLParser):
         if tag in ('script','img','link'):
             resource = a.get('src') or (a.get('href') if a.get('rel') == 'stylesheet' else '')
             if resource and urlsplit(resource).scheme: errors.append('Third-party resource: '+resource)
-page = Page()
-source = (root/'index.html').read_text()
-page.feed(source)
-for ref in page.refs:
-    url = urlsplit(ref)
-    if url.scheme or url.netloc: continue
-    if url.path and not (root/url.path).is_file(): errors.append('Missing asset: '+url.path)
-    if not url.path and url.fragment and url.fragment not in page.ids: errors.append('Missing anchor: '+url.fragment)
+pages = {}
+for html in sorted(root.rglob('*.html')):
+    page = Page()
+    page.feed(html.read_text())
+    pages[html] = page
+for html, page in pages.items():
+    for ref in page.refs:
+        url = urlsplit(ref)
+        if url.scheme or url.netloc: continue
+        if ref.startswith('assets/screenshots/'): target = root/ref              # data-image names resolve against the site root
+        else: target = (html.parent/url.path) if url.path else html
+        if target.is_dir(): target = target/'index.html'                          # "guide/" and "../" are pages too
+        if url.path and not target.is_file(): errors.append(f'Missing asset in {html.relative_to(root)}: {url.path}')
+        if url.fragment:
+            ids = pages[target.resolve()].ids if target.resolve() in pages else page.ids
+            if url.fragment not in ids: errors.append(f'Missing anchor in {html.relative_to(root)}: {ref}')
 for file in root.rglob('*'):
     if file.is_symlink(): errors.append('Symlink in public source: '+str(file))
     if file.is_file() and file.suffix in ('.html','.css','.js','.svg'):
@@ -46,7 +54,9 @@ for image in (root/'assets/screenshots').glob('*.png'):
     content = image.read_bytes()
     assert content[:8] == b'\x89PNG\r\n\x1a\n'
     width,height = struct.unpack('>II',content[16:24])
-    if (width,height) != (2560,2160): errors.append('Unexpected screenshot dimensions: '+image.name)
+    if image.name.startswith('bar-'):
+        if height < 64 or width < 4 * height: errors.append('Unexpected bar strip dimensions: '+image.name)
+    elif (width,height) != (2560,2160): errors.append('Unexpected screenshot dimensions: '+image.name)
 if not (root/'assets/social-card.png').is_file(): errors.append('Missing social card')
 if errors: raise SystemExit('\n'.join(errors))
-print(f'PASS: {len(page.ids)} unique ids, {len(page.refs)} asset/link references, {len(list((root/"assets/screenshots").glob("*.png")))} screenshots, no external resources or private paths')
+print(f'PASS: {len(pages)} pages, {sum(len(p.ids) for p in pages.values())} unique ids, {sum(len(p.refs) for p in pages.values())} asset/link references, {len(list((root/"assets/screenshots").glob("*.png")))} screenshots, no external resources or private paths')

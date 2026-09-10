@@ -27,6 +27,10 @@ Item {
     color: "#e5c07b",
     description: "Files and folders under your home folder, found with fd",
     prefix: "~",
+    commands: [
+      { id: "files", prefix: "~", title: "Find files", summary: "Files and folders under your home folder, found with fd",
+        args: [{ name: "name", hint: "part of a file or folder name, or a path like /Documents report", rest: true }], examples: ["~readme", "~/Documents report"] }
+    ],
     settings: [
       { key: "searchMode", type: "enum", label: "Search in the main palette", "default": "fuzzy",
         options: ["fuzzy", "literal", "prefix"], optionLabels: ["Fuzzy", "Literal", "Only with ~"],
@@ -98,7 +102,7 @@ Item {
 
   function query(ctx) {
     if (ctx.scope && ctx.scope !== "files") return []
-    var req = Files.request(ctx.query, ctx.settings, !!ctx.scope)
+    var req = Files.request(ctx.query, ctx.settings, !!ctx.scope, ctx.command ? ctx.command.rest : null)
     var rows = []
     if (!ctx.scope && !req.explicit) {
       if (!ctx.query) return [navRow(20)]

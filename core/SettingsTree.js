@@ -1,5 +1,6 @@
 .pragma library
 .import "Match.js" as Match
+.import "Extensions.js" as Extensions
 
 // The settings screens as one flat, searchable tree. build() turns the
 // palette schema and the provider registry into nodes; rows() lists one
@@ -14,6 +15,7 @@
 // build() lists those under `screens` for the provider to render.
 
 var ROOT_TITLE = "Keystroke Settings"
+var GUIDE_URL = "https://evindor.github.io/keystroke/guide/"
 var GEAR = "󰒓"
 
 function titleCase(s) { s = String(s); return s.charAt(0).toUpperCase() + s.slice(1) }
@@ -23,7 +25,7 @@ function settingAction(path, key, value, schema) { return { type: "setting", pat
 function node(parentScope, parts, fields) {
   var n = { parentScope: parentScope, parts: parts, path: parts.join(" › "), title: parts[parts.length - 1], subtitle: "", icon: GEAR, iconFont: "", iconSource: "",
             tint: "", section: "Settings", verb: "Open", order: 0, accessory: "", badge: "", keywords: "", description: "", disabled: false,
-            lift: 0, listScore: 1, listOnly: false, confirm: "", relative: ({}) }
+            lift: 0, listScore: 1, listOnly: false, confirm: "", confirmDetail: "", relative: ({}) }
   for (var k in fields) n[k] = fields[k]
   return n
 }
@@ -99,8 +101,8 @@ function voiceNodes(nodes, screens, rootParts, voice) {
 }
 
 // model: { configPath, paletteSchema, paletteValues, voice,
-//          entries: [{ key, name, description, icon, iconFont, iconSource, color, source, pluginId, enabled, schemas, values }],
-//          problems: [{ pluginId, message }] }
+//          entries: [{ key, name, description, icon, iconFont, iconSource, color, source, extensionId, dir, local, loaded, enabled, schemas, values }],
+//          problems: [{ id, message }] }
 function build(model) {
   var nodes = [], screens = ({})
   var rootParts = [ROOT_TITLE]
@@ -123,34 +125,42 @@ function build(model) {
   }
   nodes.push(node("settings", rootParts.concat(["Open config file"]), { id: "config", subtitle: String(model.configPath || ""), icon: "", section: "Keystroke",
     verb: "Open file", order: 2, keywords: "json", description: "edit", action: { type: "edit" } }))
+  // The usage guide on the website: every feature, key, prefix and extension
+  // with a screenshot. Reachable from the root by name ("learn", "guide").
+  nodes.push(node("settings", rootParts.concat(["Learn Keystroke"]), { id: "learn", subtitle: "The usage guide in your browser: every feature, key and prefix, with screenshots", icon: "󰋗",
+    section: "Keystroke", verb: "Open guide", order: 3, lift: 1, keywords: "guide help docs manual tutorial", description: "learn how to use keystroke usage guide documentation help",
+    action: { type: "url", url: GUIDE_URL } }))
   var entries = model.entries || []
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i]
     var parts = rootParts.concat([e.name])
     var scope = "settings/" + e.key
-    var community = e.source === "community"
-    var origin = community ? "Plugin " + e.pluginId : "Bundled"
+    var extension = e.source === "extension"
+    var origin = extension ? (e.local ? "Local extension" : "Extension") : "Bundled"
     nodes.push(node("settings", parts, { id: e.key, subtitle: (e.enabled ? "Enabled" : "Disabled") + " · " + origin + (e.description ? " · " + e.description : ""),
-      icon: e.icon || "⌘", iconFont: e.iconFont || "", iconSource: e.iconSource || "", tint: e.color || "", section: "Providers", order: 10 + i, badge: community ? "plugin" : "",
+      icon: e.icon || "⌘", iconFont: e.iconFont || "", iconSource: e.iconSource || "", tint: e.color || "", section: "Providers", order: 10 + i, badge: extension ? (e.local ? "local" : "extension") : "",
       keywords: e.key, description: e.description || "", action: navigate(scope, e.name) }))
     var path = ["providers", e.key]
     // Labelled "Enabled" rather than "Enable provider": the row sits on the
     // provider's own screen and its breadcrumb names the provider, and the
     // word "provider" would otherwise shadow settings that carry it as a key.
     var enabledSchema = { key: "enabled", type: "boolean", label: "Enabled",
-                          description: community ? "Runs plugin code in your shell with your permissions" : "Include this provider in Keystroke" }
+                          description: extension ? "Runs the extension's code in your shell with your permissions" : "Include this provider in Keystroke" }
+    // Turning an extension on runs its code: that asks first, as the Extensions screen does.
     nodes.push(node(scope, parts.concat([enabledSchema.label]), { id: e.key + "/enabled", subtitle: enabledSchema.description, verb: "Toggle", order: -1, lift: 1,
       accessory: e.enabled ? "On" : "Off", keywords: "enabled", description: "enable disable toggle on off " + enabledSchema.description,
+      confirm: extension && !e.enabled ? Extensions.enableConfirm(e) : "",
+      confirmDetail: extension && !e.enabled ? Extensions.enableDetail(e) : "",
       action: settingAction(path, "enabled", !e.enabled, enabledSchema) }))
-    if (community)
-      nodes.push(node(scope, parts.concat(["Manage extension"]), { id: e.key + "/provenance", subtitle: "Plugin " + e.pluginId + " · update, load or remove it",
-        icon: "󰏓", verb: "Open", order: 900, badge: "plugin", listOnly: true, keywords: e.pluginId, action: navigate("extensions/" + e.pluginId, e.name) }))
+    if (extension)
+      nodes.push(node(scope, parts.concat(["Manage extension"]), { id: e.key + "/provenance", subtitle: (e.loaded ? "Loaded from " : "Off · ") + (e.dir || e.extensionId),
+        icon: "󰏓", verb: "Open", order: 900, badge: e.local ? "local" : "extension", listOnly: true, keywords: e.extensionId, action: navigate("extensions/" + e.extensionId, e.name) }))
     schemaNodes(nodes, screens, path, e.schemas || [], e.values || {}, scope, parts, e.key)
   }
   var problems = model.problems || []
   for (var p = 0; p < problems.length; p++)
-    nodes.push(node("settings", rootParts.concat([problems[p].pluginId]), { id: "problem/" + problems[p].pluginId, subtitle: problems[p].message, icon: "󰀦",
-      section: "Plugins needing attention", verb: "", order: 500 + p, disabled: true, badge: "plugin", description: "plugin problem " + problems[p].message,
+    nodes.push(node("settings", rootParts.concat([problems[p].id]), { id: "problem/" + problems[p].id, subtitle: problems[p].message, icon: "󰀦",
+      section: "Extensions needing attention", verb: "", order: 500 + p, disabled: true, badge: "extension", description: "extension problem " + problems[p].message,
       action: { type: "noop" } }))
   return { nodes: nodes, screens: screens }
 }
@@ -172,7 +182,7 @@ function relativePath(n, depth) {
 
 function row(n, score, subtitle, section) {
   return { id: n.id, title: n.title, subtitle: subtitle, icon: n.icon, iconFont: n.iconFont, iconSource: n.iconSource || "", tint: n.tint, section: section, verb: n.verb, tier: "item",
-           score: score, order: n.order, accessory: n.accessory, badge: n.badge, disabled: n.disabled, confirm: n.confirm || "", action: n.action, previewDetail: n.path }
+           score: score, order: n.order, accessory: n.accessory, badge: n.badge, disabled: n.disabled, confirm: n.confirm || "", confirmDetail: n.confirmDetail || "", action: n.action, previewDetail: n.path }
 }
 
 // Empty query: the screen at `scope`. Otherwise every node at or below it,
