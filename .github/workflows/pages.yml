@@ -30,6 +30,7 @@ jobs:
         run: |
           mkdir -p /tmp/keystroke-public
           cp site/index.html site/style.css site/script.js /tmp/keystroke-public/
+          cp -R site/guide /tmp/keystroke-public/
           cp -R site/assets /tmp/keystroke-public/
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

@@ -1,0 +1,35 @@
+{
+  "name": "Translate",
+  "version": "1.0.0",
+  "author": "Arseniy Zarechnev",
+  "description": "Google Translate without an account: tr bonjour, bonjour to english",
+  "apiVersion": 1,
+  "icon": "󰗊",
+  "color": "#61afef",
+  "license": "MIT",
+  "commands": [
+    {
+      "id": "translate",
+      "prefix": "tr",
+      "title": "Translate",
+      "summary": "Translate text into your target languages",
+      "args": [
+        {
+          "name": "to",
+          "hint": "a language code or name; leave it out to use your targets",
+          "optional": true
+        },
+        {
+          "name": "text",
+          "hint": "what to translate",
+          "rest": true
+        }
+      ],
+      "examples": [
+        "tr bonjour",
+        "tr fr good morning",
+        "bonjour to english"
+      ]
+    }
+  ]
+}

@@ -15,19 +15,19 @@ TestCase {
             paletteValues: { density: "compact", showPreview: true },
             entries: [
                 { key: "ai", name: "AI & Web Search", description: "Continue any query in Claude, ChatGPT/Codex or Google", icon: "✳", iconFont: "", color: "#e79c85",
-                  source: "bundled", pluginId: "", enabled: true,
+                  source: "bundled", extensionId: "", enabled: true,
                   schemas: [
                       { key: "provider", type: "enum", label: "Preferred assistant", "default": "chatgpt", options: ["chatgpt", "claude"], description: "Listed first among the fallbacks" },
                       { key: "mode", type: "enum", label: "Open conversations in", "default": "desktop", options: ["desktop", "cli", "browser"] },
                       { key: "autoSend", type: "boolean", label: "Send immediately in the browser", "default": false }
                   ],
                   values: { provider: "chatgpt", mode: "desktop", autoSend: false } },
-                { key: "clipboard", name: "Clipboard History", description: "Uses Omarchy's existing history", icon: "", iconFont: "", color: "", source: "bundled", pluginId: "", enabled: true,
+                { key: "clipboard", name: "Clipboard History", description: "Uses Omarchy's existing history", icon: "", iconFont: "", color: "", source: "bundled", extensionId: "", enabled: true,
                   schemas: [{ key: "limit", type: "number", label: "Maximum entries", "default": 100, min: 1, max: 300, integer: true }], values: { limit: 100 } },
-                { key: "example.hello", name: "Hello", description: "Says hello", icon: "", iconFont: "", color: "", source: "community", pluginId: "example.hello", enabled: false,
+                { key: "hello", name: "Hello", description: "Says hello", icon: "", iconFont: "", color: "", source: "extension", extensionId: "hello", dir: "/x/extensions/hello", local: false, loaded: false, enabled: false,
                   schemas: [], values: {} }
             ],
-            problems: [{ pluginId: "broken.plugin", message: "no provider" }]
+            problems: [{ id: "broken", message: "no provider" }]
         }
     }
     function search(scope, query) {
@@ -74,20 +74,23 @@ TestCase {
         compare(rows[0].action.value, false)
         rows = search("", "hello")
         compare(rows[0].title, "Hello")
-        compare(rows[0].badge, "plugin")
+        compare(rows[0].badge, "extension")
     }
     function test_listings_show_one_screen_and_value_screens_are_registered() {
         var t = SettingsTree.build(model())
         var root = SettingsTree.rows(t.nodes, "", "")
         compare(titles(root), ["Keystroke Settings"])
         compare(root[0].score, 20)
-        compare(titles(SettingsTree.rows(t.nodes, "settings", "")), ["Appearance", "Open config file", "AI & Web Search", "Clipboard History", "Hello", "broken.plugin"])
+        compare(titles(SettingsTree.rows(t.nodes, "settings", "")), ["Appearance", "Open config file", "Learn Keystroke", "AI & Web Search", "Clipboard History", "Hello", "broken"])
         compare(titles(SettingsTree.rows(t.nodes, "settings/ai", "")), ["Enabled", "Preferred assistant", "Open conversations in", "Send immediately in the browser"])
-        var hello = SettingsTree.rows(t.nodes, "settings/example.hello", "")
+        var hello = SettingsTree.rows(t.nodes, "settings/hello", "")
+        compare(hello[0].title, "Enabled")
+        compare(hello[0].confirm, "Turn on Hello?")
+        verify(hello[0].confirmDetail.indexOf("run it at your own risk") > 0)
         compare(hello[1].title, "Manage extension")
         compare(hello[1].action.type, "navigate")
-        compare(hello[1].action.scope, "extensions/example.hello")
-        compare(SettingsTree.rows(t.nodes, "settings/example.hello", "manext").length, 0)   // "Manage extension" is list-only, never a search hit
+        compare(hello[1].action.scope, "extensions/hello")
+        compare(SettingsTree.rows(t.nodes, "settings/hello", "manext").length, 0)   // "Manage extension" is list-only, never a search hit
         var options = SettingsTree.rows(t.nodes, "settings/ai/provider", "").map(function(r) { return r.title + " " + r.icon })
         compare(options, ["Chatgpt ✓", "Claude ○"])
         verify(t.screens["settings/clipboard/limit"] !== undefined)
@@ -153,6 +156,15 @@ TestCase {
         compare(t.screens["settings/voice/keys"], undefined)
         t = SettingsTree.build(model())                                              // no voice model at all: nothing changes
         compare(titles(SettingsTree.rows(t.nodes, "settings", "")).slice(0, 2), ["Appearance", "Open config file"])
+    }
+    function test_learn_keystroke_opens_the_guide_from_anywhere() {
+        var rows = search("", "learn")
+        compare(rows[0].title, "Learn Keystroke")
+        compare(rows[0].subtitle, "Keystroke Settings")
+        compare(rows[0].action.type, "url")
+        compare(rows[0].action.url, "https://evindor.github.io/keystroke/guide/")
+        compare(search("", "guide")[0].title, "Learn Keystroke")
+        compare(search("settings", "help")[0].title, "Learn Keystroke")
     }
     function test_unrelated_queries_find_nothing() {
         compare(search("", "chrome").length, 0)

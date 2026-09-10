@@ -4,18 +4,20 @@ Keystroke is one Omarchy `menu` plugin. Everything runs in `omarchy-shell`'s QML
 
 ```text
 omarchy-shell
+  ├─ BarWidget.qml (bar-widget entry point: the menu button, then the palette's bar items,
+  │                 read off the keepLoaded Keystroke instance through shell.panelLoaders)
   └─ Keystroke.qml (menu entry point, keepLoaded)
-       ├─ window, keys, navigation stack, dmenu protocol, effects, config, frecency
+       ├─ window, keys, navigation stack, dmenu protocol, effects, config, frecency,
+       │  bar items (host.setBarItem: one { text, tooltip, payload } per enabled provider)
        ├─ providers/Registry.qml
        │    ├─ bundled: OmarchyMenu, Applications, Calculator, Converter, Colors,
-       │    │           Emoji, Clipboard, Files, Hotkeys, Codex, AiWeb, Extensions, SettingsProvider
-       │    └─ community: Service.qml of every ~/.config/omarchy/plugins folder whose manifest
-       │                  carries "x-keystroke", created and injected here (omarchy-shell hands
-       │                  a third-party plugin only its own manifest and service)
-       ├─ providers/Extensions.qml   install/update/remove/toggle community providers through
-       │                             Omarchy's plugin scripts; discovery from extensions/index.json
-       │                             and the marketplace catalog (core/Extensions.js)
-       ├─ core/*.js   Match (fuzzy matcher + tiers), Patterns (provider-declared query shapes), SettingsTree, Frecency, Settings, VoiceBindings, Intent, Calculator, Units, Colors, Emoji, AiTargets, Files, Extensions
+       │    │           Emoji, Clipboard, Files, Hotkeys, Codex, AiWeb, Extensions, CommandsProvider, SettingsProvider
+       │    └─ extensions: Service.qml of every folder under extensions/ (ships with Keystroke) and
+       │                   ~/.local/share/keystroke/extensions (local work), created here only once
+       │                   the user turns it on; off means never compiled
+       ├─ providers/Extensions.qml   the Extensions screen: switches, setup scripts in a visible
+       │                             terminal, source links (core/Extensions.js)
+       ├─ core/*.js   Match (fuzzy matcher + tiers), Patterns (provider-declared query shapes), Commands (declared prefixes: routing, hint line, placeholders, usage), SettingsTree, Frecency, Settings, VoiceBindings, Intent, Calculator, Units, Colors, Emoji, AiTargets, Files, Extensions
        ├─ omarchy/MenuModel.js   vendored stock menu model (parse, merge, routes, guards)
        ├─ voice/VoiceSession.qml   voxtype recording lifecycle, optional live transcript and audio levels
        ├─ codex/      AppServer, CodexSession, ConversationView, Policy
@@ -81,7 +83,7 @@ All from Omarchy 4.0.2 source: property injection of `shell`, `manifest`, `plugi
 
 `providers/Files.qml` runs `fd` outside the UI thread for each distinct query under the home directory. The default fuzzy mode translates each word into an escaped subsequence regex; literal mode keeps the old substring behavior. The final word must match the basename, and preceding words match relative path components. Spaces and slashes separate terms. This fixes `dwnlds`: previously literal candidate generation discarded Downloads before fuzzy ranking ever saw it.
 
-At the root, `~` restricts providers to Files and bypasses embeddings. `~dwnlds`, `~ dwnlds`, and `~/dwnlds` all work. Bare `~` shows a typing hint without walking the disk. The `searchMode` setting selects `fuzzy` (default), `literal`, or `prefix` (only explicit file search at the root). The Files screen and `~` always use fuzzy search. Existing file/folder/hidden settings still apply; gitignore rules remain respected.
+At the root, `~` is the Files provider's declared sigil command (`core/Commands.js`): the host routes the query to Files alone, hands it the text after the sigil in `ctx.command.rest`, and bypasses embeddings. Every other prefix (`:`, `/`, `timer`, `tr`) works the same way, from the same declaration that draws the hint line and the placeholders. `~dwnlds`, `~ dwnlds`, and `~/dwnlds` all work. Bare `~` shows a typing hint without walking the disk. The `searchMode` setting selects `fuzzy` (default), `literal`, or `prefix` (only explicit file search at the root). The Files screen and `~` always use fuzzy search. Existing file/folder/hidden settings still apply; gitignore rules remain respected.
 
 Each walk uses two threads, stops after 400 candidates, and has a three-second watchdog. New queries cancel obsolete walks; a summon caches at most 32 queries. Queries need two characters and are bounded to 128 characters/eight terms. NUL-delimited output preserves unusual filenames, and argv avoids shell interpolation. QML rechecks paths below home and ranks the bounded candidates with `Match.match`, retaining the 0.55 file weight and final host-owned selection learning. The main palette shows its configured limit; `~` and the Files screen show up to 60. There is no persistent filesystem index or model for file search. A broad query can hit the candidate cap before reaching the best match; deeper paths or longer queries help. Slow disks and hidden trees may reach the watchdog and return partial results.
 

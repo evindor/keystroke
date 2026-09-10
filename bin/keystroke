@@ -19,9 +19,10 @@ Usage: bin/keystroke <command>
   toggle      Toggle the palette (routes through omarchy.menu)
   open <q>    Open the palette with a query
   validate    omarchy plugin validate on this checkout
+  check-extensions [dir...]  Check extension folders (extensions/ by default): extension.json, QML lint, unit tests
   matching [small|large]  Prepare the local matching engine and fetch the model (default: small)
   engine      Rebuild the static matching engine shipped in matching/bin (after editing matching/engine)
-  test        Run QML, voice lifecycle, time-zone checks, and qmllint
+  test        Run QML, voice lifecycle, time-zone checks, the extension checks, and qmllint
 USAGE
 }
 
@@ -30,7 +31,8 @@ sync_copy() {
   local stage
   stage="$(mktemp -d "$(dirname "$TARGET")/.keystroke.XXXXXX")"
   # -L dereferences any symlink so the installed tree never contains one.
-  rsync -aL --delete --exclude .git --exclude .claude --exclude .agents --exclude .codex --exclude tests --exclude docs --exclude assets --exclude examples --exclude experiments \
+  # extensions/ ships with the copy (each one is off until the user turns it on); tests/ and docs/ do not, at any depth.
+  rsync -aL --delete --exclude .git --exclude .claude --exclude .agents --exclude .codex --exclude tests --exclude docs --exclude assets --exclude experiments \
     --exclude '__pycache__' --exclude '*.pyc' --exclude matching/engine/target "$ROOT/" "$stage/"
   if [[ -e $TARGET ]]; then rm -rf "$TARGET"; fi
   mv "$stage" "$TARGET"
@@ -48,7 +50,7 @@ case "${1:-help}" in
       if omarchy-plugin-list --json | jq -e --arg id "$ID" 'any(.[]; .id == $id)' >/dev/null; then break; fi
       sleep 0.05
     done
-    omarchy plugin enable "$ID"
+    omarchy plugin enable "$ID" left --index 0
     echo "Keystroke is now the Omarchy menu. Super+Space and every omarchy-menu caller route to it."
     ;;
   uninstall)
@@ -57,7 +59,7 @@ case "${1:-help}" in
     omarchy-shell shell rescanPlugins >/dev/null
     echo "Removed $TARGET; the stock Omarchy menu is active again."
     ;;
-  enable) omarchy plugin enable "$ID" ;;
+  enable) omarchy plugin enable "$ID" left --index 0 ;;
   disable) omarchy plugin disable "$ID" ;;
   dictate) exec omarchy-shell shell summon omarchy.menu '{"scope":"dictation","title":"Dictate to Clipboard","dictate":true}' ;;
   toggle) exec omarchy-shell shell toggle omarchy.menu '{"menu":"root"}' ;;
@@ -66,6 +68,7 @@ case "${1:-help}" in
     exec omarchy-shell shell summon omarchy.menu "$(jq -nc --arg q "${*:-}" '{query: $q}')"
     ;;
   validate) exec omarchy plugin validate "$ROOT" ;;
+  check-extensions) shift; exec python3 "$ROOT/tools/check_extensions.py" "$@" ;;
   matching) exec python3 "$ROOT/helpers/matching-start.py" --model "${2:-small}" --install-only ;;
   engine) exec "$ROOT/matching/engine/build-prebuilt.sh" ;;
   test)
@@ -76,6 +79,7 @@ case "${1:-help}" in
     python3 "$ROOT/tests/matching_session_check.py"
     python3 "$ROOT/tests/palette_matching_check.py"
     python3 "$ROOT/tests/palette_shortcut_check.py"
+    python3 "$ROOT/tests/palette_route_check.py"
     python3 "$ROOT/tests/palette_motion_check.py"
     uv run --with-requirements "$ROOT/matching/requirements.lock" python "$ROOT/tests/matching_worker_check.py"
     uv run --with-requirements "$ROOT/matching/requirements.lock" python "$ROOT/tests/matching_engine_check.py"
@@ -84,8 +88,9 @@ case "${1:-help}" in
     python3 "$ROOT/tests/codex_session_check.py"
     python3 "$ROOT/tests/palette_dictation_check.py"
     python3 "$ROOT/tests/tz_helper_check.py"
-    python3 "$ROOT/tests/extensions_check.py"
     python3 "$ROOT/tests/palette_extensions_check.py"
+    python3 "$ROOT/tests/palette_commands_check.py"
+    python3 "$ROOT/tools/check_extensions.py"
     python3 "$ROOT/tests/hotkeys_check.py"
     "$ROOT/tests/lint.sh"
     ;;
