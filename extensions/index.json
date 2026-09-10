@@ -24,6 +24,17 @@
         "units",
         "currency"
       ]
+    },
+    {
+      "id": "gunhan.keystroke-currency",
+      "name": "Keystroke Currency",
+      "description": "Currency conversion with EUR-based cross rates, preferred and automatic targets, daily cache",
+      "author": "gunhan",
+      "repo": "https://github.com/gunhanselas/keystroke-currency.git",
+      "tags": [
+        "productivity",
+        "currency"
+      ]
     }
   ]
 }
