@@ -28,7 +28,9 @@
   checks pass.
 - `tests/palette_commands_check.py` (real `Keystroke.qml` offscreen, fake
   curl): the empty root's row and index; `tr` recognised live with hint and
-  ghost before any query runs; Tab adding the space; the ghost and hint
+  ghost before any query runs; Tab adding the space after the prefix and
+  after the first argument, doing nothing on the last argument, with a
+  trailing space or after a sigil; the ghost and hint
   following the caret through `tr fr ` and `tr fr hello`; `timer 10m tea`
   routed through `ctx.command`; `tm 10m tea` after renaming the prefix in
   keystroke.json; `:smi` answered by Emoji alone; `/` listing every command

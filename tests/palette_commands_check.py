@@ -9,7 +9,8 @@ the ghost placeholders that follow the caret; a typed command routes the text
 to its owner ("timer 10m tea" starts a timer, "tm 10m tea" after the prefix
 is renamed in keystroke.json); a typed command is exclusive (":smi" lists only emoji);
 "/" lists every command and "/tr" filters it; a name ("trans") suggests the
-command and Tab types its prefix; Tab after a bare prefix adds the space; an
+command and Tab types its prefix; Tab while typing a command is a space that
+moves to the next argument and does nothing on the last one; an
 extension's screen starts with Usage rows and a runnable example; turning an
 extension on says what to type; the Prefix setting shows the renamed trigger.
 """
@@ -95,6 +96,18 @@ ShellRoot {
      test.check(state().query === "tr " && state().ghost === "[to] <text>", "Tab after a bare prefix adds the space: " + JSON.stringify(state().query) + " " + JSON.stringify(state().ghost))
      palette.setQuery("tr fr ")
      test.check(state().ghost === "<text>" && state().hint === "Translate · text: what to translate", "the ghost and the hint follow the caret: " + state().ghost + " / " + state().hint)
+     palette.setQuery("tr fr")
+     palette.completeCommand()
+     test.check(state().query === "tr fr " && state().ghost === "<text>", "Tab after the first argument moves to the next: " + JSON.stringify(state().query))
+     palette.completeCommand()
+     test.check(state().query === "tr fr ", "Tab with a trailing space does nothing")
+     palette.setQuery("tr fr hello")
+     palette.completeCommand()
+     test.check(state().query === "tr fr hello", "Tab on the last argument does nothing")
+     palette.setQuery(":")
+     palette.completeCommand()
+     test.check(state().query === ":", "Tab after a sigil does not break it")
+     palette.setQuery("tr fr ")
      capture("ghost")
      test.stage = 21; return
    case 21:

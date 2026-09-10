@@ -214,13 +214,21 @@ Item {
     search.forceActiveFocus()
     if (wasDeep) root.slideLevel(-1)
   }
-  // Tab: a command row types its prefix; a bare prefix gets its space so the
-  // placeholders show; anything else is left alone.
+  // Tab: a command row types its prefix; while a command is being typed, Tab
+  // is a space that moves to the next argument (after the bare prefix, after
+  // "tr fr", after "timer 10m"), and does nothing on the last argument or
+  // when the text already ends with a space.
   function completeCommand() {
     var row = root.current
     if (row && row.action && row.action.type === "query" && !row.disabled) { root.perform(row.action, row); return }
     var m = root.activeCommand
-    if (m && !m.command.sigil && m.rest === "" && !/\s$/.test(search.text)) { search.text = search.text + " "; search.cursorPosition = search.text.length; root.edited() }
+    if (!m || search.cursorPosition !== search.text.length || /\s$/.test(search.text)) return
+    var p = Commands.placeholders(m.command, m.rest)
+    var moreArgs = p.index >= 0 && p.index < m.command.args.length - 1
+    if (!moreArgs && (m.rest !== "" || m.command.sigil)) return
+    search.text = search.text + " "
+    search.cursorPosition = search.text.length
+    root.edited()
   }
   // Bundled providers are on unless turned off; extensions are off until turned on.
   function providerEnabled(entry) { return !!entry && Settings.isEnabled(root.config, ["providers", entry.key], entry.source === "bundled") }
