@@ -866,3 +866,19 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
 - Not yet exercised: the attest job, which runs only on pushes to `main` and
   `v*` tags. `gh attestation verify … --source-digest <commit>` is the check to
   run after the first release that carries it (docs/engine-provenance.md).
+
+## Release 1.4.2 (2026-09-11)
+
+- Contents since 1.4.1: the reproducible engine (above), the Currency and
+  Keyboard Cleaner extensions ported from their contributors' pull requests,
+  the currency download judgement fix, the select-picker empty-state fix,
+  the offset-based time-zone deduplication, and the runner fixes for the
+  extension check. `manifest.json` 1.4.1 → 1.4.2; README lists the four
+  extensions in the box and points at the 1.4.2 notes.
+- `bin/keystroke test` on the dev tip (`5636531`): 162 QML tests passed, 0
+  failed; every integration check passed (applications, files, catalog,
+  matching, palette matching, shortcut, dmenu, routes, motion, worker,
+  engine, voxtype, clipboard, dictation, time zones); exit 0.
+  `omarchy plugin validate` exit 0; `git diff --check` clean. The engine
+  workflow and the extension check are green on the same commit. Not
+  exercised here: the attest job, which first runs on the `v1.4.2` tag.
