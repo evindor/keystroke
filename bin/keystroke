@@ -21,7 +21,7 @@ Usage: bin/keystroke <command>
   validate    omarchy plugin validate on this checkout
   check-extensions [dir...]  Check extension folders (extensions/ by default): extension.json, QML lint, unit tests
   matching [small|large]  Prepare the local matching engine and fetch the model (default: small)
-  engine      Rebuild the static matching engine shipped in matching/bin (after editing matching/engine)
+  engine      Rebuild the static matching engine shipped in matching/bin in its pinned container (after editing matching/engine; needs docker or podman)
   test        Run QML, voice lifecycle, time-zone checks, the extension checks, and qmllint
 USAGE
 }

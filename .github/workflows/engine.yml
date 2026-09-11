@@ -1,0 +1,40 @@
+# Rebuilds the shipped matching engine in its digest-pinned container and fails
+# unless the result is byte-identical to matching/bin/keystroke-matching. On
+# main and release tags it also records a build provenance attestation for the
+# committed binary. docs/engine-provenance.md explains how to verify both.
+name: Matching engine
+on:
+  push:
+    branches: [main, dev]
+    tags: ['v*']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  reproduce:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Rebuild in the pinned container and compare with the committed binary
+        run: matching/engine/build-prebuilt.sh --check --output "$RUNNER_TEMP/engine"
+      - name: Keep the fresh build for inspection
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: keystroke-matching-${{ github.sha }}
+          path: ${{ runner.temp }}/engine/
+          if-no-files-found: ignore
+  attest:
+    needs: reproduce
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Attest the committed binary the reproduce job just matched
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: matching/bin/keystroke-matching
