@@ -79,6 +79,7 @@ case "${1:-help}" in
     python3 "$ROOT/tests/matching_session_check.py"
     python3 "$ROOT/tests/palette_matching_check.py"
     python3 "$ROOT/tests/palette_shortcut_check.py"
+    python3 "$ROOT/tests/palette_dmenu_check.py"
     python3 "$ROOT/tests/palette_route_check.py"
     python3 "$ROOT/tests/palette_motion_check.py"
     uv run --with-requirements "$ROOT/matching/requirements.lock" python "$ROOT/tests/matching_worker_check.py"

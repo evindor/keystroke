@@ -1,5 +1,23 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Dmenu empty-state height (2026-09-10)
+
+- Reproduced from Omarchy's Keybindings picker with a query that matched no
+  rows. Dmenu sizing reserved one 49 px result row at zero results, while the
+  empty state's glyph, spacing and message needed 76 px; the card collapsed
+  around the shorter viewport and clipped “No matches for …” at its bottom.
+- A zero-result select picker now reserves two row slots for that empty state.
+  A picker with one real row remains one row tall, and the caller's
+  `maxHeight` continues to cap the result area.
+- `tests/palette_dmenu_check.py` drives the real palette offscreen with the
+  Keybindings payload and filters its only option away. Its viewport-fit
+  assertion fails on the `dev` baseline (`49 >= 76`) and passes on this tree;
+  it also verifies that only the empty picker grows. Full `bin/keystroke test`
+  passes: 162 QML tests and all integration checks, including the new dmenu
+  check. `bin/keystroke validate` passes and qmllint reports only existing
+  metadata warnings. An offscreen after-image was rendered and reviewed; the
+  patched plugin was not installed over the user's release copy.
+
 ## Release 1.4.1 (2026-09-11)
 
 - Documentation only: `site/guide/index.html` copy pass (32 replacements:
