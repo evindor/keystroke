@@ -89,6 +89,7 @@ case "${1:-help}" in
     python3 "$ROOT/tests/palette_dictation_check.py"
     python3 "$ROOT/tests/tz_helper_check.py"
     python3 "$ROOT/tests/palette_extensions_check.py"
+    python3 "$ROOT/tests/palette_currency_check.py"
     python3 "$ROOT/tests/palette_commands_check.py"
     python3 "$ROOT/tools/check_extensions.py"
     python3 "$ROOT/tests/hotkeys_check.py"

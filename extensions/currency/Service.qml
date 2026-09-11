@@ -79,6 +79,7 @@ QtObject {
   // One curl at a time. stdout and the exit code arrive in either order, so
   // the fetch is over only when both have.
   property bool bodyDone: false
+  property string body: ""
   property int exitCode: -1
   property string stderrText: ""
   readonly property Process fetcher: Process {
@@ -88,6 +89,7 @@ QtObject {
   }
   function startFetch() {
     root.bodyDone = false
+    root.body = ""
     root.exitCode = -1
     root.stderrText = ""
     root.fetching = true
@@ -95,35 +97,31 @@ QtObject {
     fetcher.running = true
   }
   function fetched(text) {
+    root.body = String(text)
     root.bodyDone = true
-    if (String(text).trim()) {
-      var table = Currency.parseResponse(text, new Date().toISOString())
-      if (table) {
-        root.cache = table
-        root.error = ""
-        root.failedAt = 0
-        cacheFile.setText(JSON.stringify(table) + "\n")
-      } else {
-        root.error = "Frankfurter's answer could not be read"
-        root.failedAt = Date.now()
-      }
-    } else if (root.exitCode === 0) {
-      root.error = "Frankfurter answered nothing"
-      root.failedAt = Date.now()
-    }
     if (root.exitCode >= 0) root.finish()
   }
   function exited(code) {
     root.exitCode = code
-    if (code !== 0) {
-      var why = root.stderrText.trim().split("\n")[0].slice(0, 120)
-      root.error = "curl exited with code " + code + (why ? ": " + why : "")
+    if (root.bodyDone) root.finish()
+  }
+  // Both halves are in: judge the answer once, so every outcome (a bad exit,
+  // an empty body, an unreadable table) records a failure and waits RETRY_MS.
+  function finish() {
+    var table = root.exitCode === 0 && root.body.trim() ? Currency.parseResponse(root.body, new Date().toISOString()) : null
+    if (table) {
+      root.cache = table
+      root.error = ""
+      root.failedAt = 0
+      cacheFile.setText(JSON.stringify(table) + "\n")
+    } else {
+      if (root.exitCode !== 0) {
+        var why = root.stderrText.trim().split("\n")[0].slice(0, 120)
+        root.error = "curl exited with code " + root.exitCode + (why ? ": " + why : "")
+      } else root.error = root.body.trim() ? "Frankfurter's answer could not be read" : "Frankfurter answered nothing"
       root.failedAt = Date.now()
       if (root.host && root.cache === null) root.host.errorMessage = "Currency: " + root.error
     }
-    if (root.bodyDone) root.finish()
-  }
-  function finish() {
     root.fetching = false
     root.settle()
   }
