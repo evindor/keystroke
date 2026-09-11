@@ -1194,7 +1194,8 @@ Item {
   readonly property int rowHeight: Style.space(compact ? 46 : 56)
   readonly property int rowSpacing: Style.space(3)
   readonly property int dmenuRowsHeight: {
-    var count = Math.max(1, resultModel.count)
+    // The empty state is a glyph plus a label, so one row clips it.
+    var count = resultModel.count || 2
     var maxRows = root.dmenuMaxHeight > 0 ? Math.max(1, Math.floor(Style.space(root.dmenuMaxHeight) / (rowHeight + rowSpacing))) : 12
     return Math.min(count, maxRows) * (rowHeight + rowSpacing)
   }
@@ -1550,6 +1551,7 @@ Item {
             foreground: root.foreground
         }
         Column {
+          id: emptyState
           visible: root.rows.length === 0 && root.mode !== "input" && (!root.pending || root.showLoading)
           anchors.centerIn: parent
           spacing: Style.space(12)
