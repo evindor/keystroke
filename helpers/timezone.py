@@ -138,7 +138,7 @@ class Zone:
         return "" if self.key == "here" or spelled_out else self.typed + " = " + self.key
 
 
-def resolve(name, local_zone):
+def resolve(name, local_zone, now=None):
     name = name.strip()
     if not name:
         raise ValueError("Which time zone?")
@@ -164,6 +164,11 @@ def resolve(name, local_zone):
     if len(matches) == 1:
         return Zone(name, ZoneInfo(matches[0]), matches[0])
     if matches:
+        # If all matches share the same current offset, they're effectively the same zone
+        now = now or dt.datetime.now(dt.timezone.utc)
+        offsets = {ZoneInfo(m).utcoffset(now) for m in matches}
+        if len(offsets) == 1:
+            return Zone(name, ZoneInfo(matches[0]), matches[0])
         raise Hint("Which " + name + "? Try " + " or ".join(matches[:3]))
     raise ValueError("Unknown time zone: " + name)
 
@@ -226,15 +231,15 @@ def parse_time(m):
     return hour, minute
 
 
-def parse(text, local_zone):
+def parse(text, local_zone, now=None):
     """Returns ("at", hour, minute, source Zone, target Zone, date match) or ("now", Zone)."""
     text = normalize(text)
     m = NOW_QUERY.fullmatch(text)
     if m:
-        return "now", resolve(m["zone"], local_zone)
+        return "now", resolve(m["zone"], local_zone, now)
     m = ZONE_TIME.fullmatch(text)
     if m and not TIME_QUERY.fullmatch(text):
-        return "now", resolve(m["zone"], local_zone)
+        return "now", resolve(m["zone"], local_zone, now)
     text, date = split_date(text)
     m = TIME_QUERY.fullmatch(text)
     if not m:
@@ -248,12 +253,12 @@ def parse(text, local_zone):
     else:
         parts = SPLIT_RE.split(rest, maxsplit=1)
         source_name, target_name = parts[0], (parts[1] if len(parts) > 1 else "here")
-    return "at", hour, minute, resolve(source_name, local_zone), resolve(target_name, local_zone), date
+    return "at", hour, minute, resolve(source_name, local_zone, now), resolve(target_name, local_zone, now), date
 
 
 def convert_time(text, local_zone, now=None):
     now = now or dt.datetime.now(dt.timezone.utc)
-    parsed = parse(text, local_zone)
+    parsed = parse(text, local_zone, now)
     if parsed[0] == "now":
         zone = parsed[1]
         return {"result": now.astimezone(zone.tz).strftime("%H:%M %Z"),

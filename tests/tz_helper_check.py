@@ -66,6 +66,11 @@ CASES = [
     ("10am pt sep 6 2027", "Europe/Tallinn", {"detail": "Mon, 06 Sep"}),
     ("10am pt on 2026-09-06", "Europe/Tallinn", {"detail": "Sun, 06 Sep"}),
     ("10pm pt on tuesday to tokyo", "Europe/Tallinn", {"detail": "Tue, 15 Sep · 22:00 PDT → Wed, 16 Sep"}),
+    # Offset-based deduplication: Asia/Istanbul and Europe/Istanbul share the same offset
+    ("now in istanbul", "Europe/Tallinn", {"result": "15:00 +03", "live": True}),
+    ("now in Asia/Istanbul", "Europe/Tallinn", {"result": "15:00 +03", "live": True}),
+    ("now in Europe/Istanbul", "Europe/Tallinn", {"result": "15:00 +03", "live": True}),
+    ("15:00 istanbul to utc", "Europe/Tallinn", {"result": "12:00 UTC"}),
 ]
 failed = 0
 for query, zone, expected in CASES:
