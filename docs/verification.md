@@ -813,3 +813,38 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
   `manifestHasKind`, which should accept a QML sequence, not only a JS array.
 - Validation: 148 QML tests, application compatibility and palette dictation
   checks passed; plugin validation clean.
+
+## Reproducible matching engine (2026-09-11)
+
+- Marketplace review of omacom/omarchy-plugin-marketplace#5906 blocked 1.4.1 on
+  `matching/bin/keystroke-matching`: a committed ELF "without a signature,
+  attestation, or reproducible source-to-binary byte comparison". Other Rust
+  plugins were accepted with a digest-pinned container rebuild in CI compared
+  byte for byte against the committed binary plus a GitHub build provenance
+  attestation; a checksum beside the binary, a signature alone, or a CI build
+  that never compares were all refused.
+- The old binary rebuilt byte-identically on the machine that made it, but it
+  embedded `/home/<user>/.cargo/registry` paths and linked Arch's static glibc
+  objects through GCC 16.2.1, so nobody else could reproduce it. `trim-paths` is
+  not stable on cargo 1.98.1.
+- Local experiments (rustc 1.98.1): `--remap-path-prefix` removed every home
+  path and gave identical bytes across target directories; a musl static-pie
+  linked with `-C linker=rust-lld -C link-self-contained=yes` carried only the
+  toolchain's own LLD and crt objects in `.comment` and was identical across
+  two builds (695,096 bytes). The engine answered the protocol.
+- `build-prebuilt.sh` now builds in
+  `rust:1.98.1-alpine3.22@sha256:b420013…` with those flags, `--locked`,
+  `CARGO_INCREMENTAL=0`, `SOURCE_DATE_EPOCH=1`, and `--check` fails on any
+  difference from the committed binary or manifest. Docker was not runnable
+  here (daemon stopped), so the first committed bytes are the artifact of
+  engine workflow run 34623427621; run 34623634274 on the next push printed
+  "reproduced byte for byte". Shipped sha256
+  `192ef1ecb8fb835d5ba1c805ab1e37f95847c6ae093b05d544ac50bed2cbfd75`, 695,104
+  bytes, source fingerprint unchanged (`034fc6d9fa03190a`), no build path in
+  the binary beyond the remapped `/cargo/registry/src`.
+- `tests/matching_engine_check.py` passes with the new binary (build, protocol,
+  tokenizer parity on the shipped binary and the installed small model) and now
+  requires the musl target and a digest-pinned image in the manifest.
+- Not yet exercised: the attest job, which runs only on pushes to `main` and
+  `v*` tags. `gh attestation verify … --source-digest <commit>` is the check to
+  run after the first release that carries it (docs/engine-provenance.md).
