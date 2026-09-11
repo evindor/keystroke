@@ -1,7 +1,8 @@
 {
+ "image": "docker.io/library/rust:1.98.1-alpine3.22@sha256:b42001307cfa41fcf31bd1530dfc7d712104b61c8e2150b2f02e75415f3d501a",
  "machine": "x86_64",
  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
- "sha256": "aa25b7849ac2a556fd2ec2faf9a8a32800dfe6795a841e62a38ffe1be7f2e1ee",
+ "sha256": "192ef1ecb8fb835d5ba1c805ab1e37f95847c6ae093b05d544ac50bed2cbfd75",
  "source": "034fc6d9fa03190a",
- "target": "x86_64-unknown-linux-gnu"
+ "target": "x86_64-unknown-linux-musl"
 }

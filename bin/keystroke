@@ -21,7 +21,7 @@ Usage: bin/keystroke <command>
   validate    omarchy plugin validate on this checkout
   check-extensions [dir...]  Check extension folders (extensions/ by default): extension.json, QML lint, unit tests
   matching [small|large]  Prepare the local matching engine and fetch the model (default: small)
-  engine      Rebuild the static matching engine shipped in matching/bin (after editing matching/engine)
+  engine      Rebuild the static matching engine shipped in matching/bin in its pinned container (after editing matching/engine; needs docker or podman)
   test        Run QML, voice lifecycle, time-zone checks, the extension checks, and qmllint
 USAGE
 }
@@ -79,6 +79,7 @@ case "${1:-help}" in
     python3 "$ROOT/tests/matching_session_check.py"
     python3 "$ROOT/tests/palette_matching_check.py"
     python3 "$ROOT/tests/palette_shortcut_check.py"
+    python3 "$ROOT/tests/palette_dmenu_check.py"
     python3 "$ROOT/tests/palette_route_check.py"
     python3 "$ROOT/tests/palette_motion_check.py"
     uv run --with-requirements "$ROOT/matching/requirements.lock" python "$ROOT/tests/matching_worker_check.py"
@@ -89,6 +90,7 @@ case "${1:-help}" in
     python3 "$ROOT/tests/palette_dictation_check.py"
     python3 "$ROOT/tests/tz_helper_check.py"
     python3 "$ROOT/tests/palette_extensions_check.py"
+    python3 "$ROOT/tests/palette_currency_check.py"
     python3 "$ROOT/tests/palette_commands_check.py"
     python3 "$ROOT/tools/check_extensions.py"
     python3 "$ROOT/tests/hotkeys_check.py"

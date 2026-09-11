@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Disable every keyboard and pointer in Hyprland for a while, then restore them.
+
+Hyprland can switch an input device off at runtime with no privileges:
+`hyprctl eval 'hl.device({ name = "...", enabled = false })'` makes the
+compositor drop that device's events, the same call Omarchy's touchpad
+toggle uses. That is the whole trick. Nothing here opens /dev/input, so no
+group membership is needed, and because the setting is not persisted a
+Hyprland reload or restart brings every device back on its own.
+
+    keyboard-cleaner --seconds 30 [--keep-pointer] [--device NAME ...]
+
+The first line on stdout is a JSON object: {"blocked": N, "devices": [...],
+"seconds": N, "until": <epoch seconds>} once the devices are off, or
+{"error": "..."} with exit status 1 when nothing could be blocked. The
+devices come back when the time is up, on SIGTERM, SIGINT or SIGHUP, and
+on any error in between. --device names the devices explicitly instead of
+discovering them; that is how the tests exercise a single harmless one.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import signal
+import subprocess
+import sys
+import time
+
+MAX_SECONDS = 300
+# Enter was still going down when the palette started us; let its release
+# reach the compositor before the keyboard goes quiet.
+GRACE_SECONDS = 0.5
+# Virtual keyboards (fcitx, wtype) never touch a wiped keyboard, and the
+# power and sleep buttons stay as the way out of a stuck block. The name list
+# covers the kernels that call them that; SKIP_FRAGMENTS covers the rest
+# (Apple SMC calls its power and lid events one device).
+SKIP_PREFIXES = ("hl-virtual",)
+SKIP_NAMES = {"power-button", "sleep-button"}
+SKIP_FRAGMENTS = ("powerbutton", "sleepbutton", "powerlid", "lidswitch")
+
+
+def safe_name(name: object) -> bool:
+    """A device name that is safe to hand to hyprctl as data."""
+    if not isinstance(name, str) or not name:
+        return False
+    return not any(ord(c) < 32 or c == "\x7f" for c in name)
+
+
+def normalize(name: str) -> str:
+    """A device name reduced to letters and digits, for cross-list matching.
+
+    Hyprland reports one physical device differently in each list, so an exact
+    string match never fires on Apple hardware:
+
+        keyboards: apple-smc-power/lid-events
+        switches:  Apple SMC power/lid events
+    """
+    return "".join(c for c in name.lower() if c.isalnum())
+
+
+def usable(name: object, switches: object = ()) -> bool:
+    """A discovered device worth blocking: safe, real, and not an escape hatch.
+
+    A device Hyprland lists under `switches` is a power or lid button whatever
+    its name, and stays on so there is always a way out of a block.
+    """
+    if not safe_name(name) or name.startswith(SKIP_PREFIXES) or name in SKIP_NAMES:
+        return False
+    normalized = normalize(name)
+    if any(fragment in normalized for fragment in SKIP_FRAGMENTS):
+        return False
+    return normalized not in {normalize(s) for s in (switches or []) if isinstance(s, str)}
+
+
+def select_devices(devices: dict, keep_pointer: bool) -> list[str]:
+    """Keyboard names, plus mouse and touchpad names unless keep_pointer."""
+    kinds = ["keyboards"] if keep_pointer else ["keyboards", "mice"]
+    switches = [d.get("name") for d in devices.get("switches") or [] if isinstance(d, dict)]
+    names: list[str] = []
+    for kind in kinds:
+        for device in devices.get(kind) or []:
+            name = device.get("name") if isinstance(device, dict) else None
+            if usable(name, switches) and name not in names:
+                names.append(name)
+    return names
+
+
+def lua_call(name: str, enabled: bool) -> str:
+    """The hl.device call with the name as a quoted Lua string, never as code."""
+    quoted = name.replace("\\", "\\\\").replace('"', '\\"')
+    return 'hl.device({ name = "%s", enabled = %s })' % (quoted, "true" if enabled else "false")
+
+
+def hyprctl(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["hyprctl", *args], capture_output=True, text=True, timeout=5, check=False)
+
+
+def set_enabled(name: str, enabled: bool) -> bool:
+    try:
+        result = hyprctl("eval", lua_call(name, enabled))
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0 and result.stdout.strip() == "ok"
+
+
+def discover() -> dict:
+    result = hyprctl("devices", "-j")
+    if result.returncode != 0:
+        raise RuntimeError("hyprctl devices failed: " + (result.stderr or result.stdout).strip()[:200])
+    return json.loads(result.stdout)
+
+
+def emit(payload: dict) -> None:
+    sys.stdout.write(json.dumps(payload) + "\n")
+    sys.stdout.flush()
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Block Hyprland input devices for a while.")
+    parser.add_argument("--seconds", type=int, required=True, help="how long, 1 to %d" % MAX_SECONDS)
+    parser.add_argument("--keep-pointer", action="store_true", help="leave mice and touchpads alone")
+    parser.add_argument("--device", action="append", default=[], help="block exactly this device (repeatable)")
+    args = parser.parse_args(argv)
+    seconds = max(1, min(MAX_SECONDS, args.seconds))
+
+    time.sleep(GRACE_SECONDS)
+    try:
+        names = [n for n in args.device if safe_name(n)] if args.device else select_devices(discover(), args.keep_pointer)
+    except FileNotFoundError:
+        emit({"error": "hyprctl is not installed; this extension needs Hyprland"})
+        return 1
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        emit({"error": "Could not list input devices: %s" % error})
+        return 1
+    if not names:
+        emit({"error": "No keyboard or pointer to block"})
+        return 1
+
+    blocked: list[str] = []
+
+    def restore() -> None:
+        while blocked:
+            set_enabled(blocked.pop(), True)
+
+    def interrupted(signum: int, frame: object) -> None:
+        raise SystemExit(128 + signum)
+
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, interrupted)
+    try:
+        for name in names:
+            if set_enabled(name, False):
+                blocked.append(name)
+        if not blocked:
+            emit({"error": "Hyprland refused to disable any device"})
+            return 1
+        emit({"blocked": len(blocked), "devices": list(blocked), "seconds": seconds, "until": time.time() + seconds})
+        time.sleep(seconds)
+    finally:
+        restore()
+    emit({"restored": True})
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

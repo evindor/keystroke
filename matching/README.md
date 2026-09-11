@@ -24,12 +24,15 @@ the script; a file cached by an earlier release's `huggingface_hub` layout is re
 when its digest matches. It then serves the model through the first of:
 
 1. `matching/bin/keystroke-matching`, the static x86_64 binary shipped with the
-   plugin (1.5 MB, no shared-library dependencies). Its manifest
-   (`keystroke-matching.json`) names the machine architecture and the fingerprint
-   of the engine source it was built from; the binary is used only while both match
-   the running machine and the checked-out source. `bin/keystroke engine`
-   (`matching/engine/build-prebuilt.sh`) rebuilds it after an engine change, and
-   `tests/matching_engine_check.py` fails while it is stale.
+   plugin (700 KB, musl, no shared-library dependencies). Its manifest
+   (`keystroke-matching.json`) names the machine architecture, the fingerprint
+   of the engine source it was built from and the digest-pinned image it was
+   built in; the binary is used only while machine and fingerprint match the
+   running machine and the checked-out source. `bin/keystroke engine`
+   (`matching/engine/build-prebuilt.sh`) rebuilds it in that container after an
+   engine change, `tests/matching_engine_check.py` fails while it is stale, and
+   CI rebuilds and byte-compares it on every push and attests it on releases
+   ([docs/engine-provenance.md](../docs/engine-provenance.md)).
 2. `matching/engine`, the Rust source, built once per source revision with `cargo`
    (`--locked`; about ten seconds and a dozen small crates: serde, serde_json,
    unicode-normalization, unicode_categories) into the data directory when the

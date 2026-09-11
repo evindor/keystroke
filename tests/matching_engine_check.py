@@ -99,6 +99,8 @@ with tempfile.TemporaryDirectory(prefix='keystroke-engine-') as temp:
     assert manifest['source'] == fingerprint, 'matching/bin/keystroke-matching is stale: run bin/keystroke engine'
     import hashlib
     assert manifest['sha256'] == hashlib.sha256(shipped.read_bytes()).hexdigest(), 'shipped engine does not match its manifest'
+    assert manifest['target'] == 'x86_64-unknown-linux-musl', 'shipped engine must be the static musl build'
+    assert manifest['image'].startswith('docker.io/library/rust:') and '@sha256:' in manifest['image'], 'shipped engine must name its digest-pinned build image'
     if manifest['machine'] == os.uname().machine:
         parity(shipped, model, corpus, 'shipped binary')
     else:

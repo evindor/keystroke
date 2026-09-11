@@ -1,0 +1,37 @@
+{
+  "name": "Keyboard Cleaner",
+  "version": "1.0.1",
+  "author": "ozz1ee",
+  "description": "Block every keyboard and pointer for a moment so you can wipe them: wipe 30s",
+  "apiVersion": 1,
+  "icon": "󰌓",
+  "color": "#7aa2f7",
+  "license": "MIT",
+  "homepage": "https://github.com/radiohost-cloud/ozz1ee.keystroke-keyboard-cleaner",
+  "commands": [
+    {
+      "id": "wipe",
+      "prefix": "wipe",
+      "title": "Block input to wipe the keyboard",
+      "summary": "Disables every keyboard and pointer for a while, then brings them back",
+      "args": [
+        {
+          "name": "duration",
+          "hint": "30s, 2m, 90 seconds or a bare number of seconds; 5 minutes at most",
+          "optional": true
+        },
+        {
+          "name": "note",
+          "hint": "shown next to the countdown",
+          "optional": true,
+          "rest": true
+        }
+      ],
+      "examples": [
+        "wipe 30s",
+        "wipe 2m",
+        "wipe"
+      ]
+    }
+  ]
+}

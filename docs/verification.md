@@ -1,5 +1,23 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Dmenu empty-state height (2026-09-10)
+
+- Reproduced from Omarchy's Keybindings picker with a query that matched no
+  rows. Dmenu sizing reserved one 49 px result row at zero results, while the
+  empty state's glyph, spacing and message needed 76 px; the card collapsed
+  around the shorter viewport and clipped “No matches for …” at its bottom.
+- A zero-result select picker now reserves two row slots for that empty state.
+  A picker with one real row remains one row tall, and the caller's
+  `maxHeight` continues to cap the result area.
+- `tests/palette_dmenu_check.py` drives the real palette offscreen with the
+  Keybindings payload and filters its only option away. Its viewport-fit
+  assertion fails on the `dev` baseline (`49 >= 76`) and passes on this tree;
+  it also verifies that only the empty picker grows. Full `bin/keystroke test`
+  passes: 162 QML tests and all integration checks, including the new dmenu
+  check. `bin/keystroke validate` passes and qmllint reports only existing
+  metadata warnings. An offscreen after-image was rendered and reviewed; the
+  patched plugin was not installed over the user's release copy.
+
 ## Release 1.4.1 (2026-09-11)
 
 - Documentation only: `site/guide/index.html` copy pass (32 replacements:
@@ -559,7 +577,7 @@ thread (1 ms resolution).
 
 ## Time-zone grammar: abbreviations, bare zones, now, dates (2026-09-09)
 
-- `10am pt` used to fall through both the JS gate and the helper (the grammar was `<time> in|from <zone> [to <zone>] [on YYYY-MM-DD]`). `helpers/timezone.py` now owns the grammar: `<time> [in|from|at] <zone> [to|in <zone>] [on <date>]`, `<time> to <zone>` (local time shown elsewhere), `now|time|what time is it in <zone>`, `<zone> time`, and a date before or after (`tomorrow 9am est`, `10am pt on friday`, `10pm pt on tuesday to tokyo`). Times: `10am`, `10:30pm`, `10.30`, `1530`, `15:00`, `noon`, `midnight`, `10 a.m.`; a bare hour still needs `in`/`from`/`at`. Zones: an abbreviation table (`pt`, `pst`, `est`, `cet`, `eet`, `ist`, `jst`, `aest`, `nzt`, ...; ambiguous ones take the common reading and the detail line says which IANA zone was used, e.g. `pt = America/Los_Angeles`), region words (`pacific`, `eastern`), cities and countries that are not IANA names (`sf`, `nyc`, `india`, `germany`), IANA names with `/` or `_`, offsets (`utc+2`, `gmt-5`, `+05:30`), and `here`/`local`/`my time`. Names that span several zones (`australia`, `usa`) and IANA last-segment collisions come back as a hint the palette shows as a disabled row; half-typed queries stay silent.
+- `10am pt` used to fall through both the JS gate and the helper (the grammar was `<time> in|from <zone> [to <zone>] [on YYYY-MM-DD]`). `helpers/timezone.py` now owns the grammar: `<time> [in|from|at] <zone> [to|in <zone>] [on <date>]`, `<time> to <zone>` (local time shown elsewhere), `now|time|what time is it in <zone>`, `<zone> time`, and a date before or after (`tomorrow 9am est`, `10am pt on friday`, `10pm pt on tuesday to tokyo`). Times: `10am`, `10:30pm`, `10.30`, `1530`, `15:00`, `noon`, `midnight`, `10 a.m.`; a bare hour still needs `in`/`from`/`at`. Zones: an abbreviation table (`pt`, `pst`, `est`, `cet`, `eet`, `ist`, `jst`, `aest`, `nzt`, ...; ambiguous ones take the common reading and the detail line says which IANA zone was used, e.g. `pt = America/Los_Angeles`), region words (`pacific`, `eastern`), cities and countries that are not IANA names (`sf`, `nyc`, `india`, `germany`), IANA names with `/` or `_`, offsets (`utc+2`, `gmt-5`, `+05:30`), and `here`/`local`/`my time`. Names that span several zones (`australia`, `usa`) come back as a hint the palette shows as a disabled row; IANA last-segment collisions that share the same current UTC offset resolve automatically (e.g. `istanbul` picks `Asia/Istanbul`); collisions with different offsets still come back as a hint; half-typed queries stay silent.
 - `core/Units.js` `isTimeQuery` is now a loose time-shaped gate (time token at the start after an optional date, `10 in <zone>`, `now in <zone>`, `<zone> time`) so the helper decides; decimals such as `128 * 1.24` and `10 amsterdam` do not pass it. `providers/Converter.qml` shows hint errors as a row, marks `live` answers and re-runs them every 30 s while on screen.
 - `tests/tz_helper_check.py`: 48/48 with the clock fixed at 2026-09-09 12:00 UTC (the helper takes an optional ISO instant as its third argument). `tests/tst_units.qml` gate: 14 positive, 7 negative forms. `bin/keystroke test`: 110 QML tests, the voice, clipboard, Codex and dictation checks and the time-zone check pass; `bin/keystroke validate` passes; qmllint unchanged. `tests/extensions_check.py` fails its `update applied` step ("Extensions are up to date" instead of "Updated Probe") on this tree and identically on pristine `main` (three runs each): the update job schedules a check job the moment it finishes and the check's status overwrites the update's before the harness reads it. Pre-existing timing race in the check, not touched here.
 - Not exercised live in the shell this round: the palette journey for `10am pt` and the 30 s refresh of `now in london` (same code paths as the unit-tested gate and helper; the QML changes are the hint row and the refresh timer).
@@ -813,3 +831,54 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
   `manifestHasKind`, which should accept a QML sequence, not only a JS array.
 - Validation: 148 QML tests, application compatibility and palette dictation
   checks passed; plugin validation clean.
+
+## Reproducible matching engine (2026-09-11)
+
+- Marketplace review of omacom/omarchy-plugin-marketplace#5906 blocked 1.4.1 on
+  `matching/bin/keystroke-matching`: a committed ELF "without a signature,
+  attestation, or reproducible source-to-binary byte comparison". Other Rust
+  plugins were accepted with a digest-pinned container rebuild in CI compared
+  byte for byte against the committed binary plus a GitHub build provenance
+  attestation; a checksum beside the binary, a signature alone, or a CI build
+  that never compares were all refused.
+- The old binary rebuilt byte-identically on the machine that made it, but it
+  embedded `/home/<user>/.cargo/registry` paths and linked Arch's static glibc
+  objects through GCC 16.2.1, so nobody else could reproduce it. `trim-paths` is
+  not stable on cargo 1.98.1.
+- Local experiments (rustc 1.98.1): `--remap-path-prefix` removed every home
+  path and gave identical bytes across target directories; a musl static-pie
+  linked with `-C linker=rust-lld -C link-self-contained=yes` carried only the
+  toolchain's own LLD and crt objects in `.comment` and was identical across
+  two builds (695,096 bytes). The engine answered the protocol.
+- `build-prebuilt.sh` now builds in
+  `rust:1.98.1-alpine3.22@sha256:b420013…` with those flags, `--locked`,
+  `CARGO_INCREMENTAL=0`, `SOURCE_DATE_EPOCH=1`, and `--check` fails on any
+  difference from the committed binary or manifest. Docker was not runnable
+  here (daemon stopped), so the first committed bytes are the artifact of
+  engine workflow run 34623427621; run 34623634274 on the next push printed
+  "reproduced byte for byte". Shipped sha256
+  `192ef1ecb8fb835d5ba1c805ab1e37f95847c6ae093b05d544ac50bed2cbfd75`, 695,104
+  bytes, source fingerprint unchanged (`034fc6d9fa03190a`), no build path in
+  the binary beyond the remapped `/cargo/registry/src`.
+- `tests/matching_engine_check.py` passes with the new binary (build, protocol,
+  tokenizer parity on the shipped binary and the installed small model) and now
+  requires the musl target and a digest-pinned image in the manifest.
+- Not yet exercised: the attest job, which runs only on pushes to `main` and
+  `v*` tags. `gh attestation verify … --source-digest <commit>` is the check to
+  run after the first release that carries it (docs/engine-provenance.md).
+
+## Release 1.4.2 (2026-09-11)
+
+- Contents since 1.4.1: the reproducible engine (above), the Currency and
+  Keyboard Cleaner extensions ported from their contributors' pull requests,
+  the currency download judgement fix, the select-picker empty-state fix,
+  the offset-based time-zone deduplication, and the runner fixes for the
+  extension check. `manifest.json` 1.4.1 → 1.4.2; README lists the four
+  extensions in the box and points at the 1.4.2 notes.
+- `bin/keystroke test` on the dev tip (`5636531`): 162 QML tests passed, 0
+  failed; every integration check passed (applications, files, catalog,
+  matching, palette matching, shortcut, dmenu, routes, motion, worker,
+  engine, voxtype, clipboard, dictation, time zones); exit 0.
+  `omarchy plugin validate` exit 0; `git diff --check` clean. The engine
+  workflow and the extension check are green on the same commit. Not
+  exercised here: the attest job, which first runs on the `v1.4.2` tag.
