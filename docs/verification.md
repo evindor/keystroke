@@ -1,5 +1,24 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## GIF Search previews stopped after one pass (2026-09-12)
+
+- Reported against a working API key: GIFs in the grid played once instead of
+  looping. Not the files — every GIPHY GIF checked, previews included, carries
+  a NETSCAPE2.0 block with `loop=0`, i.e. infinite (`fixed_height_small`,
+  `preview_gif`, `200w` and the original for three different IDs).
+- The cause is `cache: false` on the delegate's `AnimatedImage` when the source
+  is remote. Probed three configurations side by side against the same GIPHY
+  URL: with `cache: false` the animation stops on its last frame and `playing`
+  goes false; with the cache left alone it wraps indefinitely. The same file
+  over `file://` loops either way, because a local source can be re-read — so
+  the offscreen fixture, which rewrites the source to a local GIF, could never
+  have caught it. Removing the override fixed it: 11 wraps in 12 seconds with
+  `playing` still true.
+- `tests/palette_check.py` guards the property rather than the behaviour, for
+  the reason above, and the guard was confirmed to fail when `cache: false` is
+  put back. The trade is memory: a page's previews now stay in Qt's image
+  cache, which is what every other animated image in the shell already does.
+
 ## GIF Search on the user's own GIPHY key (2026-09-12)
 
 - Version 1.2.0 drops Raycast's public GIPHY proxy and calls GIPHY directly with

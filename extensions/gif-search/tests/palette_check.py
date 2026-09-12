@@ -97,6 +97,7 @@ ShellRoot {
  property var svc: null
  property var input: null
  property var grid: null
+ property var preview: null
  property string key: ''' + json.dumps(KEY) + '''
  property TestCase keyboard: TestCase { when: false }
  function find(object, name) {
@@ -154,9 +155,14 @@ ShellRoot {
        if (window && window.contentItem) {
          test.input = find(window.contentItem, "gifSearchInput")
          test.grid = find(window.contentItem, "gifSearchGrid")
+         test.preview = find(window.contentItem, "gifPreview")
        }
      }
      check(!!test.input && !!test.grid, "view controls loaded")
+     // cache:false on a remote animation stops it on the last frame: the data is
+     // gone and QMovie cannot rewind. This fixture's source is a local file, which
+     // loops either way, so guard the property rather than the behaviour.
+     check(!!test.preview && test.preview.cache, "previews stay cached so a remote GIF loops")
      test.input.cursorPosition = 1
      keyboard.keyClick(Qt.Key_Right)
      check(test.input.activeFocus && test.input.cursorPosition === 2, "Right inside text edits normally")

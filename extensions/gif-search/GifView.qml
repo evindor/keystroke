@@ -129,10 +129,14 @@ Item {
             border.color: grid.currentIndex === tile.index ? root.accent : root.hairline
             AnimatedImage {
               id: preview
+              objectName: "gifPreview"
               anchors { fill: parent; margins: Style.space(4); bottomMargin: title.height + Style.space(8) }
               source: tile.modelData.preview
               asynchronous: true
-              cache: false
+              // Leave cache alone. `cache: false` on a remote animation drops the
+              // downloaded data after the first pass, so QMovie cannot rewind: it
+              // halts on the last frame and clears `playing`. A local file re-reads
+              // itself and loops either way, which is why only the real grid shows it.
               playing: visible && root.service.active
               fillMode: Image.PreserveAspectFit
             }

@@ -56,7 +56,9 @@ Keystroke's `CONTRIBUTING.md` extension guide and `docs/providers.md` API 1.
 row; `Service.qml` owns requests, debounce and clipboard state; `GifView.qml`
 renders a three-column animated grid using host theme tokens. The Python
 standard-library helper replaces macOS file copying with binary `wl-copy` input.
-Only the current page is retained in memory. Outdated responses are ignored.
+Outdated responses are ignored. Preview animations are left to Qt's ordinary
+image cache so they loop: `cache: false` on a remote animation discards the
+downloaded data after one pass, and the GIF then halts on its last frame.
 
 ## Dependencies and data access
 
