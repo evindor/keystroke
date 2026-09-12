@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the real palette with isolated HOME, fake network and clipboard."""
+"""Exercise the real palette with isolated HOME, a local GIPHY and fake clipboard."""
 import base64
 import json
 import os
@@ -7,8 +7,54 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
+
+KEY = "abcdef0123456789abcdef0123456789"
+REQUESTS = []
+KEYS_SEEN = set()
+RATINGS_SEEN = set()
+
+
+def gif(index, term):
+    return {"id": str(index), "title": term + " " + str(index),
+            "images": {"original": {"url": "https://media.giphy.com/" + str(index) + ".gif"},
+                       "preview_gif": {"url": "https://media.giphy.com/small.gif"}}}
+
+
+class Giphy(BaseHTTPRequestHandler):
+    def do_GET(self):
+        parts = urlsplit(self.path)
+        query = parse_qs(parts.query)
+        term = query.get("q", ["trending"])[0]
+        offset = int(query.get("offset", ["0"])[0])
+        REQUESTS.append("%s:%d" % (term, offset))
+        KEYS_SEEN.add(query.get("api_key", [""])[0])
+        RATINGS_SEEN.add(query.get("rating", [""])[0])
+        if term == "slow":
+            time.sleep(0.7)
+        status = 500 if term == "error" else 429 if term == "ratelimit" else 200
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        if status != 200:
+            self.wfile.write(json.dumps({"meta": {"status": status}}).encode())
+            return
+        data = [] if term == "empty" else [gif(offset + i, term) for i in range(24)]
+        self.wfile.write(json.dumps({"data": data,
+                                     "pagination": {"offset": offset, "count": 24, "total_count": 48}}).encode())
+
+    def log_message(self, *args):
+        pass
+
 
 root = Path(__file__).resolve().parents[3]
+server = ThreadingHTTPServer(("127.0.0.1", 0), Giphy)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+base = "http://127.0.0.1:%d/v1/gifs/" % server.server_address[1]
+
 with tempfile.TemporaryDirectory(prefix="keystroke-gifs-") as temp:
     work = Path(temp)
     project = work / "project"
@@ -31,22 +77,9 @@ with tempfile.TemporaryDirectory(prefix="keystroke-gifs-") as temp:
         'type("Fixture", (io.BytesIO,), {"headers": {}})(b"GIF89a\\x00\\xff")'))
     fake = work / "bin"
     fake.mkdir()
-    def script(name, body):
-        path = fake / name
-        path.write_text(body)
-        path.chmod(0o755)
-    script("curl", '''#!/usr/bin/env python3
-import json, sys, time, urllib.parse
-qs = urllib.parse.parse_qs(urllib.parse.urlsplit(sys.argv[-1]).query)
-term = qs.get('q', ['trending'])[0]
-offset = int(qs['offset'][0])
-with open(''' + repr(str(work / "requests")) + ''', 'a') as out: out.write(term + ':' + str(offset) + '\\n')
-if term == 'slow': time.sleep(0.7)
-if term == 'error': sys.exit(22)
-gif = lambda i: {'id': str(i), 'title': term + ' ' + str(i), 'images': {'original': {'url': 'https://media.giphy.com/' + str(i) + '.gif'}, 'preview_gif': {'url': 'https://media.giphy.com/small.gif'}}}
-print(json.dumps({'data': [] if term == 'empty' else [gif(offset+i) for i in range(24)], 'pagination': {'offset':offset, 'count':24, 'total_count':48}}))
-''')
-    script("wl-copy", "#!/usr/bin/env python3\nimport sys\nfrom pathlib import Path\nPath(" + repr(str(work / "copied")) + ").write_bytes(sys.stdin.buffer.read())\n")
+    wl = fake / "wl-copy"
+    wl.write_text("#!/usr/bin/env python3\nimport sys\nfrom pathlib import Path\nPath(" + repr(str(work / "copied")) + ").write_bytes(sys.stdin.buffer.read())\n")
+    wl.chmod(0o755)
     (work / ".config/omarchy").mkdir(parents=True)
     (work / ".config/omarchy/keystroke.json").write_text('{"version":1,"matching":{"mode":"off"}}')
     capture = os.environ.get("KEYSTROKE_CAPTURE_DIR", "")
@@ -64,6 +97,7 @@ ShellRoot {
  property var svc: null
  property var input: null
  property var grid: null
+ property string key: ''' + json.dumps(KEY) + '''
  property TestCase keyboard: TestCase { when: false }
  function find(object, name) {
    if (object.objectName === name) return object
@@ -72,26 +106,49 @@ ShellRoot {
    return null
  }
  function check(ok, message) { if (!ok) { failures++; console.log("FAIL", message) } }
- function config(enabled) { return JSON.stringify({version:1, matching:{mode:"off"}, providers:{"gif-search":{enabled:enabled, prefix:"reaction"}}}) }
+ function config(enabled, apiKey) {
+   return JSON.stringify({version:1, matching:{mode:"off"},
+     providers:{"gif-search":{enabled:enabled, prefix:"reaction", apiKey:apiKey, rating:"pg-13"}}})
+ }
+ // The view reads settings once, at activate; keep the key when overriding.
+ function withKey(extra) {
+   var out = { apiKey: test.key, rating: "pg-13" }
+   for (var k in extra) out[k] = extra[k]
+   return out
+ }
  Keystroke { id: palette; omarchyPath: "/usr/share/omarchy" }
  Timer { interval: 100; repeat: true; running: true; onTriggered: {
    switch (test.stage) {
    case 0:
      if (!palette.registry.manifests["gif-search"]) return
      check(!palette.registry.services["gif-search"], "off by default")
-     palette.applyConfigText(config(true)); test.stage++; return
+     palette.applyConfigText(config(true, "")); test.stage++; return
    case 1:
      var entry = palette.registry.services["gif-search"]
      if (!entry || !entry.instance) return
      test.svc = entry.instance
      palette.open(JSON.stringify({query:"reaction happy"})); test.stage++; return
    case 2:
+     var noKey = palette.rows.findIndex(function(r) { return r.id === "gif-search-open" })
+     if (noKey < 0) return
+     check(palette.rows[noKey].verb === "Set up", "root row asks for setup while the key is missing")
+     palette.activateAt(noKey); test.stage++; return
+   case 3:
+     if (!palette.providerViewActive) return
+     check(svc.needsKey && !svc.loading, "the view knows the key is missing")
+     check(!svc.items.length, "nothing is searched without a key")
+     palette.cancel()
+     palette.applyConfigText(config(true, test.key))
+     palette.open(JSON.stringify({query:"reaction happy"})); test.stage++; return
+   case 4:
      var index = palette.rows.findIndex(function(r) { return r.id === "gif-search-open" })
      if (index < 0) return
      check(palette.rows[index].action.term === "happy", "renamed command seeds term")
      palette.activateAt(index); test.stage++; return
-   case 3:
+   case 5:
      if (svc.loading || !svc.items.length || !palette.providerViewActive) return
+     check(!svc.needsKey, "the key from settings reaches the service")
+     check(svc.request.command.join(" ").indexOf(test.key) === -1, "the key never enters argv")
      for (var n = 0; n < palette.resources.length; n++) {
        var window = palette.resources[n]
        if (window && window.contentItem) {
@@ -120,50 +177,56 @@ ShellRoot {
      check(svc.items[0].title === "happy 0", "initial search results")
      check(svc.more, "next page available")
      svc.turnPage(1); test.stage++; return
-   case 4:
+   case 6:
      if (svc.loading) return
      check(svc.items[0].id === "24" && !svc.more, "second page offset")
      svc.search("slow"); test.stage++; return
-   case 5:
+   case 7:
      if (++test.ticks < 4) return
      svc.search("new"); test.stage++; return
-   case 6:
+   case 8:
      if (svc.loading) return
      check(svc.items[0].title === "new 0", "stale response ignored")
      keyboard.keyClick(Qt.Key_Return, Qt.ControlModifier); test.stage++; return
-   case 7:
+   case 9:
      if (svc.copying) return
      check(svc.message === "Copied to clipboard", "copy link succeeded")
      check(palette.opened && svc.settings.defaultAction === "image" && !svc.settings.closeAfterCopy, "defaults keep view open")
-     svc.settings = { defaultAction: "link", closeAfterCopy: false }
+     svc.settings = withKey({ defaultAction: "link", closeAfterCopy: false })
      keyboard.keyClick(Qt.Key_Return)
      check(svc.clipboard.command[2] === "link", "Enter uses link default")
-     test.stage = 71; return
-   case 71:
+     test.stage = 91; return
+   case 91:
      if (svc.copying) return
      keyboard.keyClick(Qt.Key_Return, Qt.ControlModifier)
      check(svc.clipboard.command[2] === "gif", "Ctrl+Enter swaps to GIF")
-     test.stage = 72; return
-   case 72:
+     test.stage = 92; return
+   case 92:
      if (svc.copying) return
      check(svc.message === "Copied to clipboard" && palette.opened, "image copy keeps view open")
      svc.search("error"); test.stage++; return
-   case 73:
-     test.stage = 8; return
-   case 8:
+   case 93:
      if (svc.loading) return
-     check(svc.items.length === 0 && svc.message.indexOf("Could not reach") === 0, "request error visible")
-     svc.search("empty"); test.stage++; return
-   case 9:
+     check(svc.items.length === 0 && svc.message.indexOf("HTTP 500") !== -1, "the helper's own error message is shown")
+     svc.search("ratelimit"); test.stage = 94; return
+   case 94:
+     if (svc.loading) return
+     check(svc.message.indexOf("rate limit reached") !== -1, "a 429 names the rate limit")
+     svc.search("empty"); test.stage = 10; return
+   case 10:
      if (svc.loading) return
      check(svc.items.length === 0 && svc.message.indexOf("No GIFs") === 0, "empty state")
      svc.search(""); test.stage++; return
-   case 10:
+   case 11:
      if (svc.loading) return
      check(svc.items[0].title === "trending 0", "trending")
+     svc.search("new"); test.stage = 111; return
+   case 111:
+     if (svc.loading) return
+     check(svc.items[0].title === "new 0", "a page already fetched is served from the cache")
      test.input.text = ""
-     test.ticks = 0; test.stage++; return
-   case 11:
+     test.ticks = 0; test.stage = 12; return
+   case 12:
      if (++test.ticks < 5) return
      var captureDir = ''' + json.dumps(capture) + '''
      if (captureDir) {
@@ -173,36 +236,42 @@ ShellRoot {
        }
      }
      test.stage++; return
-   case 12:
-     svc.settings = { defaultAction: "link", closeAfterCopy: true }
+   case 13:
+     svc.settings = withKey({ defaultAction: "link", closeAfterCopy: true })
      svc.copyBodyDone = true; svc.copyExit = 1; svc.copyBody = "Copy failed"
      svc.copied()
      check(palette.opened, "failed copy never closes")
      keyboard.keyClick(Qt.Key_Return)
-     test.stage = 121; return
-   case 121:
+     test.stage = 131; return
+   case 131:
      if (svc.copying) return
      check(!palette.opened, "successful copy closes when enabled")
      check(!svc.active && !svc.items.length, "dismiss releases previews")
-     palette.applyConfigText(config(false)); test.stage = 13; return
-   case 13:
+     palette.applyConfigText(config(false, test.key)); test.stage = 14; return
+   case 14:
      if (palette.registry.services["gif-search"]) return
      console.log(test.failures ? "FAIL palette gifs" : "PASS palette gifs")
      Qt.quit(); test.stage++; return
    }
  } }
- Timer { interval: 18000; running: true; onTriggered: { console.log("FAIL timeout", test.stage, JSON.stringify(palette.registry.problems)); Qt.quit() } }
+ Timer { interval: 25000; running: true; onTriggered: { console.log("FAIL timeout", test.stage, JSON.stringify(palette.registry.problems)); Qt.quit() } }
 }
 ''')
     env = dict(os.environ, HOME=str(work), XDG_RUNTIME_DIR=str(work), PATH=f"{fake}:{os.environ.get('PATH', '')}",
+               GIPHY_API_BASE=base,
                QT_QPA_PLATFORM="offscreen", QT_QPA_PLATFORMTHEME="generic", QT_QUICK_BACKEND="software", QML_IMPORT_PATH=str(work))
     env.pop("DISPLAY", None)
     env.pop("WAYLAND_DISPLAY", None)
-    result = subprocess.run(["quickshell", "-p", str(work / "shell.qml")], env=env, capture_output=True, text=True, timeout=30)
+    env.pop("GIPHY_API_KEY", None)
+    result = subprocess.run(["quickshell", "-p", str(work / "shell.qml")], env=env, capture_output=True, text=True, timeout=60)
     output = result.stdout + result.stderr
     assert "PASS palette gifs" in output and "FAIL" not in output, output
     assert "TypeError" not in output and "ReferenceError" not in output and "Unable to assign" not in output, output
     assert (work / "copied").read_bytes() == b"https://media.giphy.com/0.gif"
-    requests = (work / "requests").read_text().splitlines()
-    assert requests == ['happy:0', 'happy:24', 'slow:0', 'new:0', 'error:0', 'empty:0', 'trending:0'], requests
-    print("PASS real palette: enable, renamed command, view, paging, stale response, clipboard link, errors, empty, trending, dismiss, disable")
+    expected = ['happy:0', 'happy:24', 'slow:0', 'new:0', 'error:0', 'ratelimit:0', 'empty:0', 'trending:0']
+    assert REQUESTS == expected, REQUESTS
+    # The key travelled in the environment and arrived intact; the rating was honoured.
+    assert KEYS_SEEN == {KEY}, KEYS_SEEN
+    assert RATINGS_SEEN == {"pg-13"}, RATINGS_SEEN
+    print("PASS real palette: setup without a key, key from settings, renamed command, view, paging, "
+          "stale response, clipboard, HTTP and rate-limit errors, empty, trending, cache, dismiss, disable")

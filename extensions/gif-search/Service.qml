@@ -25,23 +25,26 @@ QtObject {
   property bool copyBodyDone: false
   property int copyExit: -1
   property string copyBody: ""
-  property var settings: ({ defaultAction: "image", closeAfterCopy: false })
+  property var settings: ({ defaultAction: "image", closeAfterCopy: false, apiKey: "", rating: "g" })
   property int session: 0
   property int copySession: -1
   signal copySucceeded()
 
+  readonly property string helper: decodeURIComponent(String(Qt.resolvedUrl("bin/search.py")).replace(/^file:\/\//, ""))
+  readonly property string apiKey: String(settings.apiKey || "").trim()
+  readonly property bool needsKey: apiKey === ""
+  // A beta key allows about 100 calls an hour, so a page already fetched is
+  // never fetched twice within one visit to the grid.
+  property var cache: ({})
+
   readonly property var provider: ({
     apiVersion: 1, name: "GIF Search", icon: Gifs.ICON, color: "#c678dd",
     description: "Search GIPHY and copy GIFs", view: view,
-    settings: [
-      { key: "defaultAction", type: "enum", label: "Default action", "default": "image",
-        options: ["image", "link"], optionLabels: { image: "Copy image", link: "Copy link" },
-        description: "Enter uses this action; Ctrl+Enter uses the other" },
-      { key: "closeAfterCopy", type: "boolean", label: "Close after copy", "default": false }
-    ],
-    query: function(ctx) { return Gifs.rows(ctx, root.key) },
+    settings: Gifs.SETTINGS,
+    query: function(ctx) { return Gifs.rows(ctx, root.key, !String((ctx.settings || {}).apiKey || "").trim()) },
+    opened: function() { root.cache = ({}) },
     activate: function(row, ctx) {
-      root.settings = ctx.settings || ({ defaultAction: "image", closeAfterCopy: false })
+      root.settings = ctx.settings || root.settings
       root.session++
       root.active = true
       root.term = row.action.term || ""
@@ -74,16 +77,21 @@ QtObject {
     items = []
     more = false
     message = ""
+    if (needsKey) { loading = false; debounce.stop(); return }
+    var hit = cache[cacheKey()]
+    if (hit) { loading = false; items = hit.items; more = hit.more; message = hit.message; debounce.stop(); return }
     loading = true
     debounce.restart()
   }
+  function cacheKey() { return page + " " + settings.rating + " " + term }
   function fetch() {
-    if (!active || request.running) return
+    if (!active || request.running || needsKey) return
     requestedRevision = revision
     body = ""
     bodyDone = false
     exitCode = -1
-    request.command = Gifs.searchArgv(term, page)
+    request.environment = ({ GIPHY_API_KEY: apiKey })
+    request.command = Gifs.searchArgv(helper, term, page, settings.rating)
     request.running = true
   }
   function finish() {
@@ -92,11 +100,18 @@ QtObject {
     if (requestedRevision !== revision) { debounce.restart(); return }
     loading = false
     try {
-      if (exitCode !== 0) throw new Error("Could not reach GIPHY. Check your connection and retry.")
+      // The helper prints why it failed; it never echoes the key or the URL.
+      if (exitCode !== 0) throw new Error(body.trim() || "Could not reach GIPHY. Check your connection and retry.")
       var result = Gifs.parse(body)
       items = result.items
       more = result.more
       message = items.length ? "" : "No GIFs found. Try another search."
+      var next = ({})
+      for (var k in cache) next[k] = cache[k]
+      next[cacheKey()] = { items: items, more: more, message: message }
+      var keys = Object.keys(next)
+      while (keys.length > 16) delete next[keys.shift()]
+      cache = next
     } catch (error) { message = error.message }
   }
   function dismiss() {

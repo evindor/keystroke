@@ -50,15 +50,33 @@ Item {
     return root.tree
   }
 
-  // String and number settings: the query is the new value.
+  // A secret is still shown as set or not set, but never in full: the settings
+  // list is as readable over a shoulder or in a screenshot as any other screen.
+  function shown(schema, value) {
+    var text = String(value)
+    if (!schema.secret) return text
+    return text.length > 4 ? text.slice(0, 4) + "••••••••" : "••••••••"
+  }
+
+  // String and number settings: the query is the new value. A schema may
+  // declare `setup` for the case where the value is still empty and the user
+  // has to fetch it from somewhere: the row then says so in the answer type
+  // size and ↵ opens wherever it comes from, rather than sitting inert.
   function valueRows(ctx, screen) {
     var schema = screen.schema, value = screen.value
     var typed = schema.type === "number" ? Number(ctx.query) : ctx.query
     var ok = ctx.query.length > 0
     try { Settings.validate(schema, typed) } catch (e) { ok = false }
-    var rows = [{ id: "current", title: value === "" || value === undefined ? "Not set" : String(value), subtitle: "Current value · type a new one",
-                  icon: "󰒓", section: schema.label, verb: "", tier: "item", score: 1, order: 0, disabled: true, action: { type: "noop" } }]
-    if (ok) rows.push({ id: "save", title: "Save “" + String(typed) + "”", subtitle: schema.description || "", icon: "✓", section: schema.label,
+    var unset = value === "" || value === undefined
+    var setup = unset && schema.setup ? schema.setup : null
+    var rows = [setup
+      ? { id: "current", title: setup.notice, subtitle: setup.detail || "", icon: setup.icon || "󰒓", section: schema.label,
+          verb: setup.verb || "Open", tier: "answer", score: 1, order: 0, hint: setup.hint || "",
+          preview: setup.url, previewLabel: "SETUP", previewDetail: setup.detail || "",
+          action: { type: "url", url: setup.url } }
+      : { id: "current", title: unset ? "Not set" : root.shown(schema, value), subtitle: "Current value · type a new one",
+          icon: "󰒓", section: schema.label, verb: "", tier: "item", score: 1, order: 0, disabled: true, action: { type: "noop" } }]
+    if (ok) rows.push({ id: "save", title: "Save “" + root.shown(schema, typed) + "”", subtitle: schema.description || "", icon: "✓", section: schema.label,
                         verb: "Save", tier: "item", score: 100, order: 1, action: SettingsTree.settingAction(screen.path, schema.key, typed, schema) })
     return rows
   }

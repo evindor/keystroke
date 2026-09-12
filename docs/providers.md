@@ -33,7 +33,7 @@ readonly property var provider: ({
   name: "Thing", icon: "✳", iconFont: "", iconSource: "", color: "#hex", description: "",
   commands: [ { id, prefix, title, summary, args: [{ name, hint, optional, rest }], examples } ],   // optional, see Commands
   patterns: [ { id, regex, flags, boost, example, description } ],   // optional, see Patterns
-  settings: [ { key, type: "boolean"|"enum"|"number"|"string", label, "default", options, min, max, integer, description } ],
+  settings: [ { key, type: "boolean"|"enum"|"number"|"string", label, "default", options, min, max, integer, description, secret, setup } ],
   view: Component { ... },                        // optional, see Provider views
   query: function(ctx) { ... return rows },       // required
   activate: function(row, ctx) { ... return effect }, // optional; defaults to row.action (row.altAction when ctx.alternate)
@@ -131,6 +131,8 @@ A provider with something to show next to the menu button in the bar calls `host
 ## Scopes and settings
 
 Navigating into a provider gives it scope `<key>`; deeper scopes are `<key>/<sub>`. Settings are stored under `providers.<key>` in `~/.config/omarchy/keystroke.json`; the `enabled` and `prefix` keys are reserved (`prefix` exists only for a provider that declares commands). Screens are generated from `settings`; no UI code is needed. Every screen, setting and enum choice is also searchable from the palette root through its breadcrumb (Keystroke Settings › <name> › <label> › <choice>); the setting `key` and enum option values count as identifiers, so a key like `provider` makes `prefp` reach a setting labelled "Preferred assistant".
+
+`secret` and `setup` are for a setting the user has to obtain from somewhere, an API key being the usual case. `secret: true` means the value is never rendered in full: the settings list and the value screen show the first four characters followed by dots, while the value that is saved and handed to the provider stays whole. `setup: { notice, detail, hint, verb, icon, url }` covers the value still being empty: the settings list reads **Not set** rather than the usual `—`, and the value screen's first row becomes an answer-tier row — the notable type size — carrying `notice`, where `↵` opens `url` instead of the row sitting inert. Once a value is set the row returns to the ordinary (masked, if secret) display. `extensions/gif-search` uses both for its GIPHY key, and `tests/tst_settingssecret.qml` covers them.
 
 ## Stability
 

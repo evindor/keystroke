@@ -1,5 +1,48 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## GIF Search on the user's own GIPHY key (2026-09-12)
+
+- Version 1.2.0 drops Raycast's public GIPHY proxy and calls GIPHY directly with
+  a key the user provides. The proxy was a thin passthrough — its payload is
+  GIPHY's own `data`/`meta`/`pagination` envelope — so `Gifs.parse` and
+  `Gifs.mediaUrl` are unchanged; only the request moved. GIPHY splits what the
+  proxy merged: `/v1/gifs/search` requires `q`, `/v1/gifs/trending` refuses it.
+- Shipping one key for everyone was rejected: a free beta key allows about 100
+  calls an hour *per key*, which is the ceiling for the whole user base, and a
+  key in a public repository is scraped and revoked. A production key needs an
+  application and a negotiated fee. Tenor stopped accepting new API clients in
+  January 2026, so it is not an alternative.
+- `bin/search.py` reads the key from `GIPHY_API_KEY` rather than argv:
+  `/proc/<pid>/cmdline` is world readable, `/proc/<pid>/environ` is owner only.
+  No message it prints carries the key or the URL, including the catch-all that
+  would otherwise let a traceback out. HTTP 401/403 and 429 get their own text,
+  so a rejected key and a spent hourly allowance are distinguishable.
+  `tests/test_search.py` covers eight cases, asserting the key is absent from
+  every failure path's output.
+- New generic schema fields, documented in `docs/providers.md`: `secret: true`
+  masks a value everywhere it is displayed while saving it whole, and `setup`
+  turns the value screen's first row into an answer-tier row (the notable type
+  size) that says the value is not set and opens `url` on `↵` instead of sitting
+  inert; the settings list reads **Not set** rather than `—`.
+  `tests/tst_settingssecret.qml` covers both, including that the full key is
+  what gets saved while only a masked form is shown.
+- A content rating setting (G default, PG, PG-13, R) is sent on every request.
+  The proxy chose this for us; calling GIPHY directly makes it the user's
+  choice, which matters for a launcher that puts images on screen. An unknown
+  rating falls back to `g` in `searchArgv` before it can reach GIPHY.
+- A page already fetched during one visit to the grid is served from memory,
+  bounded to 16 entries and cleared on each palette open, so repeating a search
+  does not spend the hourly allowance twice.
+- `extensions/gif-search/tests/palette_check.py` now runs the production helper
+  against a local GIPHY stand-in instead of a fake `curl`. It asserts the key
+  reaches the request but never `request.command`, that the configured rating
+  arrives, that a repeated page produces no second request, and that HTTP 500
+  and 429 surface the helper's own wording. It also covers the no-key state:
+  the root row reads **Set up** and nothing is requested.
+- 272 QML tests, eight search-helper tests, four clipboard tests, the reworked
+  palette check and all six extension checks pass. A live GIPHY key was not
+  exercised end to end: every network assertion is against the local stand-in.
+
 ## Browser search review fixes (2026-09-12)
 
 - The service judged a helper run inside `onExited`, reading output that only

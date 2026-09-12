@@ -1,6 +1,8 @@
 import QtQuick
+import Quickshell
 import qs.Commons
 import qs.Ui as Ui
+import "core/Gifs.js" as Gifs
 
 Item {
   id: root
@@ -17,7 +19,9 @@ Item {
   function dismiss() { service.dismiss() }
   function transcript(text, final) { search.text = text }
   readonly property bool linkDefault: service.settings.defaultAction === "link"
+  function openSignup() { Quickshell.execDetached(["xdg-open", Gifs.SIGNUP_URL]) }
   function choose(alternate) {
+    if (service.needsKey) { openSignup(); return }
     var link = alternate ? !linkDefault : linkDefault
     if (grid.currentIndex >= 0) service.copy(service.items[grid.currentIndex], link)
   }
@@ -164,11 +168,57 @@ Item {
         width: parent.width
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
-        visible: !grid.count
+        visible: !grid.count && !root.service.needsKey
         text: root.service.loading ? "Searching GIPHY..." : root.service.message
         color: root.muted
         font.family: root.family
         font.pixelSize: root.labelSize
+      }
+      // Without a key there is nothing to search, so the empty grid explains
+      // itself and offers the one action that gets the user out of the state.
+      Column {
+        anchors.centerIn: parent
+        width: Math.min(parent.width, Style.space(420))
+        spacing: Style.space(10)
+        visible: root.service.needsKey
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          text: "GIPHY API key is not set"
+          color: root.foreground
+          font.family: root.family
+          font.pixelSize: root.host ? root.host.fontInput : Style.font.heading
+          font.weight: Font.DemiBold
+        }
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.WordWrap
+          text: "GIF Search needs your own free key from the GIPHY developer dashboard. Paste it into Settings → GIF Search → GIPHY API key."
+          color: root.muted
+          font.family: root.family
+          font.pixelSize: root.labelSize
+        }
+        Item {
+          width: parent.width
+          height: signup.height
+          Ui.Button {
+            id: signup
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "Get a free key"
+            foreground: root.foreground; accent: root.accent
+            fontFamily: root.family; fontSize: root.labelSize
+            onClicked: root.openSignup()
+          }
+        }
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          text: "↵ opens developers.giphy.com"
+          color: root.muted
+          font.family: root.family
+          font.pixelSize: root.labelSize
+        }
       }
     }
     Column {
@@ -181,6 +231,7 @@ Item {
         Row {
           id: pagination
           spacing: Style.space(12)
+          visible: !root.service.needsKey
           Ui.Button {
             text: "Previous"
             enabled: !root.service.loading && root.service.page > 0
@@ -215,9 +266,11 @@ Item {
       Text {
         width: parent.width
         elide: Text.ElideRight
-        text: root.service.message || (root.linkDefault
-          ? "Enter copies link  ·  Ctrl+Enter copies GIF  ·  Tab switches to grid"
-          : "Enter copies GIF  ·  Ctrl+Enter copies link  ·  Tab switches to grid")
+        text: root.service.needsKey
+          ? "Settings → GIF Search → GIPHY API key"
+          : root.service.message || (root.linkDefault
+            ? "Enter copies link  ·  Ctrl+Enter copies GIF  ·  Tab switches to grid"
+            : "Enter copies GIF  ·  Ctrl+Enter copies link  ·  Tab switches to grid")
         color: root.muted
         font.family: root.family
         font.pixelSize: root.labelSize

@@ -36,7 +36,13 @@ function schemaNodes(nodes, screens, path, schemas, values, scope, parentParts, 
     var isBool = schema.type === "boolean", isEnum = schema.type === "enum"
     var parts = parentParts.concat([schema.label])
     var childScope = scope + "/" + k
-    var current = isBool ? (value ? "On" : "Off") : (value === "" || value === undefined ? "—" : String(value))
+    var blank = value === "" || value === undefined
+    // A secret never reaches the list in full; a value the user still has to
+    // fetch says so outright, since "—" reads as merely optional.
+    var current = isBool ? (value ? "On" : "Off")
+      : blank ? (schema.setup ? "Not set" : "—")
+      : schema.secret ? (String(value).length > 4 ? String(value).slice(0, 4) + "••••••••" : "••••••••")
+      : String(value)
     if (schema.optionLabels && schema.optionLabels[value]) current = schema.optionLabels[value]
     nodes.push(node(scope, parts, { id: idPrefix + "/" + k, subtitle: schema.description || "", verb: isBool ? "Toggle" : "Change", order: i,
       accessory: current, keywords: k + (isEnum ? " " + schema.options.join(" ") : ""), description: schema.description || "",
