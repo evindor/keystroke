@@ -1,0 +1,16 @@
+{
+  "name": "GIF Search",
+  "version": "1.1.1",
+  "author": "Arseniy Zarechnev",
+  "description": "Search GIPHY and copy a GIF or its link: gif happy",
+  "apiVersion": 1,
+  "icon": "󰵸",
+  "color": "#c678dd",
+  "license": "MIT",
+  "commands": [{
+    "id": "search", "prefix": "gif", "title": "Search GIFs",
+    "summary": "Browse GIFs and copy one to the clipboard",
+    "args": [{ "name": "search", "hint": "a reaction or phrase", "optional": true, "rest": true }],
+    "examples": ["gif happy", "gif thank you", "gif"]
+  }]
+}

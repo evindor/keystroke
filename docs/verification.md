@@ -917,6 +917,34 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
   `v*` tags. `gh attestation verify … --source-digest <commit>` is the check to
   run after the first release that carries it (docs/engine-provenance.md).
 
+## GIF Search extension (2026-09-12)
+
+- Version 1.1.0: replaced Back with the search icon, right-aligned GIPHY credit
+  and centered it vertically with pagination. Added default image/link action
+  and close-after-success settings (default image, stay open). Right at the end
+  of unselected search text focuses the grid and advances one result; modified
+  Right and cursor movement inside text retain normal editing behavior.
+  Extension checks and the expanded offscreen keyboard/copy tests pass, including
+  swapped Enter/Ctrl+Enter and successful-copy closing; failures stay open.
+  Visually checked the updated header and footer in the offscreen capture.
+- Added a self-contained GIPHY search/trending grid with GIF and link copying,
+  following the API 1 extension guide. The extension README records the Raycast
+  source dissection, process/network access, dependencies and limits.
+- `QT_QPA_PLATFORMTHEME=generic bin/keystroke check-extensions extensions/gif-search`
+  passed (manifest, folder boundaries, qmllint, QML tests). The generic platform
+  theme avoids the local GTK theme's attempt to connect to a display offscreen.
+- Four Python clipboard tests passed, covering URL boundaries, binary transfer,
+  invalid/oversized downloads, link copying without network and clipboard errors.
+- `python3 extensions/gif-search/tests/palette_check.py` passed with an isolated
+  HOME and fake curl/wl-copy: off by default, enable, renamed command, view load,
+  Tab/arrows/Ctrl+Enter, pagination, stale-response rejection, HTTP error, empty
+  results, trending, dismissal and service destruction. No QML runtime type or
+  assignment errors. Visually checked its capture with a real GIF preview.
+- Live proxy search and preview download succeeded; the production helper copied
+  a 2,987,777-byte original GIF to a fake wl-copy receiver with `image/gif` MIME.
+  `bin/keystroke validate` passed. Desktop clipboard and application pasting,
+  live installation, and the full unrelated core regression suite were not run.
+
 ## Release 1.4.2 (2026-09-11)
 
 - Contents since 1.4.1: the reproducible engine (above), the Currency and
