@@ -93,9 +93,19 @@ ShellRoot {
       test.stage++; return
     case 7:
       check(items().length === 1 && items()[0].title === "Fixture bookmark", "obsolete process cannot replace latest results")
-      configure(false, true, true)
       test.stage++; return
     case 8:
+      // The helper's exit code can reach the service before its output does.
+      var probe = service()
+      probe.inflight = "probe"; probe.superseded = false
+      probe.output = ""; probe.outputDone = false; probe.exitCode = -1; probe.failure = ""
+      probe.exitCode = 0; probe.settle()
+      check(probe.cache["probe"] === undefined, "exit before output does not judge the run")
+      probe.output = '{"browser":"Chromium","results":[]}'; probe.outputDone = true; probe.settle()
+      check(probe.cache["probe"] && !probe.cache["probe"].error, "run judged once the output follows")
+      configure(false, true, true)
+      test.stage++; return
+    case 9:
       check(!service(), "disabling destroys service")
       console.log(test.failures ? "FAIL browser palette" : "PASS browser palette")
       Qt.quit(); stop(); return

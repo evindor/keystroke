@@ -15,6 +15,8 @@ QtObject {
   property string inflight: ""
   property bool superseded: false
   property string output: ""
+  property bool outputDone: false
+  property int exitCode: -1
   property string failure: ""
 
   readonly property var provider: ({
@@ -46,6 +48,8 @@ QtObject {
       root.inflight = k
       root.superseded = false
       root.output = ""
+      root.outputDone = false
+      root.exitCode = -1
       root.failure = ""
       worker.command = Browser.argv(root.helper, req)
       worker.running = true
@@ -55,25 +59,28 @@ QtObject {
     return []
   }
 
+  // The output and the exit code arrive in either order; the run is judged once both are in.
   readonly property Process worker: Process {
-    stdout: StdioCollector { onStreamFinished: root.output = text }
-    onExited: function(code) {
-      watchdog.stop()
-      if (!root.superseded) {
-        var result = root.failure || code !== 0
-          ? { browser: "", results: [], error: root.failure || "Browser search helper failed; check that Python 3 is installed" }
-          : Browser.parse(root.output)
-        var next = ({})
-        for (var k in root.cache) next[k] = root.cache[k]
-        next[root.inflight] = result
-        var keys = Object.keys(next)
-        while (keys.length > 16) delete next[keys.shift()]
-        root.cache = next
-      }
-      root.inflight = ""
-      root.superseded = false
-      if (root.host) root.host.requery({ catalog: false, provider: root.key })
+    stdout: StdioCollector { onStreamFinished: { root.output = text; root.outputDone = true; root.settle() } }
+    onExited: function(code) { root.exitCode = code; root.settle() }
+  }
+  function settle() {
+    if (!root.outputDone || root.exitCode < 0) return
+    watchdog.stop()
+    if (!root.superseded) {
+      var result = root.failure || root.exitCode !== 0
+        ? { browser: "", results: [], error: root.failure || "Browser search helper failed; check that Python 3 is installed" }
+        : Browser.parse(root.output)
+      var next = ({})
+      for (var k in root.cache) next[k] = root.cache[k]
+      next[root.inflight] = result
+      var keys = Object.keys(next)
+      while (keys.length > 16) delete next[keys.shift()]
+      root.cache = next
     }
+    root.inflight = ""
+    root.superseded = false
+    if (root.host) root.host.requery({ catalog: false, provider: root.key })
   }
   readonly property Timer watchdog: Timer {
     interval: 5000

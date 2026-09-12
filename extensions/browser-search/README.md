@@ -14,8 +14,8 @@ the command prefix can also be renamed there.
 
 ## Browsers and matching
 
-- Detects the default desktop entry with `xdg-settings get default-web-browser`,
-  falling back to `xdg-mime query default x-scheme-handler/https`.
+- Detects the default desktop entry with `xdg-mime query default
+  x-scheme-handler/https`, falling back to `xdg-settings get default-web-browser`.
 - Supports standard Linux Chromium, Chrome (stable/beta/dev), Brave, Vivaldi,
   Edge and Firefox/Firefox ESR desktop entries, plus the Flatpak desktop IDs
   listed in `bin/search.py`. An unknown browser gets an explanation with the

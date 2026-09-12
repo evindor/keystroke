@@ -1,5 +1,28 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Browser search review fixes (2026-09-12)
+
+- The service judged a helper run inside `onExited`, reading output that only
+  `onStreamFinished` fills. The two arrive in either order, as the currency
+  download fix records, so an exit seen first cached "could not read browser
+  data" under that query key for the rest of the palette session. `settle()`
+  now waits for both halves, like `extensions/currency/Service.qml`.
+- The browser palette check gained a stage that drives the exit code in before
+  the output: it fails on the previous code (verified by reverting the guard)
+  and passes now.
+- `matches()` ran the URL parse before the substring test for every row SQLite
+  scanned; the order is now reversed. 200k synthetic history rows: 0.85 s to
+  0.29 s. Detection tries `xdg-mime` before `xdg-settings`, which answered
+  identically here in 41 ms instead of 290 ms. One live query against the real
+  Chromium profile: 0.40 s to 0.18 s. Both matter because one 2 s deadline
+  covers every profile and source, and an abort loses that source entirely.
+- Dropped `RecursionError` and `AttributeError` from the source-read `except`:
+  `bookmark_rows` walks an explicit stack, and neither is reachable.
+- Passed: eight Python fixture tests; `bin/keystroke check-extensions` for all
+  five extensions; the browser palette check; `bin/keystroke validate`. Host
+  QML unit tests and the wider integration suite were not re-run; nothing
+  outside `extensions/browser-search` changed.
+
 ## Browser search extension (2026-09-12)
 
 - Added the self-contained `extensions/browser-search` provider using the

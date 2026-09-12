@@ -36,8 +36,10 @@ FLATPAKS = {
 
 
 def default_browser():
-    for command in (["xdg-settings", "get", "default-web-browser"],
-                    ["xdg-mime", "query", "default", "x-scheme-handler/https"]):
+    # xdg-mime reads mimeapps.list directly; xdg-settings probes the desktop
+    # environment first and costs several hundred milliseconds for the same answer.
+    for command in (["xdg-mime", "query", "default", "x-scheme-handler/https"],
+                    ["xdg-settings", "get", "default-web-browser"]):
         try:
             result = subprocess.run(command, capture_output=True, text=True, timeout=1)
             if result.returncode == 0 and result.stdout.strip():
@@ -94,8 +96,10 @@ def web_url(url):
 
 
 def matches(title, url, terms):
+    # SQLite calls this for every row: the substring test first, the costlier
+    # URL parse only for the few rows that survive it.
     text = (str(title or "") + " " + str(url or "")).casefold()
-    return web_url(url) and all(term in text for term in terms)
+    return all(term in text for term in terms) and web_url(url)
 
 
 def database_rows(path, family, source, terms, deadline):
@@ -175,7 +179,7 @@ def search(query, history=True, bookmarks=True, *, desktop=None, home=None, conf
                                                    "bookmark": False, "history": False, "stamp": 0})
                     item["bookmark" if source == "bookmarks" else "history"] = True
                     item["stamp"] = max(item["stamp"], stamp or 0)
-            except (OSError, ValueError, sqlite3.Error, TypeError, RecursionError, AttributeError):
+            except (OSError, ValueError, sqlite3.Error, TypeError):
                 errors.add(source)
     result["results"] = sorted(merged.values(), key=lambda item: (not item["bookmark"], -item["stamp"], item["url"]))[:30]
     if errors:
