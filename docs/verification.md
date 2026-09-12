@@ -1,5 +1,32 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Browser search extension (2026-09-12)
+
+- Added the self-contained `extensions/browser-search` provider using the
+  extension guide, Timer/Translate examples and Files' asynchronous query
+  pattern. Main-palette search and `browser <query>` search the detected
+  default browser, with separate history/bookmark switches and URL deduplication.
+- Python's standard-library reader supports Chromium-family history/bookmark
+  files and Firefox Places in standard native and listed Flatpak locations.
+  Disabled sources are not queried; SQLite uses read-only connections with
+  live WAL visibility. Results are kept in memory for one palette session.
+- Passed: eight Python fixture tests; extension QML logic tests and qmllint
+  through `QT_QPA_PLATFORMTHEME=generic bin/keystroke check-extensions` for all
+  five shipped extensions; all 162 host QML unit tests; `bin/keystroke validate`;
+  the new offscreen browser palette check; existing palette extension lifecycle
+  and command checks.
+  The generic Qt theme avoids this machine's GTK display initialization error.
+- The browser palette check covers initially disabled loading, both source
+  settings, root results, explicit/renamed commands, URL and copy actions,
+  cache invalidation, obsolete queries and service destruction. Python
+  fixtures cover WAL visibility without changing database/WAL contents,
+  locked/corrupt sources, multiple profiles, Firefox, Flatpak, unknown defaults,
+  Unicode and literal SQL-like input.
+- Live read-only smoke check detected `chromium.desktop` / Chromium and
+  completed with no reader error. No actual browser navigation was triggered.
+  No live installation, settings change or shell restart was performed. The
+  entire host integration suite was not run; unrelated providers were unchanged.
+
 ## Dmenu empty-state height (2026-09-10)
 
 - Reproduced from Omarchy's Keybindings picker with a query that matched no
