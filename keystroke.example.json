@@ -24,6 +24,10 @@
     "applications": {
       "enabled": true
     },
+    "open-url": {
+      "enabled": true,
+      "prefix": "$"
+    },
     "calculator": {
       "enabled": true,
       "precision": 12

@@ -917,6 +917,34 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
   `v*` tags. `gh attestation verify … --source-digest <commit>` is the check to
   run after the first release that carries it (docs/engine-provenance.md).
 
+## Open URL provider (2026-09-12)
+
+- `core/Url.js` recognises browser destinations with no network request and no
+  shell: schemes are limited to http(s), so `javascript:`, `data:`, `file:` and
+  `mailto:` cannot reach a launch, and text carrying whitespace, control
+  characters, backslashes or `<>"\`` is refused outright. `tests/tst_url.qml`
+  covers 24 accepted and 71 rejected spellings, including IPv6, IDN, punycode,
+  userinfo and port bounds.
+- `tests/palette_url_check.py` drives the real offscreen palette and asserts the
+  launch boundary from a fake `bash`: a URL holding `$(id)` and `';echo` arrives
+  at `xdg-open` as one literal argument, so URL punctuation never becomes shell
+  code. It also covers ranking, `//` routing past the `/` help prefix, the
+  settings pair, disabling and renaming the prefix.
+- Bare file names are not offered as addresses. Before the guard a real
+  `~/Documents/readme.md` ranked *second*, under an "Open https://readme.md"
+  answer row, so `↵` opened a browser instead of the file; the same held for
+  `notes.txt`, `package.json`, `photo.jpg` and `report.pdf`. `fileTail` in
+  `core/Url.js` withholds the offer for a bare two-part word ending in a file
+  extension, since an extension is not a reliable tell either way (`.txt` is no
+  TLD, `.md`, `.sh`, `.zip` and `.mov` are live ones). A scheme, the prefix, a
+  port or a path still asks for the address. Extensions that read as ordinary
+  destinations are deliberately absent from the list: io, co, rs, dev, app, ai,
+  me, tv, so, cc — `docs.rs`, `crates.io` and `vercel.app` stay addresses.
+  Checked in both layers and by re-running the offscreen ranking probe.
+- 239 QML tests and `tests/palette_url_check.py` pass. Parsing costs about
+  0.5 µs per call measured over 60,000 calls, against the ~25 µs Qt.md5 baseline
+  in `tools/profile_palette.py`, so the per-keystroke cost is not material.
+
 ## GIF Search extension (2026-09-12)
 
 - Version 1.1.0: replaced Back with the search icon, right-aligned GIPHY credit
