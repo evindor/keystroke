@@ -7,7 +7,7 @@
   "icon": "󰌓",
   "color": "#7aa2f7",
   "license": "MIT",
-  "homepage": "https://github.com/radiohost-cloud/ozz1ee.keystroke-keyboard-cleaner",
+  "homepage": "https://github.com/ozz1ee-dev/ozz1ee.keystroke-keyboard-cleaner",
   "commands": [
     {
       "id": "wipe",
