@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ctrl+1…Ctrl+8 run the nth result: activateAt() on the real palette, offscreen."""
+"""Delete on a filtered application asks to uninstall it, and Ctrl+1…Ctrl+8 run the nth result: the real palette, offscreen."""
 import os
 from pathlib import Path
 import shutil
@@ -62,6 +62,14 @@ ShellRoot {
    return
    }
    if (test.stage === 1) {
+   palette.testSearch.cursorPosition = 4
+   keys.keyClick(Qt.Key_Delete)
+   test.check(palette.testSearch.text === "testapp" && !palette.confirmPending,"Delete mid-query still forward-deletes")
+   keys.keyClick(Qt.Key_Left, Qt.ShiftModifier)
+   keys.keyClick(Qt.Key_Delete)
+   test.check(palette.testSearch.text === "tesapp" && !palette.confirmPending,"Delete with a selection still deletes it")
+   palette.testSearch.text = "test app"; palette.edited()
+   palette.testSearch.cursorPosition = palette.testSearch.text.length
    keys.keyClick(Qt.Key_Delete)
    test.check(palette.testSearch.text === "test app","Delete does not edit the application query")
    test.check(palette.confirmPending && palette.confirmPending.message === "Do you want to uninstall Keystroke Test App?","Delete opens the uninstall confirmation")

@@ -947,13 +947,17 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
 
 ## Delete-to-uninstall with a filtered app (2026-09-12)
 
-- Removed the empty-query restriction from the palette's Delete handler. A
-  selected application now opens the existing uninstall confirmation even when
-  it was found by typing a query, matching the row's `Del uninstall` hint.
+- The palette's Delete handler no longer requires an empty query. A selected
+  application opens the existing uninstall confirmation when the caret is at
+  the end of the query with nothing selected, matching the row's
+  `Del uninstall` hint. Mid-query and with a selection, Delete still edits the
+  text; without that guard forward-delete was lost whenever an app was
+  selected, and Delete followed by Enter removed the app.
 - `tests/palette_shortcut_check.py` drives the real palette offscreen with a
-  fake application library: a nonempty query selects an app, Delete preserves
-  the query and opens the named confirmation, and Escape cancels without
-  calling the removal API.
+  fake application library: a nonempty query selects an app, Delete mid-query
+  and over a selection edits the text, Delete at the end preserves the query
+  and opens the named confirmation, and Escape cancels without calling the
+  removal API.
 - `bin/keystroke validate`, `git diff --check`, and the full offscreen
   `bin/keystroke test` suite pass: 265 QML tests and every integration,
   extension, matching-engine and lint check.
