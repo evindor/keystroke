@@ -14,20 +14,60 @@ with tempfile.TemporaryDirectory(prefix='keystroke-palette-shortcut-') as temp:
     (work/'qs').symlink_to('/usr/share/omarchy/shell')
     source = project/'Keystroke.qml'
     qml = source.read_text()
+    qml = qml.replace('  id: root\n', '''  id: root
+  property alias testSearch: search
+  property alias testPanel: panel
+  property var testAppLibrary: null
+''', 1)
+    qml = qml.replace('readonly property var appLibrary: applicationLibrary.library',
+                      'readonly property var appLibrary: root.testAppLibrary || applicationLibrary.library')
     qml = qml.replace('  PanelWindow {','  Window {\n    transientParent: null\n    width: 1000; height: 800')
     qml = qml.replace('    anchors { top: true; bottom: true; left: true; right: true }\n','')
     source.write_text('\n'.join(line for line in qml.splitlines() if 'exclusionMode:' not in line and 'WlrLayershell.' not in line))
     (work/'shell.qml').write_text('''import QtQuick
+import QtTest
 import Quickshell
 import "project"
 ShellRoot {
  id: test
+ property int stage: 0
  property var activated: []
  function check(ok,msg) { if(!ok) { console.log("FAIL",msg); Qt.quit(); throw Error(msg) } }
  Keystroke { id: palette; omarchyPath:"/usr/share/omarchy" }
- Timer { interval:250; running:true; onTriggered:{
+ TestCase { id: keys; name:"KeyDriver"; when:false }
+ QtObject {
+   id: fakeApps
+   signal appsChanged()
+   property int removals: 0
+   function sortedEntries(query) { return [{entry:{id:"keystroke-test-app",name:"Keystroke Test App",comment:"",genericName:"",keywords:[],icon:""}}] }
+   function entryName(entry) { return entry.name }
+   function entrySubtext(entry) { return "" }
+   function iconSource(icon) { return "" }
+   function refreshIcons() {}
+   function remove(id,name) { removals++ }
+ }
+ Timer { interval:250; repeat:true; running:true; onTriggered:{
+   if (test.stage === 0) {
+   palette.testAppLibrary = fakeApps
    palette.applyConfigText(JSON.stringify({version:1,matching:{mode:"off"}}))
-   palette.open('{}')
+   palette.open('{"query":"test app"}')
+   palette.runQuery()
+   var appIndex = palette.rows.findIndex(function(row) { return row.appId === "keystroke-test-app" })
+   test.check(appIndex >= 0,"filtered application is listed")
+   palette.selected = appIndex
+   test.check(palette.testSearch.text === "test app","application query is nonempty")
+   palette.testPanel.requestActivate()
+   palette.testSearch.forceActiveFocus()
+   test.stage = 1
+   return
+   }
+   if (test.stage === 1) {
+   keys.keyClick(Qt.Key_Delete)
+   test.check(palette.testSearch.text === "test app","Delete does not edit the application query")
+   test.check(palette.confirmPending && palette.confirmPending.message === "Do you want to uninstall Keystroke Test App?","Delete opens the uninstall confirmation")
+   test.check(fakeApps.removals === 0,"Delete only asks for confirmation")
+   keys.keyClick(Qt.Key_Escape)
+   test.check(!palette.confirmPending && palette.opened && fakeApps.removals === 0,"Escape cancels without uninstalling")
    palette.registry.entries = [{key:"fixture",source:"bundled",patterns:[],provider:{name:"Fixture",settings:[],
      query:function(ctx) { return ["a","b","c"].map(function(id, i) { return {id:id,title:"Row "+id,score:100-i,disabled:id==="b",action:{type:"noop"}} }) },
      activate:function(row) { test.activated.push(row.id); return {type:"noop"} }
@@ -46,6 +86,8 @@ ShellRoot {
    palette.cancel()
    console.log("PASS palette shortcut")
    Qt.quit()
+   test.stage = 2
+   }
  } }
  Timer { interval:8000; running:true; onTriggered:{ console.log("FAIL timeout",palette.errorMessage); Qt.quit() } }
 }
@@ -57,4 +99,4 @@ ShellRoot {
     output=result.stdout+result.stderr
     assert 'PASS palette shortcut' in output and 'FAIL' not in output, output
     assert 'TypeError' not in output and 'ReferenceError' not in output, output
-    print('PASS palette shortcut: Ctrl+number runs the nth row, skips disabled rows and numbers past the list')
+    print('PASS palette shortcut: filtered app uninstall confirmation and Ctrl+number activation')
