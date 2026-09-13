@@ -103,21 +103,29 @@ def matches(title, url, terms):
 
 
 def database_rows(path, family, source, terms, deadline):
-    # mode=ro sees committed WAL data as well; immutable=1 would miss live visits.
-    conn = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=0.1)
-    try:
-        conn.execute("PRAGMA query_only=ON")
-        conn.set_progress_handler(lambda: int(time.monotonic() > deadline), 1000)
-        conn.create_function("matches", 2, lambda title, url: matches(title, url, terms))
-        if family == "chromium":
-            sql = "SELECT title, url, last_visit_time FROM urls WHERE hidden=0 AND matches(title,url) ORDER BY last_visit_time DESC LIMIT 60"
-        elif source == "history":
-            sql = "SELECT title, url, last_visit_date FROM moz_places WHERE hidden=0 AND last_visit_date>0 AND matches(title,url) ORDER BY last_visit_date DESC LIMIT 60"
-        else:
-            sql = "SELECT COALESCE(b.title,p.title), p.url, b.dateAdded FROM moz_bookmarks b JOIN moz_places p ON p.id=b.fk WHERE b.type=1 AND matches(COALESCE(b.title,p.title),p.url) ORDER BY b.dateAdded DESC LIMIT 60"
-        return list(conn.execute(sql))
-    finally:
-        conn.close()
+    if family == "chromium":
+        sql = "SELECT title, url, last_visit_time FROM urls WHERE hidden=0 AND matches(title,url) ORDER BY last_visit_time DESC LIMIT 60"
+    elif source == "history":
+        sql = "SELECT title, url, last_visit_date FROM moz_places WHERE hidden=0 AND last_visit_date>0 AND matches(title,url) ORDER BY last_visit_date DESC LIMIT 60"
+    else:
+        sql = "SELECT COALESCE(b.title,p.title), p.url, b.dateAdded FROM moz_bookmarks b JOIN moz_places p ON p.id=b.fk WHERE b.type=1 AND matches(COALESCE(b.title,p.title),p.url) ORDER BY b.dateAdded DESC LIMIT 60"
+    # A plain read-only open sees committed WAL data as well. Chromium and
+    # Firefox hold an exclusive SQLite lock on these databases for as long as
+    # they run, which refuses even shared readers; immutable=1 then reads the
+    # file without taking locks, at the cost of visits still in a WAL file.
+    for immutable in (False, True):
+        uri = path.resolve().as_uri() + "?mode=ro" + ("&immutable=1" if immutable else "")
+        conn = sqlite3.connect(uri, uri=True, timeout=0.1)
+        try:
+            conn.execute("PRAGMA query_only=ON")
+            conn.set_progress_handler(lambda: int(time.monotonic() > deadline), 1000)
+            conn.create_function("matches", 2, lambda title, url: matches(title, url, terms))
+            return list(conn.execute(sql))
+        except sqlite3.OperationalError as exc:
+            if immutable or "locked" not in str(exc) and "busy" not in str(exc):
+                raise
+        finally:
+            conn.close()
 
 
 def bookmark_rows(path, terms, deadline):

@@ -43,8 +43,11 @@ per distinct eligible query and source combination, after the host's typing
 pause. New queries cancel obsolete work. The child detects the browser and
 reads Chromium's `History` SQLite database and/or `Bookmarks` JSON, or
 Firefox's `places.sqlite`; disabled sources are not queried. SQLite is opened
-read-only and includes committed WAL data while the browser is running.
-It does not copy databases or use `immutable=1`, which could omit live visits.
+read-only. Chromium and Firefox hold an exclusive lock on these databases while
+they run, so a locked database is reopened with `immutable=1`, which reads the
+file without locking. Nothing is copied. Chromium keeps its history in a
+rollback journal, so that read is complete; Firefox uses WAL, so visits not
+yet checkpointed can be missing until the browser closes.
 
 There are no network calls, persistent indexes, data caches, browser database
 edits, installations or background services. The host opens a URL only when

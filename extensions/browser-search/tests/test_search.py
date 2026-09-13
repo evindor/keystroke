@@ -105,8 +105,11 @@ class SearchTests(unittest.TestCase):
         (self.profile / "History").unlink()
         db = self.history()
         self.addCleanup(db.close)
+        # Chromium keeps this lock for its whole lifetime; the read must still succeed.
         db.execute("BEGIN EXCLUSIVE")
-        self.assertIn("history", self.search()["error"])
+        result = self.search()
+        self.assertEqual(result["error"], "")
+        self.assertEqual(len(result["results"]), 3)
 
     def test_default_browser_and_fallback(self):
         with patch.object(browser.subprocess, "run", return_value=type("Result", (), {"returncode": 0, "stdout": "chromium.desktop\n"})()) as run:
