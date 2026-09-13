@@ -26,6 +26,8 @@ Enter starts the block. Anything over a minute asks first, because once the bloc
 
 A block covers exactly the time it is set for. When it ends the keyboard is live again while the countdown view is still open on top, so presses from a cloth — or a key like CapsLock — land where focus is: wipe for as long as the whole cleaning takes, not just for the first few seconds. Idle handling is parked for the whole block, so a 5-minute wipe does not trip the screensaver or the lock screen on the way.
 
+Omarchy maps Caps Lock to Compose and puts the lock itself on **both Shifts together** (`kb_options = compose:caps,shift:both_capslock_cancel` in its `default/hypr/input.lua`), so a cloth pressing both Shift keys turns Caps Lock on — and the CapsLock key cannot turn it back off, because it is Compose. A single lone Shift releases it, which is what the `_cancel` variant is for. Nothing here can stop a keypress on an unblocked keyboard from doing that; wiping while a block is running is what keeps the cloth off the live keys.
+
 The countdown view says how many devices went quiet and when they come back, and turns into *Input restored* when the time is up; Esc closes it. If nothing could be blocked (not on Hyprland, `hyprctl` missing), the view says so instead of showing a countdown over a keyboard that still works.
 
 ## Settings
