@@ -151,6 +151,7 @@ function parseReport(line) {
     if (typeof info.error === "string" && info.error) out.error = info.error.slice(0, 200)
     if (typeof info.blocked === "number" && isFinite(info.blocked)) out.blocked = Math.max(0, Math.round(info.blocked))
     if (typeof info.until === "number" && isFinite(info.until)) out.until = info.until
+    if (info.idleParked === true) out.idleParked = true
     return out
   } catch (e) { return null }
 }

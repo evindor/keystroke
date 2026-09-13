@@ -35,6 +35,7 @@ QtObject {
   property string label: ""
   property int blocked: -1           // devices the helper switched off; -1 until it reports
   property string error: ""
+  property bool idleParked: false     // the helper parked the idle clock for this block
   signal changed()
 
   readonly property var provider: ({
@@ -106,6 +107,7 @@ QtObject {
     if (info.blocked !== undefined) {
       root.blocked = info.blocked
       if (info.until) root.until = info.until * 1000
+      root.idleParked = info.idleParked === true
     }
     root.changed()
   }
@@ -115,6 +117,19 @@ QtObject {
     if (code !== 0 && !root.error) root.error = "The helper exited with code " + code
     root.changed()
   }
+
+  // A block that was killed outright leaves the idle clock parked, and parking
+  // writes stay-awake, which survives reboots: un-park anything the helper left
+  // behind once, at load, while no block is running. The marker holds the pid
+  // of the helper that parked it, so a live block is left alone.
+  readonly property Process staleIdleSweep: Process {
+    command: ["bash", "-lc",
+      "marker=\"$HOME/.local/state/keyboard-cleaner/idle-parked\"; [ -f \"$marker\" ] || exit 0; " +
+      "pid=$(cat \"$marker\" 2>/dev/null); " +
+      "if [ -n \"$pid\" ] && kill -0 \"$pid\" 2>/dev/null; then exit 0; fi; " +
+      "omarchy-shell idle enable >/dev/null 2>&1 && rm -f \"$marker\""]
+  }
+  Component.onCompleted: { staleIdleSweep.running = true }
 
   Component.onDestruction: { if (helperProcess.running) helperProcess.signal(15) }
 }
