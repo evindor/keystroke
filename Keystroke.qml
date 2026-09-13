@@ -1409,7 +1409,7 @@ Item {
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { root.activate(); event.accepted = true }
             else if (event.key === Qt.Key_Right && (atEnd || !text) && !root.dmenuActive && root.rows.length) { root.activate(); event.accepted = true }
             else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Backspace) && !text && !preeditText && (root.scope || root.history.length)) { root.goBack(); event.accepted = true }
-            else if (event.key === Qt.Key_Delete && !text && root.current.appId) { root.requestUninstall(); event.accepted = true }
+            else if (event.key === Qt.Key_Delete && root.current.appId) { root.requestUninstall(); event.accepted = true }
             else if (ctrl && event.key >= Qt.Key_1 && event.key <= Qt.Key_8) { root.activateAt(event.key - Qt.Key_1); event.accepted = true }
             else if (ctrl && event.key === Qt.Key_Comma && !root.dmenuActive) { root.navigate("settings", "Settings"); event.accepted = true }
             else if (ctrl && event.key === Qt.Key_K && !root.dmenuActive) {

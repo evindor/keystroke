@@ -945,6 +945,19 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
   0.5 µs per call measured over 60,000 calls, against the ~25 µs Qt.md5 baseline
   in `tools/profile_palette.py`, so the per-keystroke cost is not material.
 
+## Delete-to-uninstall with a filtered app (2026-09-12)
+
+- Removed the empty-query restriction from the palette's Delete handler. A
+  selected application now opens the existing uninstall confirmation even when
+  it was found by typing a query, matching the row's `Del uninstall` hint.
+- `tests/palette_shortcut_check.py` drives the real palette offscreen with a
+  fake application library: a nonempty query selects an app, Delete preserves
+  the query and opens the named confirmation, and Escape cancels without
+  calling the removal API.
+- `bin/keystroke validate`, `git diff --check`, and the full offscreen
+  `bin/keystroke test` suite pass: 265 QML tests and every integration,
+  extension, matching-engine and lint check.
+
 ## GIF Search extension (2026-09-12)
 
 - Version 1.1.0: replaced Back with the search icon, right-aligned GIPHY credit
