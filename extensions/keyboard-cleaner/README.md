@@ -2,7 +2,7 @@
 
 Block every keyboard and pointer for a moment so you can wipe them down without typing, clicking or launching anything. Type `wipe 30s`, press Enter, and a countdown fills the palette while nothing you press or move counts. When it ends, everything works again.
 
-Written by [ozz1ee](https://github.com/radiohost-cloud) as the Keystroke counterpart of the [`ozz1ee.keyboard-cleaner`](https://github.com/radiohost-cloud/ozz1ee.keyboard-cleaner) Omalaunch extension, and ported into Keystroke's extension folder when extensions moved into this repository.
+Written by [ozz1ee](https://github.com/ozz1ee-dev) as the Keystroke counterpart of the [`ozz1ee.keyboard-cleaner`](https://github.com/ozz1ee-dev/ozz1ee.keyboard-cleaner) Omalaunch extension, and ported into Keystroke's extension folder when extensions moved into this repository.
 
 ## Turn it on
 
