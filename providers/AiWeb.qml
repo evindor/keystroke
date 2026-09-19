@@ -19,21 +19,25 @@ Item {
     name: "AI & Web Search",
     icon: "✳",
     color: "#e79c85",
-    description: "Continue any query in Claude, ChatGPT web or Google",
+    description: "Continue any query in Claude, ChatGPT, Cursor or Google",
     settings: [
-      { key: "provider", type: "enum", label: "Preferred assistant", "default": "chatgpt", options: ["chatgpt", "claude"],
+      { key: "provider", type: "enum", label: "Preferred assistant", "default": "chatgpt",
+        options: ["chatgpt", "claude", "cursor"],
+        optionLabels: { chatgpt: "ChatGPT / Codex", claude: "Claude", cursor: "Cursor" },
         description: "Listed first among the fallbacks" },
       { key: "mode", type: "enum", label: "Open conversations in", "default": "desktop", options: ["desktop", "cli", "browser"],
-        description: "Controls Claude; ChatGPT opens in the browser. Codex has its own provider settings." },
+        description: "Controls Claude and Cursor; ChatGPT opens in the browser. Codex has its own provider settings." },
       { key: "autoSend", type: "boolean", label: "Send immediately in the browser", "default": false,
-        description: "ChatGPT only. Claude and the desktop apps always let you review the prompt first" }
+        description: "ChatGPT only. Claude, Cursor and the desktop apps always let you review the prompt first" },
+      { key: "cursorWorkspace", type: "string", label: "Cursor workspace folder", "default": "",
+        description: "Optional path or folder name for Cursor hand-offs (desktop deeplink and agent --workspace)" }
     ],
     query: function(ctx) { return root.query(ctx) }
   })
 
   Process {
     id: detect
-    command: ["bash", "-lc", "for c in claude-desktop chatgpt claude codex; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done"]
+    command: ["bash", "-lc", "for c in claude-desktop chatgpt claude codex cursor agent; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done"]
     running: true
     stdout: StdioCollector {
       onStreamFinished: {
@@ -57,12 +61,28 @@ Item {
     var q = String(ctx.rawQuery === undefined ? ctx.query : ctx.rawQuery).trim()
     var rows = [{ id: "google", title: "Search Google", subtitle: q, icon: "󰊭", section: "Continue with", verb: "Search", tier: "fallback", score: 2,
                   action: { type: "url", url: AiTargets.googleUrl(q) } }]
-    var order = ctx.settings.provider === "claude" ? ["claude", "chatgpt"] : ["chatgpt", "claude"]
+    var preferred = ctx.settings.provider || "chatgpt"
+    var order = preferred === "cursor" ? ["cursor"] : (preferred === "claude" ? ["claude", "chatgpt"] : ["chatgpt", "claude"])
     for (var i = 0; i < order.length; i++) {
+      if (order[i] === "cursor") {
+        var c = AiTargets.cursorPlan(ctx.settings.mode, root.available, q, ctx.settings.cursorWorkspace)
+        if (!c) continue
+        rows.push({ id: c.id, title: c.title, subtitle: c.subtitle, icon: "󰨞", section: "Continue with",
+                    verb: c.verb, tier: "fallback", score: 3, action: c.effect,
+                    preview: q, previewLabel: "PROMPT", previewDetail: "Opens with this prompt in the composer" })
+        continue
+      }
       var p = AiTargets.plan(order[i], order[i] === "chatgpt" ? "browser" : ctx.settings.mode, ctx.settings.autoSend === true, root.available, q)
       rows.push({ id: p.id, title: p.title, subtitle: p.subtitle, icon: order[i] === "claude" ? "󰛄" : "󰭹", section: "Continue with",
                   verb: p.verb, tier: "fallback", score: i === 0 ? 3 : 2, action: p.effect,
                   preview: q, previewLabel: "PROMPT", previewDetail: "Opens with this prompt in the composer" })
+    }
+    if (preferred !== "cursor") {
+      var extra = AiTargets.cursorPlan(ctx.settings.mode, root.available, q, ctx.settings.cursorWorkspace)
+      if (extra)
+        rows.push({ id: extra.id, title: extra.title, subtitle: extra.subtitle, icon: "󰨞", section: "Continue with",
+                    verb: extra.verb, tier: "fallback", score: 2.5, action: extra.effect,
+                    preview: q, previewLabel: "PROMPT", previewDetail: "Opens with this prompt in the composer" })
     }
     return rows
   }

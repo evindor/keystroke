@@ -1,5 +1,15 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Cursor Agent hand-off (2026-09-19)
+
+- AI & Web Search detects `cursor` and `agent` on PATH. Desktop mode opens
+  `cursor://anysphere.cursor-deeplink/prompt?text=…` via `cursor --open-url`;
+  CLI mode runs `agent` in a terminal with the prompt as a literal argv and an
+  optional workspace from Settings → Cursor workspace folder.
+- `bin/keystroke validate` passes. `tests/tst_ai.qml` (10 tests) passes
+  offscreen. Full `bin/keystroke test` QML suite passes; integration checks
+  unchanged. Not exercised: live hand-off on a machine without Cursor installed.
+
 ## Browser search review fixes (2026-09-12)
 
 - The service judged a helper run inside `onExited`, reading output that only

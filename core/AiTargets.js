@@ -21,6 +21,12 @@
 //                              browser, so browser mode uses the real browser.
 //   chatgpt.com                ?prompt= prefills; ?q= sends immediately.
 //   claude.ai                  /new?q= prefills; there is no auto-send form.
+//   cursor 3.21.9              cursor://anysphere.cursor-deeplink/prompt?text=
+//                              prefills the composer (optional &workspace=).
+//                              Open with `cursor --open-url` when the binary is
+//                              on PATH, otherwise xdg-open via the scheme handler.
+//   agent (cursor-agent)       positional prompt; optional --workspace before
+//                              the prompt (verified with agent --help).
 //
 // Nothing here runs at query time except string building; activation is always
 // an explicit Enter.
@@ -40,6 +46,17 @@ function codexDesktopUrl(prompt) { return "codex://threads/new?prompt=" + encode
 function claudeWebUrl(prompt) { return "https://claude.ai/new?q=" + encode(prompt) }
 function chatgptWebUrl(prompt, autoSend) { return "https://chatgpt.com/?" + (autoSend ? "q=" : "prompt=") + encode(prompt) }
 function googleUrl(query) { return "https://www.google.com/search?q=" + encodeURIComponent(String(query || "").trim()).replace(/%20/g, "+") }
+
+function cursorPromptUrl(prompt, workspace) {
+  var params = "text=" + encode(prompt)
+  var folder = workspace === undefined || workspace === null ? "" : String(workspace).trim()
+  if (folder) params += "&workspace=" + encodeURIComponent(folder)
+  return "cursor://anysphere.cursor-deeplink/prompt?" + params
+}
+
+function cursorOpenEffect(url, available) {
+  return available && available.cursor ? { type: "exec", argv: ["cursor", "--open-url", url] } : { type: "url", url: url }
+}
 
 // Prefer the app's own launcher when it is on PATH (the scheme handler may not
 // be registered in mimeapps.list); otherwise let xdg-open resolve the scheme.
@@ -77,4 +94,30 @@ function plan(assistant, mode, autoSend, available, prompt) {
   return { id: assistant, target: "chatgpt-web", title: "Ask ChatGPT",
            subtitle: "chatgpt.com · " + (autoSend ? "sends your prompt" : "prompt ready to send") + why, verb: "Open ChatGPT",
            effect: { type: "url", url: chatgptWebUrl(prompt, autoSend) } }
+}
+
+// Cursor Agent CLI (`agent`) and Cursor desktop (`cursor --open-url` deeplink).
+// `available` maps agent, cursor -> true when detected on PATH.
+function cursorPlan(mode, available, prompt, workspace) {
+  var avail = available || {}
+  var folder = workspace === undefined || workspace === null ? "" : String(workspace).trim()
+  if (mode === "cli") {
+    if (avail.agent) {
+      var argv = ["omarchy-launch-terminal", "agent"]
+      if (folder) argv.push("--workspace", folder)
+      argv.push(clip(prompt))
+      return { id: "cursor", target: "cursor-agent-cli", title: "Ask Cursor Agent",
+               subtitle: "Terminal · agent with your prompt", verb: "Open terminal",
+               effect: { type: "exec", argv: argv } }
+    }
+  }
+  if (mode === "desktop" || mode === "browser" || mode === "cli") {
+    if (avail.cursor) {
+      var why = mode === "cli" ? " · CLI not installed" : (mode === "browser" ? " · no browser hand-off" : "")
+      return { id: "cursor", target: "cursor-desktop", title: "Ask Cursor",
+               subtitle: "Cursor · prompt ready in the composer" + why, verb: "Open Cursor",
+               effect: cursorOpenEffect(cursorPromptUrl(prompt, folder), avail) }
+    }
+  }
+  return null
 }

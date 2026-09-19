@@ -4,7 +4,7 @@ import "../core/AiTargets.js" as Ai
 
 TestCase {
     name: "AiTargets"
-    property var all: ({ "claude-desktop": true, "chatgpt": true, "claude": true, "codex": true })
+    property var all: ({ "claude-desktop": true, "chatgpt": true, "claude": true, "codex": true, "cursor": true, "agent": true })
 
     function test_links_carry_the_prompt() {
         compare(Ai.claudeDesktopUrl("what is 2+2?"), "claude://claude.ai/new?q=what%20is%202%2B2%3F&surface=chat")
@@ -48,5 +48,20 @@ TestCase {
     }
     function test_scheme_handler_fallback_when_binary_missing() {
         compare(Ai.openLink("claude-desktop", "claude://x", {}), { type: "url", url: "claude://x" })
+    }
+    function test_cursor_desktop_deeplink_carries_prompt_and_workspace() {
+        compare(Ai.cursorPromptUrl("fix tests", ""), "cursor://anysphere.cursor-deeplink/prompt?text=fix%20tests")
+        compare(Ai.cursorPromptUrl("hi", "/home/x/code"), "cursor://anysphere.cursor-deeplink/prompt?text=hi&workspace=%2Fhome%2Fx%2Fcode")
+        var d = Ai.cursorPlan("desktop", all, "hello", "")
+        compare(d.target, "cursor-desktop")
+        compare(d.effect.argv, ["cursor", "--open-url", "cursor://anysphere.cursor-deeplink/prompt?text=hello"])
+    }
+    function test_cursor_cli_passes_prompt_and_workspace_as_literal_argv() {
+        var payload = "explain $(rm -rf /)"
+        var c = Ai.cursorPlan("cli", all, payload, "/tmp/ws")
+        compare(c.effect.argv, ["omarchy-launch-terminal", "agent", "--workspace", "/tmp/ws", payload])
+        var missing = Ai.cursorPlan("cli", { cursor: true }, "x", "")
+        compare(missing.target, "cursor-desktop")
+        verify(missing.subtitle.indexOf("CLI not installed") > 0)
     }
 }
