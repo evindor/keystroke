@@ -93,6 +93,8 @@ TestCase {
 
     function test_helper_reports() {
         compare(Parser.parseReport('{"blocked": 3, "devices": ["a"], "seconds": 30, "until": 1789079797.7}'), { blocked: 3, until: 1789079797.7 })
+        compare(Parser.parseReport('{"blocked": 3, "idleParked": true, "until": 1789079797.7}'), { blocked: 3, until: 1789079797.7, idleParked: true })
+        compare(Parser.parseReport('{"blocked": 3, "idleParked": false}'), { blocked: 3 })
         compare(Parser.parseReport('{"error": "hyprctl is not installed; this extension needs Hyprland"}'), { error: "hyprctl is not installed; this extension needs Hyprland" })
         compare(Parser.parseReport('{"restored": true}'), {})
         compare(Parser.parseReport("Traceback (most recent call last):"), null)

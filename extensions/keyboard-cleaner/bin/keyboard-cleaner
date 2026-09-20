@@ -2,41 +2,74 @@
 """Disable every keyboard and pointer in Hyprland for a while, then restore them.
 
 Hyprland can switch an input device off at runtime with no privileges:
-`hyprctl eval 'hl.device({ name = "...", enabled = false })'` makes the
+`hyprctl eval 'hl.device({ name = \"...\", enabled = false })'` makes the
 compositor drop that device's events, the same call Omarchy's touchpad
 toggle uses. That is the whole trick. Nothing here opens /dev/input, so no
 group membership is needed, and because the setting is not persisted a
 Hyprland reload or restart brings every device back on its own.
 
-    keyboard-cleaner --seconds 30 [--keep-pointer] [--device NAME ...]
+    keyboard-cleaner --seconds 30 [--keep-pointer] [--device NAME ...] [--dry-run]
+
+Three things the block has to get right beyond flipping the flags:
+
+* **Every key comes up first.** A key held at the moment its device goes dead
+  never delivers its release, so the compositor keeps it pressed for the whole
+  block (CapsLock ends up out of step with its LED and needs a second press).
+  We wait for the keyboard to come up and refuse to start while something is
+  still down.
+* **Idle is parked for the block.** A disabled keyboard feeds no activity, so
+  Omarchy's idle clock keeps running: past the screensaver timeout the
+  screensaver lands on top of the desktop and at the lock timeout
+  `omarchy-system-lock` puts up a password prompt nobody can type into. We
+  park it with `omarchy-shell idle disable` and hand it back afterwards, but
+  only when we parked it ourselves.
+* **The power and lid button is inside the block.** Hyprland lists the Apple
+  SMC power/lid node as a keyboard, and `XF86PowerOff` is bound to Omarchy's
+  power menu (`omarchy-menu toggle system`), whose rows are Screensaver, Lock,
+  Log out, Reboot and Shut down. Left outside the block, a cloth wiping the
+  keyboard opens that menu and the next stray key ends the session, at any
+  block length.
 
 The first line on stdout is a JSON object: {"blocked": N, "devices": [...],
-"seconds": N, "until": <epoch seconds>} once the devices are off, or
-{"error": "..."} with exit status 1 when nothing could be blocked. The
-devices come back when the time is up, on SIGTERM, SIGINT or SIGHUP, and
+"seconds": N, "until": <epoch seconds>, "idleParked": <bool>} once the devices
+are off, or {"error": "..."} with exit status 1 when nothing could be blocked.
+The devices come back when the time is up, on SIGTERM, SIGINT or SIGHUP, and
 on any error in between. --device names the devices explicitly instead of
 discovering them; that is how the tests exercise a single harmless one.
+--dry-run prints what a block would cover and touches nothing.
 """
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
+import os
 import signal
 import subprocess
 import sys
+import tempfile
 import time
+from pathlib import Path
 
 MAX_SECONDS = 300
 # Enter was still going down when the palette started us; let its release
 # reach the compositor before the keyboard goes quiet.
 GRACE_SECONDS = 0.5
-# Virtual keyboards (fcitx, wtype) never touch a wiped keyboard, and the
-# power and sleep buttons stay as the way out of a stuck block. The name list
-# covers the kernels that call them that; SKIP_FRAGMENTS covers the rest
-# (Apple SMC calls its power and lid events one device).
+# A key still down after this long is not a key on its way up: it is somebody
+# leaning on the keyboard, and blocking the device would swallow its release.
+RELEASE_TIMEOUT_SECONDS = 2.0
+RELEASE_POLL_SECONDS = 0.05
+# hl.is_key_down takes xkb keycodes (evdev + 8); 255 covers the whole evdev
+# range we can care about.
+KEYCODE_SCAN_MAX = 255
+# Virtual keyboards (fcitx, wtype) are synthesised by the host and never touch
+# a wiped keyboard.
 SKIP_PREFIXES = ("hl-virtual",)
-SKIP_NAMES = {"power-button", "sleep-button"}
-SKIP_FRAGMENTS = ("powerbutton", "sleepbutton", "powerlid", "lidswitch")
+
+# Omarchy ships these; both are optional so a non-Omarchy Hyprland still blocks.
+OMARCHY_SHELL = "omarchy-shell"
+STATE_DIR = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "keyboard-cleaner"
+PARK_MARKER = STATE_DIR / "idle-parked"
 
 
 def safe_name(name: object) -> bool:
@@ -46,41 +79,24 @@ def safe_name(name: object) -> bool:
     return not any(ord(c) < 32 or c == "\x7f" for c in name)
 
 
-def normalize(name: str) -> str:
-    """A device name reduced to letters and digits, for cross-list matching.
+def usable(name: object) -> bool:
+    """A discovered device worth blocking: safe, real, and not a virtual one.
 
-    Hyprland reports one physical device differently in each list, so an exact
-    string match never fires on Apple hardware:
-
-        keyboards: apple-smc-power/lid-events
-        switches:  Apple SMC power/lid events
+    Devices Hyprland lists as keyboards or mice are all blocked, including the
+    power button: it is bound to the power menu, so leaving it live lets a wipe
+    end the session (see the module docstring).
     """
-    return "".join(c for c in name.lower() if c.isalnum())
-
-
-def usable(name: object, switches: object = ()) -> bool:
-    """A discovered device worth blocking: safe, real, and not an escape hatch.
-
-    A device Hyprland lists under `switches` is a power or lid button whatever
-    its name, and stays on so there is always a way out of a block.
-    """
-    if not safe_name(name) or name.startswith(SKIP_PREFIXES) or name in SKIP_NAMES:
-        return False
-    normalized = normalize(name)
-    if any(fragment in normalized for fragment in SKIP_FRAGMENTS):
-        return False
-    return normalized not in {normalize(s) for s in (switches or []) if isinstance(s, str)}
+    return safe_name(name) and not str(name).startswith(SKIP_PREFIXES)
 
 
 def select_devices(devices: dict, keep_pointer: bool) -> list[str]:
     """Keyboard names, plus mouse and touchpad names unless keep_pointer."""
     kinds = ["keyboards"] if keep_pointer else ["keyboards", "mice"]
-    switches = [d.get("name") for d in devices.get("switches") or [] if isinstance(d, dict)]
     names: list[str] = []
     for kind in kinds:
         for device in devices.get(kind) or []:
             name = device.get("name") if isinstance(device, dict) else None
-            if usable(name, switches) and name not in names:
+            if usable(name) and name not in names:
                 names.append(name)
     return names
 
@@ -110,6 +126,161 @@ def discover() -> dict:
     return json.loads(result.stdout)
 
 
+def keys_from_probe_output(text: str) -> list[int]:
+    """Parse the comma-separated keycodes the Lua probe wrote out.
+
+    Tolerates a leading `ok:` (the shape other probes in the wild use) and any
+    junk between the numbers.
+    """
+    cleaned = str(text or "").strip()
+    if cleaned.startswith("ok:"):
+        cleaned = cleaned[3:]
+    keys: list[int] = []
+    for part in cleaned.split(","):
+        part = part.strip()
+        if part.isdigit():
+            key = int(part)
+            if 0 < key <= KEYCODE_SCAN_MAX and key not in keys:
+                keys.append(key)
+    return keys
+
+
+def probe_chunk(path: str) -> str:
+    """Lua that writes the currently pressed keycodes into `path`."""
+    return (
+        "local d={} for kc=1,%d do if hl.is_key_down(kc) then d[#d+1]=kc end end "
+        "local f=io.open([==[%s]==],'w') if f then f:write(table.concat(d,',')) f:close() end"
+        % (KEYCODE_SCAN_MAX, path)
+    )
+
+
+def pressed_keycodes() -> list[int]:
+    """Keycodes the compositor currently considers pressed.
+
+    `hyprctl eval` never prints the chunk's value, so the Lua side writes it to
+    a temp file. An unavailable probe reads as "nothing held": on a Hyprland
+    without hl.is_key_down we fall back to the old behaviour of blocking at
+    once rather than refusing to run.
+    """
+    handle, path = tempfile.mkstemp(prefix="keyboard-cleaner-keys-", suffix=".txt")
+    os.close(handle)
+    try:
+        result = hyprctl("eval", probe_chunk(path))
+        if result.returncode != 0 or result.stdout.strip() != "ok":
+            return []
+        return keys_from_probe_output(Path(path).read_text())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return []
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(path)
+
+
+def wait_for_release(read=pressed_keycodes, timeout=RELEASE_TIMEOUT_SECONDS,
+                     poll=RELEASE_POLL_SECONDS, sleep=time.sleep) -> bool:
+    """True once nothing is held any more, False if something still is."""
+    deadline = time.monotonic() + timeout
+    while True:
+        if not read():
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        sleep(poll)
+
+
+def omarchy_idle(action: str) -> subprocess.CompletedProcess | None:
+    try:
+        return subprocess.run([OMARCHY_SHELL, "idle", action], capture_output=True, text=True, timeout=5, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def idle_parked_from_status(text: str) -> bool:
+    """Read `omarchy-shell idle status`: is stay-awake on already?"""
+    try:
+        return bool(json.loads(text).get("stayAwake"))
+    except (TypeError, ValueError):
+        return False
+
+
+def idle_is_parked() -> bool:
+    result = omarchy_idle("status")
+    return result is not None and result.returncode == 0 and idle_parked_from_status(result.stdout)
+
+
+def park_idle() -> bool:
+    """Stop Omarchy's idle clock for the block; True only if we parked it.
+
+    Returns False when idle was already parked (the user's own stay-awake, or a
+    concurrent block) — the caller must not clear something it did not set.
+    The marker goes down before the disable so a signal landing in between
+    leaves a marker to sweep, never a parked idle nobody knows about.
+    """
+    if idle_is_parked():
+        return False
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        PARK_MARKER.write_text(str(os.getpid()), encoding="utf-8")
+    except OSError:
+        pass
+    result = omarchy_idle("disable")
+    if result is None or result.returncode != 0 or result.stdout.strip() != "disabled":
+        with contextlib.suppress(OSError):
+            PARK_MARKER.unlink()
+        return False
+    return True
+
+
+def unpark_idle() -> None:
+    """Give idle handling back, retrying: the IPC can lose the race."""
+    for _ in range(5):
+        result = omarchy_idle("enable")
+        if result is not None and result.stdout.strip() == "enabled":
+            break
+        time.sleep(1)
+    with contextlib.suppress(OSError):
+        PARK_MARKER.unlink()
+
+
+def marker_owner(text: str) -> int:
+    """The pid stored in the park marker, or 0 when it is unreadable."""
+    try:
+        return int(str(text).strip())
+    except (TypeError, ValueError):
+        return 0
+
+
+def is_helper_pid(pid: int, cmdline_of=None) -> bool:
+    """True when `pid` is a running keyboard-cleaner, not a reused pid."""
+    if pid <= 0:
+        return False
+    if cmdline_of is None:
+        def cmdline_of(p: int) -> bytes:
+            return Path("/proc", str(p), "cmdline").read_bytes()
+    try:
+        return b"keyboard-cleaner" in cmdline_of(pid)
+    except OSError:
+        return False
+
+
+def clear_stale_parking() -> bool:
+    """Un-park idle left behind by a block that was killed outright.
+
+    Parking writes stay-awake, which survives reboots, so a SIGKILLed helper
+    would otherwise keep the machine from ever locking again. The marker holds
+    the pid; a live keyboard-cleaner at that pid means the block is still
+    running and we leave it alone.
+    """
+    if not PARK_MARKER.exists():
+        return False
+    with contextlib.suppress(OSError):
+        owner = marker_owner(PARK_MARKER.read_text(encoding="utf-8"))
+        if owner and owner != os.getpid() and is_helper_pid(owner):
+            return False
+    unpark_idle()
+    return True
+
+
 def emit(payload: dict) -> None:
     sys.stdout.write(json.dumps(payload) + "\n")
     sys.stdout.flush()
@@ -120,27 +291,45 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--seconds", type=int, required=True, help="how long, 1 to %d" % MAX_SECONDS)
     parser.add_argument("--keep-pointer", action="store_true", help="leave mice and touchpads alone")
     parser.add_argument("--device", action="append", default=[], help="block exactly this device (repeatable)")
+    parser.add_argument("--dry-run", action="store_true", help="print what a block would cover and stop")
     args = parser.parse_args(argv)
     seconds = max(1, min(MAX_SECONDS, args.seconds))
 
-    time.sleep(GRACE_SECONDS)
+    clear_stale_parking()
+
     try:
-        names = [n for n in args.device if safe_name(n)] if args.device else select_devices(discover(), args.keep_pointer)
+        if args.device:
+            names = [n for n in args.device if safe_name(n)]
+        else:
+            names = select_devices(discover(), args.keep_pointer)
     except FileNotFoundError:
         emit({"error": "hyprctl is not installed; this extension needs Hyprland"})
         return 1
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         emit({"error": "Could not list input devices: %s" % error})
         return 1
+
+    if args.dry_run:
+        emit({"dryRun": True, "devices": names, "keepPointer": args.keep_pointer})
+        return 0
+
     if not names:
         emit({"error": "No keyboard or pointer to block"})
         return 1
 
+    time.sleep(GRACE_SECONDS)
+    if not wait_for_release():
+        emit({"error": "Something is still holding a key down — let go of the keyboard and start the wipe again"})
+        return 1
+
     blocked: list[str] = []
+    parked = False
 
     def restore() -> None:
         while blocked:
             set_enabled(blocked.pop(), True)
+        if parked:
+            unpark_idle()
 
     def interrupted(signum: int, frame: object) -> None:
         raise SystemExit(128 + signum)
@@ -154,7 +343,11 @@ def main(argv: list[str]) -> int:
         if not blocked:
             emit({"error": "Hyprland refused to disable any device"})
             return 1
-        emit({"blocked": len(blocked), "devices": list(blocked), "seconds": seconds, "until": time.time() + seconds})
+        # Park idle after the first device is off (the disable starts the idle
+        # clock) and before the countdown the user sees.
+        parked = park_idle()
+        emit({"blocked": len(blocked), "devices": list(blocked), "seconds": seconds,
+              "until": time.time() + seconds, "idleParked": parked})
         time.sleep(seconds)
     finally:
         restore()
