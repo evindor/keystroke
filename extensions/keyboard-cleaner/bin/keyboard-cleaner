@@ -213,17 +213,21 @@ def park_idle() -> bool:
 
     Returns False when idle was already parked (the user's own stay-awake, or a
     concurrent block) — the caller must not clear something it did not set.
+    The marker goes down before the disable so a signal landing in between
+    leaves a marker to sweep, never a parked idle nobody knows about.
     """
     if idle_is_parked():
-        return False
-    result = omarchy_idle("disable")
-    if result is None or result.returncode != 0 or result.stdout.strip() != "disabled":
         return False
     try:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         PARK_MARKER.write_text(str(os.getpid()), encoding="utf-8")
     except OSError:
         pass
+    result = omarchy_idle("disable")
+    if result is None or result.returncode != 0 or result.stdout.strip() != "disabled":
+        with contextlib.suppress(OSError):
+            PARK_MARKER.unlink()
+        return False
     return True
 
 
@@ -246,23 +250,33 @@ def marker_owner(text: str) -> int:
         return 0
 
 
+def is_helper_pid(pid: int, cmdline_of=None) -> bool:
+    """True when `pid` is a running keyboard-cleaner, not a reused pid."""
+    if pid <= 0:
+        return False
+    if cmdline_of is None:
+        def cmdline_of(p: int) -> bytes:
+            return Path("/proc", str(p), "cmdline").read_bytes()
+    try:
+        return b"keyboard-cleaner" in cmdline_of(pid)
+    except OSError:
+        return False
+
+
 def clear_stale_parking() -> bool:
     """Un-park idle left behind by a block that was killed outright.
 
     Parking writes stay-awake, which survives reboots, so a SIGKILLed helper
     would otherwise keep the machine from ever locking again. The marker holds
-    the pid; a live pid means the block is still running and we leave it alone.
+    the pid; a live keyboard-cleaner at that pid means the block is still
+    running and we leave it alone.
     """
     if not PARK_MARKER.exists():
         return False
     with contextlib.suppress(OSError):
         owner = marker_owner(PARK_MARKER.read_text(encoding="utf-8"))
-        if owner and owner != os.getpid():
-            try:
-                os.kill(owner, 0)
-                return False  # the helper that parked idle is still running
-            except OSError:
-                pass
+        if owner and owner != os.getpid() and is_helper_pid(owner):
+            return False
     unpark_idle()
     return True
 

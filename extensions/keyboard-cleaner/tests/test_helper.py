@@ -135,6 +135,14 @@ class IdleParkingTests(unittest.TestCase):
         self.assertEqual(helper.marker_owner(None), 0)
         self.assertEqual(helper.marker_owner("nonsense"), 0)
 
+    def test_marker_pid_must_still_be_a_helper(self):
+        # A pid can be reused by an unrelated process after a crash; only a
+        # running keyboard-cleaner at that pid keeps the marker alive.
+        self.assertTrue(helper.is_helper_pid(4242, cmdline_of=lambda p: b"python3\0/x/bin/keyboard-cleaner\0--seconds\x0030\0"))
+        self.assertFalse(helper.is_helper_pid(4242, cmdline_of=lambda p: b"/usr/bin/firefox\0"))
+        self.assertFalse(helper.is_helper_pid(4242, cmdline_of=lambda p: (_ for _ in ()).throw(FileNotFoundError())))
+        self.assertFalse(helper.is_helper_pid(0))
+
     def test_marker_paths_are_outside_the_plugin(self):
         self.assertIn("keyboard-cleaner", str(helper.PARK_MARKER))
         self.assertTrue(str(helper.PARK_MARKER).endswith("idle-parked"))

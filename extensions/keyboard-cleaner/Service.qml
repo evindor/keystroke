@@ -86,6 +86,7 @@ QtObject {
       root.until = root.startedAt + (root.seconds + 0.5) * 1000   // the helper waits half a second before switching off
       root.blocked = -1
       root.error = ""
+      root.idleParked = false
       root.active = true
       helperProcess.command = Parser.blockArgv(root.helper, root.seconds, root.settings.blockPointer !== false)
       helperProcess.running = true
@@ -121,12 +122,13 @@ QtObject {
   // A block that was killed outright leaves the idle clock parked, and parking
   // writes stay-awake, which survives reboots: un-park anything the helper left
   // behind once, at load, while no block is running. The marker holds the pid
-  // of the helper that parked it, so a live block is left alone.
+  // of the helper that parked it; a live pid that is still a keyboard-cleaner
+  // means the block is running and is left alone (a reused pid is not).
   readonly property Process staleIdleSweep: Process {
-    command: ["bash", "-lc",
-      "marker=\"$HOME/.local/state/keyboard-cleaner/idle-parked\"; [ -f \"$marker\" ] || exit 0; " +
-      "pid=$(cat \"$marker\" 2>/dev/null); " +
-      "if [ -n \"$pid\" ] && kill -0 \"$pid\" 2>/dev/null; then exit 0; fi; " +
+    command: ["bash", "-c",
+      "marker=\"${XDG_STATE_HOME:-$HOME/.local/state}/keyboard-cleaner/idle-parked\"; [ -f \"$marker\" ] || exit 0; " +
+      "pid=$(tr -dc 0-9 < \"$marker\" 2>/dev/null); " +
+      "if [ -n \"$pid\" ] && grep -qa keyboard-cleaner \"/proc/$pid/cmdline\" 2>/dev/null; then exit 0; fi; " +
       "omarchy-shell idle enable >/dev/null 2>&1 && rm -f \"$marker\""]
   }
   Component.onCompleted: { staleIdleSweep.running = true }
