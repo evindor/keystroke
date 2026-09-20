@@ -183,7 +183,7 @@ function commandRow(item, extra) {
   var row = { id: "command/" + item.key + "/" + cmd.id, title: cmd.title, subtitle: usage(cmd) + (cmd.summary ? " · " + cmd.summary : ""),
               icon: item.icon || "", iconFont: item.iconFont || "", iconSource: item.iconSource || "", tint: item.tint || "",
               section: "Commands", verb: "Type", tier: "item", accessory: cmd.prefix, keywords: cmd.prefix + " " + item.key + " " + item.name,
-              description: cmd.summary, hint: "↵ types " + cmd.prefix, action: queryEffect(typed(cmd)) }
+              description: cmd.summary, action: queryEffect(typed(cmd)) }
   for (var k in (extra || {})) row[k] = extra[k]
   return row
 }
@@ -211,7 +211,7 @@ function suggestRows(items, query, limit) {
     if (cmd.prefix === HELP_PREFIX) continue
     var score = Match.match(q, cmd.title, cmd.prefix + " " + items[i].key, "", cmd.summary)
     if (!(score > 0)) continue
-    out.push(commandRow(items[i], { score: score, order: i, hint: "tab types " + cmd.prefix }))
+    out.push(commandRow(items[i], { score: score, order: i }))
   }
   return out
 }
@@ -224,7 +224,7 @@ function usageRows(commands, override, settingsScope) {
   for (var i = 0; i < (commands || []).length; i++) {
     var cmd = effective(commands[i], override, i), u = usage(cmd)
     out.push({ id: "usage/" + cmd.id, title: u, subtitle: cmd.title + (cmd.summary ? " · " + cmd.summary : ""), icon: "", section: "Usage",
-               verb: "Type", tier: "item", order: i * 10, keywords: cmd.prefix + " usage " + cmd.title, hint: "↵ types " + cmd.prefix, action: queryEffect(typed(cmd)) })
+               verb: "Type", tier: "item", order: i * 10, keywords: cmd.prefix + " usage " + cmd.title, action: queryEffect(typed(cmd)) })
     for (var a = 0; a < cmd.args.length; a++) {
       var arg = cmd.args[a]
       out.push({ id: "usage/" + cmd.id + "/arg/" + arg.name, title: (arg.optional ? "[" + arg.name + "]" : "<" + arg.name + ">") + (arg.hint ? "  " + arg.hint : ""),

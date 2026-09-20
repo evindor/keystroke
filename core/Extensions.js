@@ -192,7 +192,7 @@ function listRow(e) {
               action: navigate(KEY + "/" + e.id, e.name) }
   // Turning an extension on runs its code, so that always goes through the
   // confirmation on its own screen; turning it off is one key here.
-  if (e.enabled) { row.altAction = enableEffect(e.id, false); row.hint = "ctrl ↵ turn off" }
+  if (e.enabled) { row.altAction = enableEffect(e.id, false); row.altVerb = "Turn off" }
   return row
 }
 

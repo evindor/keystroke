@@ -456,7 +456,9 @@ Item {
   // themselves never list keys.
   readonly property var footerActions: {
     var row = root.current, can = !!row.uid && !row.disabled
-    var out = [{ label: root.dictationMode ? "Copy" : voice.active ? "Finish" : row.verb || "Select", key: "↵", bright: true }]
+    // Tab types a query row's text as ↵ does (completeCommand), so both keys sit under one name.
+    var typesQuery = can && row.action && row.action.type === "query" && !root.dictationMode && !voice.active
+    var out = [{ label: root.dictationMode ? "Copy" : voice.active ? "Finish" : row.verb || "Select", keys: typesQuery ? ["↵", "tab"] : ["↵"], bright: true }]
     if (root.clipboardChoice) out.push({ label: "Paste", key: "ctrl ↵" })
     else if (can && row.altVerb && !voice.active) out.push({ label: row.altVerb, key: "ctrl ↵" })
     if (can && row.appId) out.push({ label: "Uninstall", key: "del" })
@@ -1613,6 +1615,7 @@ Item {
           Repeater {
             model: root.footerActions
             delegate: Row {
+              id: footerAction
               required property var modelData
               anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
               Text {
@@ -1620,7 +1623,10 @@ Item {
                 color: modelData.bright ? Util.alpha(root.foreground, 0.8) : root.muted
                 font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter
               }
-              Keycap { label: modelData.key; bright: !!modelData.bright; foreground: root.foreground }
+              Repeater {
+                model: modelData.keys || [modelData.key]
+                delegate: Keycap { required property string modelData; label: modelData; bright: !!footerAction.modelData.bright; foreground: root.foreground }
+              }
             }
           }
         }

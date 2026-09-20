@@ -162,7 +162,7 @@ ShellRoot {
      if (palette.pending || !palette.rows.length) return
      var i = indexOf("Translate")
      var suggestion = palette.rows.filter(function(r) { return r.title === "Translate" && r.providerKey === "commands" })[0]
-     test.check(suggestion !== null && suggestion !== undefined && suggestion.hint === "tab types tr", "a command row is suggested for its name: " + (suggestion ? suggestion.hint : titles().join(" | ")))
+     test.check(suggestion !== null && suggestion !== undefined && suggestion.action.type === "query", "a command row is suggested for its name: " + (suggestion ? suggestion.hint : titles().join(" | ")))
      palette.selected = palette.rows.indexOf(suggestion)
      palette.completeCommand()
      test.check(state().query === "tr " && state().scope === "" && state().command && state().command.key === "translate", "Tab typed the prefix: " + JSON.stringify(state().query))
