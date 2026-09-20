@@ -1,5 +1,36 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.4.3 (2026-09-20)
+
+- Contents since 1.4.2: the Open URL provider (`core/Url.js`,
+  `providers/OpenUrl.qml`, the `//` guard in `core/Commands.js`), the
+  Browser search and GIF Search extensions with their review fixes and the
+  `immutable=1` read of a locked history database, Keyboard Cleaner 1.1.0
+  (power node inside the block, held-key guard, idle parking, `--dry-run`)
+  from its author's pull request, and the Delete-to-uninstall fix with its
+  forward-delete follow-up. `manifest.json` 1.4.2 → 1.4.3; README lists the
+  six extensions in the box and points at the 1.4.3 notes.
+  `matching/bin/keystroke-matching` and its manifest are untouched since
+  the verified 1.4.2 commit.
+- `bin/keystroke test` on the dev tip (`7e8c8ad`) plus the release docs:
+  265 QML tests passed, 0 failed; every integration check passed
+  (applications, files, catalog, matching, palette matching, shortcut, dmenu,
+  routes, motion, worker, engine, voxtype, clipboard, codex, time zones,
+  extensions, currency, commands, URL, extension checks for all six
+  extensions, hotkeys); `tests/lint.sh` exit 0 with the existing metadata
+  warnings only; `omarchy plugin validate` exit 0; `git diff --check` clean.
+- `tests/palette_dictation_check.py` failed its first run on this tree with
+  `FAIL copy closes palette` followed by a Quickshell abort ("Object
+  destroyed while one of its QML signal handlers is in progress") that
+  outlived the check's 12 s subprocess timeout, so the runner stopped
+  there and the later checks were run one by one. The same check fails
+  the same way about one run in four on a clean export of the `v1.4.2`
+  tag (1 of 4) and passes the other runs on dev (3 of 4), so it is a timing
+  flake in the check, not a change in this release. Recorded here for the
+  follow-up; the check's assertions all pass when the run completes.
+- The extension and engine workflows are green on `7e8c8ad`. Not
+  exercised here: the attest job, which first runs on the `v1.4.3` tag.
+
 ## Browser search review fixes (2026-09-12)
 
 - The service judged a helper run inside `onExited`, reading output that only
