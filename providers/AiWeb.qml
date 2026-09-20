@@ -19,21 +19,27 @@ Item {
     name: "AI & Web Search",
     icon: "✳",
     color: "#e79c85",
-    description: "Continue any query in Claude, ChatGPT web or Google",
+    description: "Continue any query in Claude, ChatGPT, Cursor or Google",
     settings: [
-      { key: "provider", type: "enum", label: "Preferred assistant", "default": "chatgpt", options: ["chatgpt", "claude"],
+      { key: "provider", type: "enum", label: "Preferred assistant", "default": "chatgpt",
+        options: ["chatgpt", "claude", "cursor"],
+        optionLabels: { chatgpt: "ChatGPT / Codex", claude: "Claude", cursor: "Cursor" },
         description: "Listed first among the fallbacks" },
       { key: "mode", type: "enum", label: "Open conversations in", "default": "desktop", options: ["desktop", "cli", "browser"],
-        description: "Controls Claude; ChatGPT opens in the browser. Codex has its own provider settings." },
+        description: "Controls Claude and Cursor; ChatGPT opens in the browser. Codex has its own provider settings." },
       { key: "autoSend", type: "boolean", label: "Send immediately in the browser", "default": false,
-        description: "ChatGPT only. Claude and the desktop apps always let you review the prompt first" }
+        description: "ChatGPT only. Claude, Cursor and the desktop apps always let you review the prompt first" },
+      { key: "cursorWorkspace", type: "string", label: "Cursor workspace folder", "default": "",
+        description: "Absolute folder for agent --workspace; also sent to the desktop deeplink" }
     ],
     query: function(ctx) { return root.query(ctx) }
   })
 
+  // `agent` is a generic name; it only counts when it resolves inside a Cursor
+  // install (the installer links ~/.local/bin/agent to .../cursor-agent/...).
   Process {
     id: detect
-    command: ["bash", "-lc", "for c in claude-desktop chatgpt claude codex; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done"]
+    command: ["bash", "-lc", "for c in claude-desktop chatgpt claude codex cursor; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done; a=$(command -v agent 2>/dev/null) && case \"$(readlink -f \"$a\")\" in *cursor*) echo agent;; esac"]
     running: true
     stdout: StdioCollector {
       onStreamFinished: {
@@ -55,15 +61,6 @@ Item {
   function query(ctx) {
     if (ctx.scope || !ctx.query.trim()) return []
     var q = String(ctx.rawQuery === undefined ? ctx.query : ctx.rawQuery).trim()
-    var rows = [{ id: "google", title: "Search Google", subtitle: q, icon: "󰊭", section: "Continue with", verb: "Search", tier: "fallback", score: 2,
-                  action: { type: "url", url: AiTargets.googleUrl(q) } }]
-    var order = ctx.settings.provider === "claude" ? ["claude", "chatgpt"] : ["chatgpt", "claude"]
-    for (var i = 0; i < order.length; i++) {
-      var p = AiTargets.plan(order[i], order[i] === "chatgpt" ? "browser" : ctx.settings.mode, ctx.settings.autoSend === true, root.available, q)
-      rows.push({ id: p.id, title: p.title, subtitle: p.subtitle, icon: order[i] === "claude" ? "󰛄" : "󰭹", section: "Continue with",
-                  verb: p.verb, tier: "fallback", score: i === 0 ? 3 : 2, action: p.effect,
-                  preview: q, previewLabel: "PROMPT", previewDetail: "Opens with this prompt in the composer" })
-    }
-    return rows
+    return AiTargets.rows(ctx.settings, root.available, q)
   }
 }

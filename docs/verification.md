@@ -1,5 +1,30 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Cursor Agent hand-off (2026-09-19)
+
+- AI & Web Search detects `cursor` and `agent` on PATH. Desktop mode opens
+  `cursor://anysphere.cursor-deeplink/prompt?text=…` via `cursor --open-url`;
+  CLI mode runs `agent` in a terminal with the prompt as a literal argv and an
+  optional workspace from Settings → Cursor workspace folder.
+- `bin/keystroke validate` passes. `tests/tst_ai.qml` (10 tests) passes
+  offscreen. Full `bin/keystroke test` QML suite passes; integration checks
+  unchanged. Not exercised: live hand-off on a machine without Cursor installed.
+- Review fixes (2026-09-20, no Cursor on the reviewing machine): the
+  "Continue with" rows are now planned by `AiTargets.rows` (Google, then every
+  assistant with a plan, preferred first) so preferring Cursor no longer drops
+  Claude and ChatGPT, and an absent Cursor leaves the web fallbacks in place.
+  `clip` pads a leading `-` like it pads `/`, so a one-word query such as `-p`
+  or `--yolo` cannot reach `claude`, `codex` or `agent` as an option. Detection
+  only reports `agent` when `readlink -f` resolves it inside a `*cursor*` path,
+  checked by running the exact detect command against a fake
+  `~/.local/share/cursor-agent/versions/…/cursor-agent` symlink (reported) and an
+  unrelated `agent` script (not reported). Cursor's CLI parameter reference
+  confirms the positional prompt and `--workspace <path>`; its deeplink
+  reference documents only `text=` for prompt links, so `workspace=` on the
+  deeplink rests on the contributor's 3.21.9 check. `tests/tst_ai.qml`: 13
+  tests; full QML suite 270 passed; `tests/lint.sh` adds nothing for
+  `providers/AiWeb.qml`; `bin/keystroke validate` passes.
+
 ## Browser search review fixes (2026-09-12)
 
 - The service judged a helper run inside `onExited`, reading output that only
