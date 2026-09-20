@@ -451,6 +451,18 @@ Item {
   readonly property bool compact: paletteSettings.density !== "comfortable"
   readonly property color accent: paletteSettings.accent === "ember" ? "#ee987e" : paletteSettings.accent === "violet" ? "#b5a0ef" : paletteSettings.accent === "mint" ? "#8bceb4" : Color.accent
   readonly property bool clipboardChoice: root.dictationMode || !!(root.current.action && root.current.action.type === "dictation-copy")
+  // Every key that acts on the selection, for the footer: ↵ first and
+  // brightest, then what the row or the screen offers beyond it. The rows
+  // themselves never list keys.
+  readonly property var footerActions: {
+    var row = root.current, can = !!row.uid && !row.disabled
+    var out = [{ label: root.dictationMode ? "Copy" : voice.active ? "Finish" : row.verb || "Select", key: "↵", bright: true }]
+    if (root.clipboardChoice) out.push({ label: "Paste", key: "ctrl ↵" })
+    else if (can && row.altVerb && !voice.active) out.push({ label: row.altVerb, key: "ctrl ↵" })
+    if (can && row.appId) out.push({ label: "Uninstall", key: "del" })
+    out.push({ label: root.compact ? "Settings" : "Provider settings", key: "ctrl K" })
+    return out
+  }
   readonly property bool previewVisible: !dmenuActive && paletteSettings.showPreview !== false && !!(current.preview || current.previewImage || current.swatch)
 
   // ---------------------------------------------------------------- motion
@@ -885,6 +897,17 @@ Item {
   }
 
   property var lastPatterns: ({})           // provider key → matched pattern ids, for inspect()
+  // What Ctrl+↵ does with a row that has an altAction but names no altVerb.
+  function defaultVerb(effect) {
+    var type = effect && effect.type
+    if (type === "copy") return "Copy"
+    if (type === "url") return "Open"
+    if (type === "navigate") return "Open"
+    if (type === "app") return "Launch"
+    if (type === "query") return "Type"
+    if (type === "dictation-copy") return effect.paste ? "Paste" : "Copy"
+    return "Run"
+  }
   function normalize(row, entry, q, boost) {
     if (!row || typeof row !== "object" || typeof row.title !== "string") return null
     var out = {}
@@ -907,7 +930,7 @@ Item {
     out.score = q && base > 0 && boost > 0 ? base + boost : base
     out.accessory = String(row.accessory || "")
     out.badge = String(row.badge || (entry.source === "extension" ? "extension" : ""))
-    out.hint = String(row.hint || "")
+    out.altVerb = String(row.altVerb || (row.altAction ? root.defaultVerb(row.altAction) : ""))
     out.disabled = row.disabled === true
     out.remember = row.remember === true
     out.confirm = String(row.confirm || "")
@@ -926,7 +949,7 @@ Item {
       var detail = parts.join("\t")
       if (q && label.toLowerCase().indexOf(q) < 0 && detail.toLowerCase().indexOf(q) < 0) continue
       rows.push({ id: String(i), uid: "dmenu/" + i, title: label, subtitle: detail, icon: icon, iconFont: "", iconSource: "", tint: "",
-                  section: "", verb: "Select", tier: "item", score: 1, order: i, accessory: "", badge: "", hint: "", disabled: false,
+                  section: "", verb: "Select", tier: "item", score: 1, order: i, accessory: "", badge: "", altVerb: "", disabled: false,
                   remember: false, confirm: "", providerKey: "dmenu", value: detail ? label + "\t" + detail : label })
     }
     return rows
@@ -935,7 +958,7 @@ Item {
   function display(row, index, previousSection) {
     return { uid: row.uid, title: row.title, subtitle: row.subtitle, icon: row.icon, iconFont: row.iconFont, iconSource: row.iconSource,
              tint: row.tint, section: row.section, sectionStart: row.section !== previousSection, verb: row.verb, accessory: row.accessory,
-             disabled: row.disabled, badge: row.badge, answer: row.tier === "answer", hint: row.hint }
+             disabled: row.disabled, answer: row.tier === "answer" }
   }
 
   // Reconcile by uid so delegates update in place while typing.
@@ -1502,9 +1525,7 @@ Item {
             required property string verb
             required property string accessory
             required property bool disabled
-            required property string badge
             required property bool answer
-            required property string hint
             width: resultList.width
             // The idle root lists one row per provider, so headers would label single items there;
             // they return as soon as a query or a scope groups real sets.
@@ -1528,7 +1549,7 @@ Item {
               flashRise: root.motion.flashRise; flashFall: root.motion.flashFall
               title: delegateRoot.title; subtitle: delegateRoot.subtitle; icon: delegateRoot.icon; iconFont: delegateRoot.iconFont
               iconSource: delegateRoot.iconSource; tint: delegateRoot.tint; verb: delegateRoot.verb; accessory: delegateRoot.accessory
-              badge: delegateRoot.badge; hint: delegateRoot.hint; disabled: delegateRoot.disabled; answer: delegateRoot.answer
+              disabled: delegateRoot.disabled; answer: delegateRoot.answer
               shortcut: root.ctrlHeld && !root.dmenuActive && delegateRoot.index < root.shortcutRows ? String(delegateRoot.index + 1) : ""
               compact: root.compact
               selected: root.selected === delegateRoot.index
@@ -1586,12 +1607,20 @@ Item {
           }
         }
         Row {
-          anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
-          Text { text: root.dictationMode ? "Copy" : voice.active ? "Finish" : root.current.verb || "Select"; textFormat: Text.PlainText; color: Util.alpha(root.foreground, 0.8); font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter }
-          Keycap { label: "↵"; bright: true; foreground: root.foreground }
-          Item { width: Style.space(8); height: 1 }
-          Text { text: root.clipboardChoice ? "Paste" : root.compact ? "Settings" : "Provider settings"; textFormat: Text.PlainText; color: root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter }
-          Keycap { label: root.clipboardChoice ? "ctrl ↵" : "ctrl K"; foreground: root.foreground }
+          anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(16)
+          Repeater {
+            model: root.footerActions
+            delegate: Row {
+              required property var modelData
+              anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
+              Text {
+                text: modelData.label; textFormat: Text.PlainText
+                color: modelData.bright ? Util.alpha(root.foreground, 0.8) : root.muted
+                font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter
+              }
+              Keycap { label: modelData.key; bright: !!modelData.bright; foreground: root.foreground }
+            }
+          }
         }
       }
 

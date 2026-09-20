@@ -122,16 +122,18 @@ TestCase {
         compare(file.action, { type: "exec", argv: ["xdg-open", "/home/me/Documents/report.pdf"] })
         compare(file.altAction.argv, ["setsid", "uwsm-app", "--", "xdg-terminal-exec", "--dir=/home/me/Documents"])
         compare(file.subtitle, "~/Documents")
-        compare(file.previewLabel, "FILE")
         verify(file.remember)
         var folder = Files.rows("reports", entries, both, false)[0]
         compare(folder.action.argv, ["xdg-open", "/home/me/Documents/reports"])
         compare(folder.altAction.argv[4], "--dir=/home/me/Documents/reports")
         compare(folder.subtitle, "~/Documents · Folder")
-        compare(folder.previewLabel, "FOLDER")
-        compare(folder.hint, "ctrl ↵ terminal")
+        compare(folder.altVerb, "Open terminal")
+        // Only an image opens the preview pane; a plain file or folder has no preview at all.
         var image = Files.rows("cover", entries, both, false)[0]
         compare(image.previewImage, "/home/me/Pictures/report-cover.png")
-        compare(file.previewImage, "")
+        compare(image.previewLabel, "IMAGE")
+        compare(image.preview, "~/Pictures/report-cover.png")
+        verify(!file.preview && !file.previewImage && !file.previewLabel)
+        verify(!folder.preview && !folder.previewImage && !folder.previewLabel)
     }
 }

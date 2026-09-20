@@ -157,14 +157,18 @@ function terminalEffect(entry) {
 function row(query, entry, order, known) {
   var name = baseName(entry.rel), kind = kindOf(entry)
   var parent = tilde(parentOf(entry.rel))
-  return {
+  var out = {
     id: entry.rel, title: name, subtitle: parent + (entry.dir ? " · Folder" : ""), icon: ICONS[kind], section: "Files",
     verb: entry.dir ? "Open folder" : "Open", tier: "item", score: known === undefined ? score(query, entry) : known, order: order, remember: true,
-    hint: "ctrl ↵ terminal", action: openEffect(entry), altAction: terminalEffect(entry),
-    preview: tilde(entry.rel), previewLabel: entry.dir ? "FOLDER" : "FILE", previewImage: kind === "image" ? entry.path : "",
-    previewDetail: entry.dir ? "↵ opens in your file manager · Ctrl+↵ opens a terminal here"
-                             : "↵ opens with the default app · Ctrl+↵ opens a terminal in " + parent
+    altVerb: "Open terminal", action: openEffect(entry), altAction: terminalEffect(entry)
   }
+  // Only a picture earns the preview pane; the row already says where a
+  // file or folder is, and the footer what the keys do.
+  if (kind === "image") {
+    out.preview = tilde(entry.rel); out.previewLabel = "IMAGE"; out.previewImage = entry.path
+    out.previewDetail = "Opens with the default app · the terminal opens in " + parent
+  }
+  return out
 }
 
 // The best `limit` rows out of fd's candidates. Scoring happens here, on a

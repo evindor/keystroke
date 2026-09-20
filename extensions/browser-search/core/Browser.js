@@ -42,12 +42,12 @@ function rows(result, req) {
     if (!item || typeof item.url !== "string" || !/^https?:\/\//i.test(item.url)) continue
     var bookmark = req.bookmarks && item.bookmark, history = req.history && item.history
     if (!bookmark && !history) continue
-    var source = bookmark && history ? "Bookmark + History" : bookmark ? "Bookmark" : "History"
+    // No preview: the row shows the URL, the icon says bookmark or history,
+    // and a pane would only repeat both.
     out.push({ id: item.url, title: item.title || item.url, subtitle: item.url,
-      icon: bookmark ? "󰃀" : ICON, section: "Browser search", accessory: source,
+      icon: bookmark ? "󰃀" : ICON, section: "Browser search",
       keywords: item.url, tier: "item", score: 60 - out.length, remember: false,
-      preview: item.url, previewLabel: source, previewDetail: result.browser + " · " + (item.profile || ""),
-      verb: "Open", hint: "↵ opens · ctrl ↵ copies URL",
+      verb: "Open", altVerb: "Copy URL",
       action: { type: "url", url: item.url }, altAction: { type: "copy", text: item.url } })
   }
   if (req.explicit && result.error) out.push(status(result.error, result.browser))
