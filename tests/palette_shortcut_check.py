@@ -72,7 +72,7 @@ ShellRoot {
    palette.testSearch.cursorPosition = palette.testSearch.text.length
    keys.keyClick(Qt.Key_Delete)
    test.check(palette.testSearch.text === "test app","Delete does not edit the application query")
-   test.check(palette.confirmPending && palette.confirmPending.message === "Do you want to uninstall Keystroke Test App?","Delete opens the uninstall confirmation")
+   test.check(palette.confirmPending && palette.confirmPending.message === "Uninstall Keystroke Test App?" && palette.confirmPending.cancelText === "Keep it","Delete opens the uninstall confirmation")
    test.check(fakeApps.removals === 0,"Delete only asks for confirmation")
    keys.keyClick(Qt.Key_Escape)
    test.check(!palette.confirmPending && palette.opened && fakeApps.removals === 0,"Escape cancels without uninstalling")

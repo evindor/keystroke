@@ -105,14 +105,14 @@ Commands and patterns coexist: a command is the explicit trigger, a pattern the 
 { id: "stable-id", title: "…", subtitle: "", icon: "󰀻", iconFont: "", iconSource: "file:///…",
   tint: "#hex", section: "Thing", verb: "Open", tier: "item",  // "answer" | "item" | "fallback"
   score: 100, order: 0, keywords: "ids aliases", path: "Parent › Child › …", description: "prose", accessory: "✓",
-  disabled: false, remember: false, confirm: "Really?", confirmDetail: "one muted line under the question",
+  disabled: false, remember: false, confirm: "Really?", confirmDetail: "one muted line under the question", confirmText: "Turn on", cancelText: "Keep off",
   preview: "text", previewLabel: "RESULT", previewDetail: "…", previewImage: "/path.png", swatch: "#hex",
   action: effect, altAction: effect, altVerb: "Copy URL" }
 ```
 
 Legacy `catalog(ctx)` fields are ignored; the local model command classifier has been removed. A row's `hint` (once a line of keys shown on the selected row) is ignored too: the keys that act on the selection are listed in the footer, from `verb`, `altVerb` and the screen.
 
-`confirm` asks before the effect runs; the optional `confirmDetail` is a muted line under the question. Turning an extension on uses it to say what was checked and that the code runs at the user's own risk. A confirmation never carries a link: opening anything would move focus away from the palette.
+`confirm` asks before the effect runs, in a sheet that rises from the bottom of the card; the optional `confirmDetail` is a muted paragraph under the question. `↵` runs the effect and `Esc` keeps things as they are; `confirmText` and `cancelText` name those two keys for what they do ("Turn on" / "Keep off", "Cancel timer" / "Keep running") instead of the default Confirm / Cancel. Turning an extension on uses the detail to say what was checked and that the code runs at the user's own risk. A confirmation never carries a link: opening anything would move focus away from the palette.
 
 `altAction` is optional and runs on `Ctrl+↵` (a row without one runs `action` again). Name it in `altVerb` ("Copy URL", "Open terminal"), the way `verb` names `↵`; the footer shows both next to their keys while the row is selected. A row with an `altAction` and no `altVerb` gets a name from the effect's type (`copy` → Copy, `url` → Open). A provider's `activate(row, ctx)` receives `ctx.alternate === true` for that key so it can compute the effect itself.
 

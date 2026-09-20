@@ -446,7 +446,7 @@ Item {
   property bool showLoading: false
   property string errorMessage: ""
   property string statusMessage: ""
-  property var confirmPending: null       // { message, detail, confirmText, run }
+  property var confirmPending: null       // { message, detail, confirmText, cancelText, run }
   readonly property var current: rows.length && selected >= 0 && selected < rows.length ? rows[selected] : ({})
   readonly property bool compact: paletteSettings.density !== "comfortable"
   readonly property color accent: paletteSettings.accent === "ember" ? "#ee987e" : paletteSettings.accent === "violet" ? "#b5a0ef" : paletteSettings.accent === "mint" ? "#8bceb4" : Color.accent
@@ -935,6 +935,8 @@ Item {
     out.remember = row.remember === true
     out.confirm = String(row.confirm || "")
     out.confirmDetail = String(row.confirmDetail || "")
+    out.confirmText = String(row.confirmText || "")
+    out.cancelText = String(row.cancelText || "")
     if (q && !(base > 0)) return null
     return out
   }
@@ -1119,7 +1121,7 @@ Item {
     if (!effect) return
     root.flash(row.uid)
     var run = function() { root.remember(row); root.perform(effect, row) }
-    if (row.confirm) root.confirmPending = { message: row.confirm, detail: row.confirmDetail || "", confirmText: "Confirm", run: run }
+    if (row.confirm) root.confirmPending = { message: row.confirm, detail: row.confirmDetail || "", confirmText: row.confirmText || "Confirm", cancelText: row.cancelText || "Cancel", run: run }
     else run()
   }
 
@@ -1132,7 +1134,7 @@ Item {
     var row = root.current
     if (!row || !row.appId || !root.appLibrary) return
     var id = row.appId, name = row.title
-    root.confirmPending = { message: "Do you want to uninstall " + name + "?", confirmText: "Uninstall",
+    root.confirmPending = { message: "Uninstall " + name + "?", detail: "Removes the package from this computer.", confirmText: "Uninstall", cancelText: "Keep it",
                             run: function() { root.cancel(); root.appLibrary.remove(id, name) } }
   }
 
@@ -1631,12 +1633,12 @@ Item {
         opened: root.confirmPending !== null
         message: root.confirmPending ? root.confirmPending.message : ""
         detail: root.confirmPending && root.confirmPending.detail ? root.confirmPending.detail : ""
-        confirmText: root.confirmPending ? root.confirmPending.confirmText : "Confirm"
+        confirmText: root.confirmPending && root.confirmPending.confirmText ? root.confirmPending.confirmText : "Confirm"
+        cancelText: root.confirmPending && root.confirmPending.cancelText ? root.confirmPending.cancelText : "Cancel"
         background: root.background
         foreground: root.foreground
         muted: root.muted
         scrim: root.scrim
-        selectedBackground: root.selectedBackground
         selectedText: root.selectedText
         fontFamily: root.fontFamily
         cornerRadius: Style.cornerRadius

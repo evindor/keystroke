@@ -145,6 +145,8 @@ function enableEffect(id, value) {
 // palette cannot hand focus to a browser and survive, so the extension's
 // screen and Settings carry the source row instead.
 function enableConfirm(e) { return "Turn on " + e.name + "?" }
+// The sheet's two keys, named for what they do rather than Confirm/Cancel.
+var ENABLE_LABELS = { confirmText: "Turn on", cancelText: "Keep off" }
 function enableDetail(e) {
   if (e.local) return "This is a local folder in " + e.dir + " that nobody has reviewed. It will run inside your shell with your permissions. Run it at your own risk, and check its code first."
   return "This extension was automatically checked and reviewed before it shipped with Keystroke, and it runs inside your shell with your permissions. Nonetheless, run it at your own risk. It's recommended to check the extension code first."
@@ -223,7 +225,7 @@ function detailRows(query, e) {
   var on = { id: e.id + "/enabled", title: "Enabled", subtitle: e.enabled ? "Answering queries" : "Off: its code is not loaded",
              icon: "", section: e.name, verb: "Toggle", tier: "item", order: 0, accessory: e.enabled ? "On" : "Off", keywords: "enable disable on off",
              action: enableEffect(e.id, !e.enabled) }
-  if (!e.enabled) { on.confirm = enableConfirm(e); on.confirmDetail = enableDetail(e) }
+  if (!e.enabled) { on.confirm = enableConfirm(e); on.confirmDetail = enableDetail(e); on.confirmText = ENABLE_LABELS.confirmText; on.cancelText = ENABLE_LABELS.cancelText }
   rows.push(on)
   if (e.problem)
     rows.push({ id: e.id + "/problem", title: "Needs attention", subtitle: e.problem, icon: "󰀦", section: e.name, verb: "", tier: "item", order: 1,
@@ -231,7 +233,7 @@ function detailRows(query, e) {
   if (e.setup)
     rows.push({ id: e.id + "/setup", title: "Run setup", subtitle: e.setup.summary || "Opens a terminal and runs " + e.setup.run, icon: "",
                 section: e.name, verb: "Run", tier: "item", order: 2, keywords: "setup install prepare download build",
-                confirm: setupConfirm(e), action: { type: "extension-setup", id: e.id } })
+                confirm: setupConfirm(e), confirmText: "Run setup", cancelText: "Not now", action: { type: "extension-setup", id: e.id } })
   rows.push({ id: e.id + "/settings", title: "Settings", subtitle: e.enabled ? "Keystroke Settings › " + e.name : "Turn the extension on to see its settings",
               icon: "󰒓", section: e.name, verb: "Open", tier: "item", order: 3, action: navigate("settings/" + e.id, e.name) })
   if (e.local)
