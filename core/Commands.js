@@ -128,6 +128,8 @@ function match(items, query) {
   var best = null
   for (var i = 0; i < (items || []).length; i++) {
     var cmd = items[i].command, p = cmd.prefix, pl = p.toLowerCase()
+    // Network-path URLs (//example.com) must not enter the built-in / help.
+    if (items[i].key === "commands" && p === HELP_PREFIX && text.indexOf("//") === 0) continue
     if (lower.indexOf(pl) !== 0) continue
     if (!cmd.sigil && lower.length > pl.length && !/\s/.test(lower.charAt(pl.length))) continue
     if (best && best.prefix.length >= p.length) continue

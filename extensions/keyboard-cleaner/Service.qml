@@ -35,6 +35,7 @@ QtObject {
   property string label: ""
   property int blocked: -1           // devices the helper switched off; -1 until it reports
   property string error: ""
+  property bool idleParked: false     // the helper parked the idle clock for this block
   signal changed()
 
   readonly property var provider: ({
@@ -85,6 +86,7 @@ QtObject {
       root.until = root.startedAt + (root.seconds + 0.5) * 1000   // the helper waits half a second before switching off
       root.blocked = -1
       root.error = ""
+      root.idleParked = false
       root.active = true
       helperProcess.command = Parser.blockArgv(root.helper, root.seconds, root.settings.blockPointer !== false)
       helperProcess.running = true
@@ -106,6 +108,7 @@ QtObject {
     if (info.blocked !== undefined) {
       root.blocked = info.blocked
       if (info.until) root.until = info.until * 1000
+      root.idleParked = info.idleParked === true
     }
     root.changed()
   }
@@ -115,6 +118,20 @@ QtObject {
     if (code !== 0 && !root.error) root.error = "The helper exited with code " + code
     root.changed()
   }
+
+  // A block that was killed outright leaves the idle clock parked, and parking
+  // writes stay-awake, which survives reboots: un-park anything the helper left
+  // behind once, at load, while no block is running. The marker holds the pid
+  // of the helper that parked it; a live pid that is still a keyboard-cleaner
+  // means the block is running and is left alone (a reused pid is not).
+  readonly property Process staleIdleSweep: Process {
+    command: ["bash", "-c",
+      "marker=\"${XDG_STATE_HOME:-$HOME/.local/state}/keyboard-cleaner/idle-parked\"; [ -f \"$marker\" ] || exit 0; " +
+      "pid=$(tr -dc 0-9 < \"$marker\" 2>/dev/null); " +
+      "if [ -n \"$pid\" ] && grep -qa keyboard-cleaner \"/proc/$pid/cmdline\" 2>/dev/null; then exit 0; fi; " +
+      "omarchy-shell idle enable >/dev/null 2>&1 && rm -f \"$marker\""]
+  }
+  Component.onCompleted: { staleIdleSweep.running = true }
 
   Component.onDestruction: { if (helperProcess.running) helperProcess.signal(15) }
 }

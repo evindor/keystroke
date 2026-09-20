@@ -108,6 +108,7 @@ TestCase {
         compare(Commands.match(items, ":").rest, "")
         compare(Commands.match(items, "/").key, "commands")
         compare(Commands.match(items, "/tr").rest, "tr")
+        compare(Commands.match(items, "//example.com/path"), null)
         compare(Commands.match(items, "chrome"), null)
         compare(Commands.match(items, ""), null)
         compare(Commands.match([], "tr x"), null)

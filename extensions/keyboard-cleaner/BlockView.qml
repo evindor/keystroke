@@ -36,6 +36,7 @@ FocusScope {
   property int blocked: -1
   property string error: ""
   property string note: ""
+  property bool idleParked: false
   property real elapsedFraction: 0
   readonly property bool done: !root.active && !root.error && root.total > 0
   readonly property real progress: root.active ? root.elapsedFraction : (root.done ? 1 : 0)
@@ -49,6 +50,7 @@ FocusScope {
     root.blocked = root.service.blocked
     root.error = root.service.error
     root.note = root.service.label
+    root.idleParked = root.service.idleParked === true
     var left = Math.max(0, root.service.until - Date.now())
     root.remaining = Math.ceil(left / 1000)
     root.elapsedFraction = root.total > 0 ? Math.max(0, Math.min(1, 1 - left / (root.total * 1000))) : 0
@@ -60,7 +62,7 @@ FocusScope {
     if (root.error) return "Nothing was blocked"
     if (!root.active) return root.done ? "Input restored" + suffix : "Nothing running"
     if (root.blocked < 0) return "Switching input off…"
-    return "Blocking " + root.blocked + (root.blocked === 1 ? " device" : " devices") + " · back in " + Parser.describeDuration(root.remaining) + suffix
+    return "Blocking " + root.blocked + (root.blocked === 1 ? " device" : " devices") + " · back in " + Parser.describeDuration(root.remaining) + (root.idleParked ? " · screensaver and lock paused" : "") + suffix
   }
   function body() {
     if (root.error) return root.error

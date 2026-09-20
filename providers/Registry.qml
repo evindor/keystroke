@@ -27,6 +27,7 @@ Item {
 
   OmarchyMenu { id: omarchyMenu; host: root.host }
   Applications { id: applications; host: root.host }
+  OpenUrl { id: openUrl; host: root.host }
   Calculator { id: calculator; host: root.host }
   Converter { id: converter; host: root.host }
   Colors { id: colors; host: root.host }
@@ -41,7 +42,7 @@ Item {
   CommandsProvider { id: commandsProvider; host: root.host }
   SettingsProvider { id: settingsProvider; host: root.host }
 
-  readonly property var bundled: [omarchyMenu, applications, calculator, converter, colors, emoji, clipboard, dictation, files, hotkeys, codex, aiWeb, extensions, commandsProvider, settingsProvider]
+  readonly property var bundled: [omarchyMenu, applications, openUrl, calculator, converter, colors, emoji, clipboard, dictation, files, hotkeys, codex, aiWeb, extensions, commandsProvider, settingsProvider]
   readonly property var reserved: bundled.map(function(b) { return b.provider.id }).concat(["palette", "dmenu", "matching", "voice"])
 
   // Declared patterns and commands are compiled here, once per rebuild, never

@@ -1,5 +1,86 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.4.3 (2026-09-20)
+
+- Contents since 1.4.2: the Open URL provider (`core/Url.js`,
+  `providers/OpenUrl.qml`, the `//` guard in `core/Commands.js`), the
+  Browser search and GIF Search extensions with their review fixes and the
+  `immutable=1` read of a locked history database, Keyboard Cleaner 1.1.0
+  (power node inside the block, held-key guard, idle parking, `--dry-run`)
+  from its author's pull request, and the Delete-to-uninstall fix with its
+  forward-delete follow-up. `manifest.json` 1.4.2 → 1.4.3; README lists the
+  six extensions in the box and points at the 1.4.3 notes.
+  `matching/bin/keystroke-matching` and its manifest are untouched since
+  the verified 1.4.2 commit.
+- `bin/keystroke test` on the dev tip (`7e8c8ad`) plus the release docs:
+  265 QML tests passed, 0 failed; every integration check passed
+  (applications, files, catalog, matching, palette matching, shortcut, dmenu,
+  routes, motion, worker, engine, voxtype, clipboard, codex, time zones,
+  extensions, currency, commands, URL, extension checks for all six
+  extensions, hotkeys); `tests/lint.sh` exit 0 with the existing metadata
+  warnings only; `omarchy plugin validate` exit 0; `git diff --check` clean.
+- `tests/palette_dictation_check.py` failed its first run on this tree with
+  `FAIL copy closes palette` followed by a Quickshell abort ("Object
+  destroyed while one of its QML signal handlers is in progress") that
+  outlived the check's 12 s subprocess timeout, so the runner stopped
+  there and the later checks were run one by one. The same check fails
+  the same way about one run in four on a clean export of the `v1.4.2`
+  tag (1 of 4) and passes the other runs on dev (3 of 4), so it is a timing
+  flake in the check, not a change in this release. Recorded here for the
+  follow-up; the check's assertions all pass when the run completes.
+- The extension and engine workflows are green on `7e8c8ad`. Not
+  exercised here: the attest job, which first runs on the `v1.4.3` tag.
+
+## Browser search review fixes (2026-09-12)
+
+- The service judged a helper run inside `onExited`, reading output that only
+  `onStreamFinished` fills. The two arrive in either order, as the currency
+  download fix records, so an exit seen first cached "could not read browser
+  data" under that query key for the rest of the palette session. `settle()`
+  now waits for both halves, like `extensions/currency/Service.qml`.
+- The browser palette check gained a stage that drives the exit code in before
+  the output: it fails on the previous code (verified by reverting the guard)
+  and passes now.
+- `matches()` ran the URL parse before the substring test for every row SQLite
+  scanned; the order is now reversed. 200k synthetic history rows: 0.85 s to
+  0.29 s. Detection tries `xdg-mime` before `xdg-settings`, which answered
+  identically here in 41 ms instead of 290 ms. One live query against the real
+  Chromium profile: 0.40 s to 0.18 s. Both matter because one 2 s deadline
+  covers every profile and source, and an abort loses that source entirely.
+- Dropped `RecursionError` and `AttributeError` from the source-read `except`:
+  `bookmark_rows` walks an explicit stack, and neither is reachable.
+- Passed: eight Python fixture tests; `bin/keystroke check-extensions` for all
+  five extensions; the browser palette check; `bin/keystroke validate`. Host
+  QML unit tests and the wider integration suite were not re-run; nothing
+  outside `extensions/browser-search` changed.
+
+## Browser search extension (2026-09-12)
+
+- Added the self-contained `extensions/browser-search` provider using the
+  extension guide, Timer/Translate examples and Files' asynchronous query
+  pattern. Main-palette search and `browser <query>` search the detected
+  default browser, with separate history/bookmark switches and URL deduplication.
+- Python's standard-library reader supports Chromium-family history/bookmark
+  files and Firefox Places in standard native and listed Flatpak locations.
+  Disabled sources are not queried; SQLite uses read-only connections with
+  live WAL visibility. Results are kept in memory for one palette session.
+- Passed: eight Python fixture tests; extension QML logic tests and qmllint
+  through `QT_QPA_PLATFORMTHEME=generic bin/keystroke check-extensions` for all
+  five shipped extensions; all 162 host QML unit tests; `bin/keystroke validate`;
+  the new offscreen browser palette check; existing palette extension lifecycle
+  and command checks.
+  The generic Qt theme avoids this machine's GTK display initialization error.
+- The browser palette check covers initially disabled loading, both source
+  settings, root results, explicit/renamed commands, URL and copy actions,
+  cache invalidation, obsolete queries and service destruction. Python
+  fixtures cover WAL visibility without changing database/WAL contents,
+  locked/corrupt sources, multiple profiles, Firefox, Flatpak, unknown defaults,
+  Unicode and literal SQL-like input.
+- Live read-only smoke check detected `chromium.desktop` / Chromium and
+  completed with no reader error. No actual browser navigation was triggered.
+  No live installation, settings change or shell restart was performed. The
+  entire host integration suite was not run; unrelated providers were unchanged.
+
 ## Dmenu empty-state height (2026-09-10)
 
 - Reproduced from Omarchy's Keybindings picker with a query that matched no
@@ -866,6 +947,79 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
 - Not yet exercised: the attest job, which runs only on pushes to `main` and
   `v*` tags. `gh attestation verify … --source-digest <commit>` is the check to
   run after the first release that carries it (docs/engine-provenance.md).
+
+## Open URL provider (2026-09-12)
+
+- `core/Url.js` recognises browser destinations with no network request and no
+  shell: schemes are limited to http(s), so `javascript:`, `data:`, `file:` and
+  `mailto:` cannot reach a launch, and text carrying whitespace, control
+  characters, backslashes or `<>"\`` is refused outright. `tests/tst_url.qml`
+  covers 24 accepted and 71 rejected spellings, including IPv6, IDN, punycode,
+  userinfo and port bounds.
+- `tests/palette_url_check.py` drives the real offscreen palette and asserts the
+  launch boundary from a fake `bash`: a URL holding `$(id)` and `';echo` arrives
+  at `xdg-open` as one literal argument, so URL punctuation never becomes shell
+  code. It also covers ranking, `//` routing past the `/` help prefix, the
+  settings pair, disabling and renaming the prefix.
+- Bare file names are not offered as addresses. Before the guard a real
+  `~/Documents/readme.md` ranked *second*, under an "Open https://readme.md"
+  answer row, so `↵` opened a browser instead of the file; the same held for
+  `notes.txt`, `package.json`, `photo.jpg` and `report.pdf`. `fileTail` in
+  `core/Url.js` withholds the offer for a bare two-part word ending in a file
+  extension, since an extension is not a reliable tell either way (`.txt` is no
+  TLD, `.md`, `.sh`, `.zip` and `.mov` are live ones). A scheme, the prefix, a
+  port or a path still asks for the address. Extensions that read as ordinary
+  destinations are deliberately absent from the list: io, co, rs, dev, app, ai,
+  me, tv, so, cc — `docs.rs`, `crates.io` and `vercel.app` stay addresses.
+  Checked in both layers and by re-running the offscreen ranking probe.
+- 239 QML tests and `tests/palette_url_check.py` pass. Parsing costs about
+  0.5 µs per call measured over 60,000 calls, against the ~25 µs Qt.md5 baseline
+  in `tools/profile_palette.py`, so the per-keystroke cost is not material.
+
+## Delete-to-uninstall with a filtered app (2026-09-12)
+
+- The palette's Delete handler no longer requires an empty query. A selected
+  application opens the existing uninstall confirmation when the caret is at
+  the end of the query with nothing selected, matching the row's
+  `Del uninstall` hint. Mid-query and with a selection, Delete still edits the
+  text; without that guard forward-delete was lost whenever an app was
+  selected, and Delete followed by Enter removed the app.
+- `tests/palette_shortcut_check.py` drives the real palette offscreen with a
+  fake application library: a nonempty query selects an app, Delete mid-query
+  and over a selection edits the text, Delete at the end preserves the query
+  and opens the named confirmation, and Escape cancels without calling the
+  removal API.
+- `bin/keystroke validate`, `git diff --check`, and the full offscreen
+  `bin/keystroke test` suite pass: 265 QML tests and every integration,
+  extension, matching-engine and lint check.
+
+## GIF Search extension (2026-09-12)
+
+- Version 1.1.0: replaced Back with the search icon, right-aligned GIPHY credit
+  and centered it vertically with pagination. Added default image/link action
+  and close-after-success settings (default image, stay open). Right at the end
+  of unselected search text focuses the grid and advances one result; modified
+  Right and cursor movement inside text retain normal editing behavior.
+  Extension checks and the expanded offscreen keyboard/copy tests pass, including
+  swapped Enter/Ctrl+Enter and successful-copy closing; failures stay open.
+  Visually checked the updated header and footer in the offscreen capture.
+- Added a self-contained GIPHY search/trending grid with GIF and link copying,
+  following the API 1 extension guide. The extension README records the Raycast
+  source dissection, process/network access, dependencies and limits.
+- `QT_QPA_PLATFORMTHEME=generic bin/keystroke check-extensions extensions/gif-search`
+  passed (manifest, folder boundaries, qmllint, QML tests). The generic platform
+  theme avoids the local GTK theme's attempt to connect to a display offscreen.
+- Four Python clipboard tests passed, covering URL boundaries, binary transfer,
+  invalid/oversized downloads, link copying without network and clipboard errors.
+- `python3 extensions/gif-search/tests/palette_check.py` passed with an isolated
+  HOME and fake curl/wl-copy: off by default, enable, renamed command, view load,
+  Tab/arrows/Ctrl+Enter, pagination, stale-response rejection, HTTP error, empty
+  results, trending, dismissal and service destruction. No QML runtime type or
+  assignment errors. Visually checked its capture with a real GIF preview.
+- Live proxy search and preview download succeeded; the production helper copied
+  a 2,987,777-byte original GIF to a fake wl-copy receiver with `image/gif` MIME.
+  `bin/keystroke validate` passed. Desktop clipboard and application pasting,
+  live installation, and the full unrelated core regression suite were not run.
 
 ## Release 1.4.2 (2026-09-11)
 

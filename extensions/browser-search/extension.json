@@ -1,0 +1,16 @@
+{
+  "name": "Browser search",
+  "version": "1.0.0",
+  "author": "Keystroke contributors",
+  "description": "Search your default browser's history and bookmarks",
+  "apiVersion": 1,
+  "icon": "󰖟",
+  "color": "#61afef",
+  "license": "MIT",
+  "commands": [{
+    "id": "browser", "prefix": "browser", "title": "Search browser",
+    "summary": "Find a page in your default browser's history and bookmarks",
+    "args": [{ "name": "query", "hint": "words from a page title or URL", "rest": true }],
+    "examples": ["browser github", "browser documentation"]
+  }]
+}
