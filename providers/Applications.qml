@@ -53,7 +53,7 @@ Item {
     return {
       id: String(entry.id), title: name, subtitle: subtitle, icon: "󰀻", iconSource: root.library.iconSource(entry.icon),
       section: "Applications", verb: "Launch", tier: "item", score: score, order: order, remember: true,
-      appId: String(entry.id), action: { type: "app", id: String(entry.id), name: name }, hint: "Del uninstall",
+      appId: String(entry.id), action: { type: "app", id: String(entry.id), name: name },
       description: root.searchText(entry), descriptionKey: name
     }
   }

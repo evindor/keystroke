@@ -179,7 +179,7 @@ TestCase {
         var suggest = Commands.suggestRows(items, "trans")
         compare(suggest.length, 1)
         compare(suggest[0].title, "Translate")
-        compare(suggest[0].hint, "tab types tr")
+        compare(suggest[0].action.type, "query") // ↵ and Tab both type it; the footer says so
         verify(suggest[0].score > 0)
         compare(Commands.suggestRows(items, "").length, 0)
         compare(Commands.suggestRows(items, "zzzz").length, 0)

@@ -51,7 +51,7 @@ Item {
     if (ctx.scope && ctx.scope !== "codex") return []
     var text = raw(ctx), rows = [], scoped = ctx.scope === "codex"
     if (text.trim()) {
-      rows.push({id: "ask", title: "Ask Codex here", subtitle: text, icon: "✳", section: "Continue with", tier: /^\?/.test(ctx.query) ? "answer" : "fallback", score: root.preferredScore(), verb: "Ask", hint: "Ctrl+Enter opens a task in Codex", action: {type: "provider-view", provider: "codex", text: text}, altAction: {type: "codex-external", text: text}})
+      rows.push({id: "ask", title: "Ask Codex here", subtitle: text, icon: "✳", section: "Continue with", tier: /^\?/.test(ctx.query) ? "answer" : "fallback", score: root.preferredScore(), verb: "Ask", altVerb: "Open task in Codex", action: {type: "provider-view", provider: "codex", text: text}, altAction: {type: "codex-external", text: text}})
       rows.push({id: "task", title: "Open task in Codex", subtitle: (root.preferences.destination === "cli" ? "Terminal" : "Desktop") + " · full request ready to continue", icon: "↗", section: "Continue with", tier: "fallback", score: root.preferredScore() - 0.1, verb: "Open", action: {type: "codex-external", text: text}})
       if (scoped) rows.push({id: "desktop-task", title: "Do this here · desktop settings", subtitle: "Agent may edit ~/.config · uses the Omarchy skill", icon: "⌘", score: 3, verb: "Start task", action: {type: "provider-view", provider: "codex", text: text, cwd: root.host.home + "/.config"}})
       if (scoped && root.preferences.workspace) rows.push({id: "project-task", title: "Do this here · working folder", subtitle: root.preferences.workspace, icon: "⌘", score: 2, verb: "Start task", action: {type: "provider-view", provider: "codex", text: text, cwd: root.preferences.workspace}})

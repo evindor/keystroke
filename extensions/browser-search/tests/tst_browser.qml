@@ -26,13 +26,15 @@ TestCase {
     var req = { history: false, bookmarks: true, explicit: true }
     var rows = Browser.rows(data, req)
     compare(rows.length, 1)
-    compare(rows[0].accessory, "Bookmark")
+    compare(rows[0].icon, "󰃀")
+    verify(!rows[0].accessory && !rows[0].preview) // no provenance label, no pane: the row is the whole result
     compare(rows[0].action, { type: "url", url: "https://example.org" })
     compare(rows[0].altAction, { type: "copy", text: "https://example.org" })
+    compare(rows[0].altVerb, "Copy URL")
     verify(!rows[0].remember)
     req.history = true
     compare(Browser.rows(data, req)[0].id, rows[0].id)
-    compare(Browser.rows(data, req)[0].accessory, "Bookmark + History")
+    compare(Browser.rows(data, req).length, 2)
   }
   function test_errors_and_empty() {
     verify(Browser.parse("invalid").error.length > 0)

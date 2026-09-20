@@ -1,5 +1,36 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.4.4 (2026-09-20)
+
+- Contents since 1.4.3: the results cleanup (`ui/ResultRow.qml` drops the
+  badge, the key hint and the ↵ swap on selection; `Keystroke.qml` builds
+  the footer's action list from `verb`, `altVerb`, `appId`, a query action
+  and the screen; `ui/PreviewPane.qml` shows the badge beside the detail
+  line; `core/Files.js` and `extensions/browser-search` carry a preview
+  only for images or not at all), the confirmation sheet
+  (`ui/ConfirmSheet.qml` rewritten; `confirmText`/`cancelText` on rows
+  from `core/Extensions.js`, `core/SettingsTree.js`, the Timer and the
+  uninstall path), the `hint` → `altVerb` conversion across providers and
+  extensions, `docs/providers.md`, and every screenshot re-rendered with
+  `tools/showcase/offscreen.py`. `manifest.json` 1.4.3 → 1.4.4.
+  `matching/bin/keystroke-matching` and its manifest are untouched since
+  the verified 1.4.2 commit (SHA-256 `192ef1ec…`).
+- `bin/keystroke test` on `ca74b79` (before the last footer fix and the
+  screenshots): 265 QML tests passed, 0 failed; every integration check
+  passed in one run, including `tests/palette_dictation_check.py`;
+  `tests/lint.sh` exit 0 with the existing metadata warnings only. After
+  `779758c`: the QML suite (265 passed), the commands, shortcut, URL,
+  extensions, dictation, route and files palette checks, the browser,
+  translate and timer extension suites, and `python3 site/check.py` (35
+  screenshots) pass; `omarchy plugin validate` exit 0.
+- Reviewed offscreen: every scene on two contact sheets, plus the Files,
+  Timer, Applications, suggest, Extensions and both confirmation scenes
+  one by one. Not exercised in the live shell: the sheet's mouse targets
+  (the two actions and the scrim), which share the `canceled`/`confirmed`
+  signals the keys use.
+- The extension and engine workflows are green on `ca74b79`. The attest
+  job first runs on the `v1.4.4` tag.
+
 ## Release 1.4.3 (2026-09-20)
 
 - Contents since 1.4.2: the Open URL provider (`core/Url.js`,

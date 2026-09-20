@@ -120,18 +120,42 @@ Item {
     asynchronous: true
     smooth: true
   }
-  Text {
+  // The detail line, with the row's badge (an extension's "extension" or
+  // "local") beside its last line: provenance lives here, not on the row.
+  Item {
     id: hint
     anchors.bottom: parent.bottom
     anchors.bottomMargin: Style.space(16)
     width: parent.width
-    text: root.row.previewDetail || (root.row.verb ? "Press return to " + String(root.row.verb).toLowerCase() : "")
-    textFormat: Text.PlainText
-    color: Util.alpha(root.foreground, 0.55)
-    font.family: Style.font.menuFamily
-    font.pixelSize: Style.font.bodySmall
-    wrapMode: Text.Wrap
-    maximumLineCount: 3
-    elide: Text.ElideRight
+    height: Math.max(detail.height, badge.visible ? badge.height : 0)
+    FontMetrics { id: detailMetrics; font: detail.font }
+    Text {
+      id: detail
+      anchors.bottom: parent.bottom
+      width: Math.min(implicitWidth, parent.width - (badge.visible ? badge.width + Style.space(8) : 0))
+      text: root.row.previewDetail || (root.row.verb ? "Press return to " + String(root.row.verb).toLowerCase() : "")
+      textFormat: Text.PlainText
+      color: Util.alpha(root.foreground, 0.55)
+      font.family: Style.font.menuFamily
+      font.pixelSize: Style.font.bodySmall
+      wrapMode: Text.Wrap
+      maximumLineCount: 3
+      elide: Text.ElideRight
+    }
+    Rectangle {
+      id: badge
+      visible: !!root.row.badge
+      anchors.left: detail.right
+      anchors.leftMargin: detail.text ? Style.space(8) : 0
+      anchors.bottom: detail.bottom
+      anchors.bottomMargin: Math.round((detailMetrics.height - height) / 2)
+      width: badgeLabel.implicitWidth + Style.space(8)
+      height: badgeLabel.implicitHeight + Style.space(3)
+      radius: height / 2
+      color: Util.alpha(root.foreground, 0.08)
+      border.width: 1
+      border.color: Util.alpha(root.foreground, 0.14)
+      Text { id: badgeLabel; anchors.centerIn: parent; text: root.row.badge || ""; textFormat: Text.PlainText; color: Util.alpha(root.foreground, 0.7); font.family: Style.font.menuFamily; font.pixelSize: Style.font.caption - 1 }
+    }
   }
 }

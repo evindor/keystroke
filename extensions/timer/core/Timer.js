@@ -123,8 +123,9 @@ function rows(query, timers, settings, now, scoped, scopeKey, stripped) {
     var t = timers[i], left = remaining(t, now)
     if (!scoped && query) continue
     out.push({ id: "running/" + t.id, title: t.label || "Timer", subtitle: describe(t.seconds) + " · ends at " + endsAt(t.startedAt, t.seconds), icon: "󰔛",
-               section: "Running", verb: "Cancel", tier: "item", score: 30 - i, order: i, accessory: countdown(left), hint: "↵ cancels",
-               confirm: "Cancel the " + (t.label || describe(t.seconds)) + " timer?", action: { type: "timer-cancel", id: t.id } })
+               section: "Running", verb: "Cancel", tier: "item", score: 30 - i, order: i, accessory: countdown(left),
+               confirm: "Cancel the " + (t.label || describe(t.seconds)) + " timer?", confirmText: "Cancel timer", cancelText: "Keep running",
+               action: { type: "timer-cancel", id: t.id } })
   }
   if (!scoped) {
     if (!query) out.push(navRow(timers, 6, scopeKey))

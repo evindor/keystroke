@@ -329,7 +329,7 @@ function speakArgv(text, lang) { return ["mpv", "--no-video", "--really-quiet", 
 function primaryEffects(text, settings) {
   var paste = settings.defaultAction === "paste"
   return { action: paste ? pasteEffect(text) : copyEffect(text), altAction: paste ? copyEffect(text) : pasteEffect(text),
-           verb: paste ? "Paste" : "Copy", hint: paste ? "ctrl ↵ copies" : "ctrl ↵ pastes" }
+           verb: paste ? "Paste" : "Copy", altVerb: paste ? "Copy" : "Paste" }
 }
 
 // ------------------------------------------------------------------ rows
@@ -387,7 +387,7 @@ function rows(ctx) {
   } else {
     var eff = primaryEffects(main.text, settings)
     out.push(row({ id: "translate/main", title: main.text, subtitle: main.pronunciation ? main.pronunciation + " · " + arrow(view.detected || from, main.to) : arrow(view.detected || from, main.to),
-                   tier: "answer", score: 100, order: 0, verb: eff.verb, hint: eff.hint, preview: main.text, previewLabel: toName.toUpperCase(),
+                   tier: "answer", score: 100, order: 0, verb: eff.verb, altVerb: eff.altVerb, preview: main.text, previewLabel: toName.toUpperCase(),
                    previewDetail: dictionarySummary(main.dictionary) || arrow(view.detected || from, main.to), action: eff.action, altAction: eff.altAction }))
   }
   if (view.reverse && view.reverse.text) {
@@ -399,7 +399,7 @@ function rows(ctx) {
     if (!x.text || x.to === view.detected) continue     // the echo of the language typed is only shown in the editor
     var xe = primaryEffects(x.text, settings)
     out.push(row({ id: "translate/extra/" + x.to, title: x.text, subtitle: (x.pronunciation ? x.pronunciation + " · " : "") + arrow(view.detected || from, x.to),
-                   tier: "item", score: 80 - i, order: 2 + i, verb: xe.verb, hint: xe.hint, preview: x.text, previewLabel: languageName(x.to).toUpperCase(),
+                   tier: "item", score: 80 - i, order: 2 + i, verb: xe.verb, altVerb: xe.altVerb, preview: x.text, previewLabel: languageName(x.to).toUpperCase(),
                    previewDetail: dictionarySummary(x.dictionary) || arrow(view.detected || from, x.to), action: xe.action, altAction: xe.altAction }))
   }
   if (view.correction) {
@@ -425,7 +425,7 @@ function selectionRow(ctx, row, kind) {
                                     action: { type: "translate-selection", text: ctx.selection, paste: false } })
   if (kind === "paste") return row({ id: "selection/paste", title: "Paste the translated selection", subtitle: text + " · replaces the selection in the focused app", tier: "item", score: 7, order: 43, verb: "Paste",
                                      action: { type: "translate-selection", text: ctx.selection, paste: true } })
-  return row({ id: "selection/view", title: "Translate the selection", subtitle: text, tier: "item", score: 9, order: 41, verb: "Open", hint: "↵ opens · ctrl ↵ copies the translation",
+  return row({ id: "selection/view", title: "Translate the selection", subtitle: text, tier: "item", score: 9, order: 41, verb: "Open", altVerb: "Copy translation",
                keywords: "translate selection", action: { type: "translate-view", text: ctx.selection, to: "" }, altAction: { type: "translate-selection", text: ctx.selection, paste: false } })
 }
 
@@ -441,10 +441,11 @@ function pickerRows(ctx) {
     var code = list[i].code, at = ctx.targets.indexOf(code), chosen = at >= 0
     var next = chosen ? ctx.targets.filter(function(t) { return t !== code }) : ctx.targets.concat([code])
     var last = chosen && ctx.targets.length === 1, full = !chosen && ctx.targets.length >= MAX_TARGETS
-    var r = { id: "lang/" + code, title: list[i].name, subtitle: chosen ? "Target " + (at + 1) + " of " + ctx.targets.length + " · " + code : code, icon: ICON, iconSource: ctx.iconSource,
+    // A row that cannot be toggled says why in its subtitle; the keys live in the footer.
+    var why = last ? " · keep at least one" : full ? " · at most " + MAX_TARGETS : ""
+    var r = { id: "lang/" + code, title: list[i].name, subtitle: (chosen ? "Target " + (at + 1) + " of " + ctx.targets.length + " · " + code : code) + why, icon: ICON, iconSource: ctx.iconSource,
               section: chosen ? "Chosen" : "Languages", keywords: code + " " + aliasesFor(code), tier: "item", order: chosen ? at : 1000 + i,
               accessory: chosen ? "✓" : "", verb: chosen ? "Remove" : "Add", disabled: last || full,
-              hint: last ? "Keep at least one" : full ? "At most " + MAX_TARGETS : (chosen ? "↵ removes" : "↵ adds"),
               action: last || full ? { type: "noop" } : { type: "setting", path: ["providers", ctx.key], key: "targets", value: next.join(","), schema: schema } }
     if (!q) r.score = chosen ? 2000 - at : 1000 - i
     out.push(r)

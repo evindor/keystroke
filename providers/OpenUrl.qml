@@ -32,7 +32,7 @@ Item {
                 tier: "answer", score: 250, disabled: true, verb: "Keep typing", action: { type: "noop" } }]
     }
     return [{ id: "open", title: "Open " + parsed.url, subtitle: "Open URL · Default browser", icon: "󰖟", section: "Open URL",
-              tier: "answer", score: 250, verb: "Open URL", hint: "↵ opens in default browser",
+              tier: "answer", score: 250, verb: "Open URL",
               preview: parsed.url, previewLabel: "URL", previewDetail: "Open in your default browser",
               action: { type: "url", url: parsed.url } }]
   }

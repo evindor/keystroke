@@ -93,7 +93,7 @@ From that declaration the host does, for every provider alike:
 - **The user's prefix.** A provider with commands gets the reserved `prefix` setting (a string, listed first on its settings screen and returned in `ctx.settings.prefix`); the host applies it to the first command. Two enabled providers with the same prefix: the earlier one in registry order answers, the other is skipped for that prefix.
 - **The hint line.** While the query starts with a command, the line under the search field shows the command's `title`, then the name and `hint` of the argument the caret is on ("Translate · to: a language code or name (optional)"); with every argument typed, the `summary`.
 - **Ghost placeholders.** The arguments still to type are drawn after the caret in the field's own font (`[to] <text>`, `<name>` required, `[name]` optional), and disappear one by one as words are typed. A word prefix on its own gets a soft highlight sweeping across it once when it is recognised, timed by the animation tier.
-- **Tab.** A row whose action is `{type: "query"}` types its text; the host offers such a row for a query that matches a command's title ("trans" → *Translate · tr [to] <text>*, hint "tab types tr"). While a command is being typed, Tab is a space: it moves to the next argument (after the bare prefix, after `tr fr`, after `timer 10m`) and does nothing on the last argument.
+- **Tab.** A row whose action is `{type: "query"}` types its text; the host offers such a row for a query that matches a command's title ("trans" → *Translate · tr [to] <text>*), and the footer shows both `↵` and `tab` under its verb. While a command is being typed, Tab is a space: it moves to the next argument (after the bare prefix, after `tr fr`, after `timer 10m`) and does nothing on the last argument.
 - **The `/` screen.** `/` is a sigil command of the bundled Commands provider: it lists every command of every enabled provider with its usage line, `/tr` filters the list, Enter types the prefix. The same list is the *Commands* scope, reachable from the root row **What can I type?**, and the empty root's hint line says so.
 - **Usage on the Extensions screen** (above), and a status line when the user turns an extension on: "Translate is on · type tr [to] <text>, or find it by name".
 
@@ -104,17 +104,21 @@ Commands and patterns coexist: a command is the explicit trigger, a pattern the 
 ```js
 { id: "stable-id", title: "…", subtitle: "", icon: "󰀻", iconFont: "", iconSource: "file:///…",
   tint: "#hex", section: "Thing", verb: "Open", tier: "item",  // "answer" | "item" | "fallback"
-  score: 100, order: 0, keywords: "ids aliases", path: "Parent › Child › …", description: "prose", accessory: "✓", hint: "↵ copies",
-  disabled: false, remember: false, confirm: "Really?", confirmDetail: "one muted line under the question",
+  score: 100, order: 0, keywords: "ids aliases", path: "Parent › Child › …", description: "prose", accessory: "✓",
+  disabled: false, remember: false, confirm: "Really?", confirmDetail: "one muted line under the question", confirmText: "Turn on", cancelText: "Keep off",
   preview: "text", previewLabel: "RESULT", previewDetail: "…", previewImage: "/path.png", swatch: "#hex",
-  action: effect, altAction: effect }
+  action: effect, altAction: effect, altVerb: "Copy URL" }
 ```
 
-Legacy `catalog(ctx)` fields are ignored; the local model command classifier has been removed.
+Legacy `catalog(ctx)` fields are ignored; the local model command classifier has been removed. A row's `hint` (once a line of keys shown on the selected row) is ignored too: the keys that act on the selection are listed in the footer, from `verb`, `altVerb` and the screen.
 
-`confirm` asks before the effect runs; the optional `confirmDetail` is a muted line under the question. Turning an extension on uses it to say what was checked and that the code runs at the user's own risk. A confirmation never carries a link: opening anything would move focus away from the palette.
+`confirm` asks before the effect runs, in a sheet that rises from the bottom of the card; the optional `confirmDetail` is a muted paragraph under the question. `↵` runs the effect and `Esc` keeps things as they are; `confirmText` and `cancelText` name those two keys for what they do ("Turn on" / "Keep off", "Cancel timer" / "Keep running") instead of the default Confirm / Cancel. Turning an extension on uses the detail to say what was checked and that the code runs at the user's own risk. A confirmation never carries a link: opening anything would move focus away from the palette.
 
-`altAction` is optional and runs on `Ctrl+↵` (a row without one runs `action` again). Say what it does in `hint` ("ctrl ↵ terminal"). A provider's `activate(row, ctx)` receives `ctx.alternate === true` for that key so it can compute the effect itself.
+`altAction` is optional and runs on `Ctrl+↵` (a row without one runs `action` again). Name it in `altVerb` ("Copy URL", "Open terminal"), the way `verb` names `↵`; the footer shows both next to their keys while the row is selected. A row with an `altAction` and no `altVerb` gets a name from the effect's type (`copy` → Copy, `url` → Open). A provider's `activate(row, ctx)` receives `ctx.alternate === true` for that key so it can compute the effect itself.
+
+A row does not change when selected beyond its highlight. `accessory` is state the row carries (a check mark, a setting's value, a countdown), not where it came from: say that with the icon or the section, or in `previewLabel` when there is a pane. An extension's rows carry an `extension` badge (a local folder's, `local`) that the preview pane shows beside `previewDetail`.
+
+Give a row a `preview`, `previewImage` or `swatch` only when the pane adds something the row cannot hold: a picture, a computed result, a long text. Without one the results take the full width. A file or folder row has no preview unless it is an image; a browser page's row is its title and URL, nothing more.
 
 `id` must be stable for a logical result: it drives in-place delegate updates and frecency. `score` orders only within the tier; omit it to use the default matcher, `Match.match(query, title, keywords, path, description)`, which is fuzzy over `title`, over `path` (the breadcrumb ending in the title, for rows that live in submenus; matched slightly below the title) and over `keywords` (identifiers a user may abbreviate: aliases, ids, config keys; matched below the path), and word-prefix only over `description` (prose). Put synonyms and sentences in `description`, not `keywords`: scattered letters would match any sentence. Rows with a zero score are dropped when the query is non-empty. A provider that owns a tree should return every descendant when the query is non-empty, with `path` relative to the current scope, so abbreviations reach deep items from the root. `remember: true` opts into frecency (never use query text as the id).
 

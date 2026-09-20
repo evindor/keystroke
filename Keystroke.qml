@@ -446,11 +446,25 @@ Item {
   property bool showLoading: false
   property string errorMessage: ""
   property string statusMessage: ""
-  property var confirmPending: null       // { message, detail, confirmText, run }
+  property var confirmPending: null       // { message, detail, confirmText, cancelText, run }
   readonly property var current: rows.length && selected >= 0 && selected < rows.length ? rows[selected] : ({})
   readonly property bool compact: paletteSettings.density !== "comfortable"
   readonly property color accent: paletteSettings.accent === "ember" ? "#ee987e" : paletteSettings.accent === "violet" ? "#b5a0ef" : paletteSettings.accent === "mint" ? "#8bceb4" : Color.accent
   readonly property bool clipboardChoice: root.dictationMode || !!(root.current.action && root.current.action.type === "dictation-copy")
+  // Every key that acts on the selection, for the footer: ↵ first and
+  // brightest, then what the row or the screen offers beyond it. The rows
+  // themselves never list keys.
+  readonly property var footerActions: {
+    var row = root.current, can = !!row.uid && !row.disabled
+    // Tab types a query row's text as ↵ does (completeCommand), so both keys sit under one name.
+    var typesQuery = can && row.action && row.action.type === "query" && !root.dictationMode && !voice.active
+    var out = [{ label: root.dictationMode ? "Copy" : voice.active ? "Finish" : row.verb || "Select", keys: typesQuery ? ["↵", "tab"] : ["↵"], bright: true }]
+    if (root.clipboardChoice) out.push({ label: "Paste", key: "ctrl ↵" })
+    else if (can && row.altVerb && !voice.active) out.push({ label: row.altVerb, key: "ctrl ↵" })
+    if (can && row.appId) out.push({ label: "Uninstall", key: "del" })
+    out.push({ label: root.compact ? "Settings" : "Provider settings", key: "ctrl K" })
+    return out
+  }
   readonly property bool previewVisible: !dmenuActive && paletteSettings.showPreview !== false && !!(current.preview || current.previewImage || current.swatch)
 
   // ---------------------------------------------------------------- motion
@@ -885,6 +899,17 @@ Item {
   }
 
   property var lastPatterns: ({})           // provider key → matched pattern ids, for inspect()
+  // What Ctrl+↵ does with a row that has an altAction but names no altVerb.
+  function defaultVerb(effect) {
+    var type = effect && effect.type
+    if (type === "copy") return "Copy"
+    if (type === "url") return "Open"
+    if (type === "navigate") return "Open"
+    if (type === "app") return "Launch"
+    if (type === "query") return "Type"
+    if (type === "dictation-copy") return effect.paste ? "Paste" : "Copy"
+    return "Run"
+  }
   function normalize(row, entry, q, boost) {
     if (!row || typeof row !== "object" || typeof row.title !== "string") return null
     var out = {}
@@ -907,11 +932,13 @@ Item {
     out.score = q && base > 0 && boost > 0 ? base + boost : base
     out.accessory = String(row.accessory || "")
     out.badge = String(row.badge || (entry.source === "extension" ? "extension" : ""))
-    out.hint = String(row.hint || "")
+    out.altVerb = String(row.altVerb || (row.altAction ? root.defaultVerb(row.altAction) : ""))
     out.disabled = row.disabled === true
     out.remember = row.remember === true
     out.confirm = String(row.confirm || "")
     out.confirmDetail = String(row.confirmDetail || "")
+    out.confirmText = String(row.confirmText || "")
+    out.cancelText = String(row.cancelText || "")
     if (q && !(base > 0)) return null
     return out
   }
@@ -926,7 +953,7 @@ Item {
       var detail = parts.join("\t")
       if (q && label.toLowerCase().indexOf(q) < 0 && detail.toLowerCase().indexOf(q) < 0) continue
       rows.push({ id: String(i), uid: "dmenu/" + i, title: label, subtitle: detail, icon: icon, iconFont: "", iconSource: "", tint: "",
-                  section: "", verb: "Select", tier: "item", score: 1, order: i, accessory: "", badge: "", hint: "", disabled: false,
+                  section: "", verb: "Select", tier: "item", score: 1, order: i, accessory: "", badge: "", altVerb: "", disabled: false,
                   remember: false, confirm: "", providerKey: "dmenu", value: detail ? label + "\t" + detail : label })
     }
     return rows
@@ -935,7 +962,7 @@ Item {
   function display(row, index, previousSection) {
     return { uid: row.uid, title: row.title, subtitle: row.subtitle, icon: row.icon, iconFont: row.iconFont, iconSource: row.iconSource,
              tint: row.tint, section: row.section, sectionStart: row.section !== previousSection, verb: row.verb, accessory: row.accessory,
-             disabled: row.disabled, badge: row.badge, answer: row.tier === "answer", hint: row.hint }
+             disabled: row.disabled, answer: row.tier === "answer" }
   }
 
   // Reconcile by uid so delegates update in place while typing.
@@ -1096,7 +1123,7 @@ Item {
     if (!effect) return
     root.flash(row.uid)
     var run = function() { root.remember(row); root.perform(effect, row) }
-    if (row.confirm) root.confirmPending = { message: row.confirm, detail: row.confirmDetail || "", confirmText: "Confirm", run: run }
+    if (row.confirm) root.confirmPending = { message: row.confirm, detail: row.confirmDetail || "", confirmText: row.confirmText || "Confirm", cancelText: row.cancelText || "Cancel", run: run }
     else run()
   }
 
@@ -1109,7 +1136,7 @@ Item {
     var row = root.current
     if (!row || !row.appId || !root.appLibrary) return
     var id = row.appId, name = row.title
-    root.confirmPending = { message: "Do you want to uninstall " + name + "?", confirmText: "Uninstall",
+    root.confirmPending = { message: "Uninstall " + name + "?", detail: "Removes the package from this computer.", confirmText: "Uninstall", cancelText: "Keep it",
                             run: function() { root.cancel(); root.appLibrary.remove(id, name) } }
   }
 
@@ -1502,9 +1529,7 @@ Item {
             required property string verb
             required property string accessory
             required property bool disabled
-            required property string badge
             required property bool answer
-            required property string hint
             width: resultList.width
             // The idle root lists one row per provider, so headers would label single items there;
             // they return as soon as a query or a scope groups real sets.
@@ -1528,7 +1553,7 @@ Item {
               flashRise: root.motion.flashRise; flashFall: root.motion.flashFall
               title: delegateRoot.title; subtitle: delegateRoot.subtitle; icon: delegateRoot.icon; iconFont: delegateRoot.iconFont
               iconSource: delegateRoot.iconSource; tint: delegateRoot.tint; verb: delegateRoot.verb; accessory: delegateRoot.accessory
-              badge: delegateRoot.badge; hint: delegateRoot.hint; disabled: delegateRoot.disabled; answer: delegateRoot.answer
+              disabled: delegateRoot.disabled; answer: delegateRoot.answer
               shortcut: root.ctrlHeld && !root.dmenuActive && delegateRoot.index < root.shortcutRows ? String(delegateRoot.index + 1) : ""
               compact: root.compact
               selected: root.selected === delegateRoot.index
@@ -1586,12 +1611,24 @@ Item {
           }
         }
         Row {
-          anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
-          Text { text: root.dictationMode ? "Copy" : voice.active ? "Finish" : root.current.verb || "Select"; textFormat: Text.PlainText; color: Util.alpha(root.foreground, 0.8); font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter }
-          Keycap { label: "↵"; bright: true; foreground: root.foreground }
-          Item { width: Style.space(8); height: 1 }
-          Text { text: root.clipboardChoice ? "Paste" : root.compact ? "Settings" : "Provider settings"; textFormat: Text.PlainText; color: root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter }
-          Keycap { label: root.clipboardChoice ? "ctrl ↵" : "ctrl K"; foreground: root.foreground }
+          anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(16)
+          Repeater {
+            model: root.footerActions
+            delegate: Row {
+              id: footerAction
+              required property var modelData
+              anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
+              Text {
+                text: modelData.label; textFormat: Text.PlainText
+                color: modelData.bright ? Util.alpha(root.foreground, 0.8) : root.muted
+                font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter
+              }
+              Repeater {
+                model: modelData.keys || [modelData.key]
+                delegate: Keycap { required property string modelData; label: modelData; bright: !!footerAction.modelData.bright; foreground: root.foreground }
+              }
+            }
+          }
         }
       }
 
@@ -1602,12 +1639,12 @@ Item {
         opened: root.confirmPending !== null
         message: root.confirmPending ? root.confirmPending.message : ""
         detail: root.confirmPending && root.confirmPending.detail ? root.confirmPending.detail : ""
-        confirmText: root.confirmPending ? root.confirmPending.confirmText : "Confirm"
+        confirmText: root.confirmPending && root.confirmPending.confirmText ? root.confirmPending.confirmText : "Confirm"
+        cancelText: root.confirmPending && root.confirmPending.cancelText ? root.confirmPending.cancelText : "Cancel"
         background: root.background
         foreground: root.foreground
         muted: root.muted
         scrim: root.scrim
-        selectedBackground: root.selectedBackground
         selectedText: root.selectedText
         fontFamily: root.fontFamily
         cornerRadius: Style.cornerRadius

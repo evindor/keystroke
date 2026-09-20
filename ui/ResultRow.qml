@@ -3,7 +3,10 @@ import qs.Commons
 import qs.Ui
 
 // One result. Fixed roles only; the host updates delegates in place while
-// typing, so nothing here may depend on object identity.
+// typing, so nothing here may depend on object identity. Selection changes
+// only the highlight and the title weight: the keys that act on the row are
+// the footer's job, and provenance (an extension's badge, where a page came
+// from) belongs to the preview pane.
 BorderSurface {
   id: root
   property string title: ""
@@ -14,8 +17,6 @@ BorderSurface {
   property string tint: ""
   property string verb: ""
   property string accessory: ""
-  property string badge: ""
-  property string hint: ""
   // The Ctrl+digit that runs this row; shown in place of the icon while set.
   property string shortcut: ""
   property bool disabled: false
@@ -104,32 +105,16 @@ BorderSurface {
     anchors.rightMargin: Style.space(8)
     anchors.verticalCenter: parent.verticalCenter
     spacing: Style.space(2)
-    Row {
+    Text {
+      id: titleText
       width: parent.width
-      spacing: Style.space(6)
-      Text {
-        id: titleText
-        width: Math.min(implicitWidth, parent.width - (badgeText.visible ? badgeText.width + Style.space(6) : 0))
-        text: root.title
-        textFormat: Text.PlainText
-        color: root.textColor
-        font.family: root.answer ? Style.font.menuFamily : Style.font.menuFamily
-        font.pixelSize: root.answer ? Style.font.heading : (root.compact ? Style.font.title : Style.font.title + 1)
-        font.weight: root.selected || root.answer ? Font.DemiBold : Font.Medium
-        elide: Text.ElideRight
-      }
-      Rectangle {
-        id: badgeText
-        visible: !!root.badge
-        anchors.verticalCenter: parent.verticalCenter
-        width: badgeLabel.implicitWidth + Style.space(8)
-        height: badgeLabel.implicitHeight + Style.space(3)
-        radius: height / 2
-        color: Util.alpha(root.foreground, 0.08)
-        border.width: 1
-        border.color: Util.alpha(root.foreground, 0.14)
-        Text { id: badgeLabel; anchors.centerIn: parent; text: root.badge; textFormat: Text.PlainText; color: Util.alpha(root.foreground, 0.7); font.family: Style.font.menuFamily; font.pixelSize: Style.font.caption - 1 }
-      }
+      text: root.title
+      textFormat: Text.PlainText
+      color: root.textColor
+      font.family: Style.font.menuFamily
+      font.pixelSize: root.answer ? Style.font.heading : (root.compact ? Style.font.title : Style.font.title + 1)
+      font.weight: root.selected || root.answer ? Font.DemiBold : Font.Medium
+      elide: Text.ElideRight
     }
     Text {
       visible: !!root.subtitle
@@ -143,29 +128,18 @@ BorderSurface {
     }
   }
 
-  Row {
+  // The accessory is state the row carries (a check mark, a countdown, a
+  // setting's value); a row that leads somewhere shows a chevron instead.
+  Text {
     id: trail
     anchors.right: parent.right
     anchors.rightMargin: Style.space(12)
     anchors.verticalCenter: parent.verticalCenter
-    spacing: Style.space(8)
-    Text {
-      visible: root.selected && !!root.hint && !root.disabled
-      anchors.verticalCenter: parent.verticalCenter
-      text: root.hint
-      textFormat: Text.PlainText
-      color: Util.alpha(root.textColor, 0.55)
-      font.family: Style.font.menuFamily
-      font.pixelSize: Style.font.caption
-    }
-    Text {
-      anchors.verticalCenter: parent.verticalCenter
-      text: root.accessory ? root.accessory : (root.disabled ? "" : (root.selected ? "↵" : (root.verb === "Open" ? "›" : "")))
-      textFormat: Text.PlainText
-      color: root.accessory ? root.textColor : Util.alpha(root.textColor, root.selected ? 0.9 : 0.4)
-      font.family: Style.font.menuFamily
-      font.pixelSize: root.accessory ? Style.font.bodySmall : Style.font.heading
-    }
+    text: root.accessory ? root.accessory : (root.disabled ? "" : (root.verb === "Open" ? "›" : ""))
+    textFormat: Text.PlainText
+    color: root.accessory ? root.textColor : Util.alpha(root.textColor, 0.4)
+    font.family: Style.font.menuFamily
+    font.pixelSize: root.accessory ? Style.font.bodySmall : Style.font.heading
   }
 
   MouseArea {
