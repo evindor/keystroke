@@ -41,13 +41,21 @@ TestCase {
         verify(g.subtitle.indexOf("sends your prompt") > 0)
     }
     function test_cli_mode_passes_the_prompt_as_a_literal_argument() {
-        var payload = "--help $(touch /tmp/no) `id` \"quoted\""
+        var payload = "$(touch /tmp/no) `id` \"quoted\" --help"
         var c = Ai.plan("claude", "cli", false, all, payload)
         compare(c.effect.argv, ["omarchy-launch-terminal", "claude", payload])
         compare(Ai.plan("chatgpt", "cli", false, all, "x").effect.argv[1], "codex")
     }
+    function test_leading_dash_never_reaches_a_cli_as_an_option() {
+        compare(Ai.plan("claude", "cli", false, all, "-p").effect.argv[2], " -p")
+        compare(Ai.plan("chatgpt", "cli", false, all, "--yolo").effect.argv[2], " --yolo")
+        compare(Ai.cursorPlan("cli", all, "--force", "").effect.argv[2], " --force")
+        compare(Ai.claudeWebUrl("-x"), "https://claude.ai/new?q=%20-x")
+    }
     function test_scheme_handler_fallback_when_binary_missing() {
         compare(Ai.openLink("claude-desktop", "claude://x", {}), { type: "url", url: "claude://x" })
+        compare(Ai.openLink("cursor", "cursor://x", {}, ["--open-url"]), { type: "url", url: "cursor://x" })
+        compare(Ai.openLink("cursor", "cursor://x", all, ["--open-url"]), { type: "exec", argv: ["cursor", "--open-url", "cursor://x"] })
     }
     function test_cursor_desktop_deeplink_carries_prompt_and_workspace() {
         compare(Ai.cursorPromptUrl("fix tests", ""), "cursor://anysphere.cursor-deeplink/prompt?text=fix%20tests")
@@ -63,5 +71,28 @@ TestCase {
         var missing = Ai.cursorPlan("cli", { cursor: true }, "x", "")
         compare(missing.target, "cursor-desktop")
         verify(missing.subtitle.indexOf("CLI not installed") > 0)
+        compare(Ai.cursorPlan("browser", all, "x", "").subtitle, "Cursor · prompt ready in the composer · no browser hand-off")
+        compare(Ai.cursorPlan("desktop", { claude: true }, "x", ""), null)
+    }
+    function ids(rows) { return rows.map(function(r) { return r.id }) }
+    function test_rows_list_every_assistant_with_the_preferred_one_first() {
+        compare(ids(Ai.rows({ provider: "cursor", mode: "cli" }, all, "hi")), ["google", "cursor", "chatgpt", "claude"])
+        compare(ids(Ai.rows({ provider: "claude", mode: "desktop" }, all, "hi")), ["google", "claude", "chatgpt", "cursor"])
+        compare(ids(Ai.rows({}, all, "hi")), ["google", "chatgpt", "claude", "cursor"])
+        compare(ids(Ai.rows({ provider: "nonsense" }, all, "hi")), ["google", "chatgpt", "claude", "cursor"])
+        var rows = Ai.rows({ provider: "cursor", mode: "cli", cursorWorkspace: "/w" }, all, "hi")
+        compare(rows[1].action.argv, ["omarchy-launch-terminal", "agent", "--workspace", "/w", "hi"])
+        compare(rows[1].preview, "hi")
+        for (var i = 1; i < rows.length; i++) {
+            verify(rows[i].score > rows[0].score, rows[i].id + " ranks above Google")
+            verify(i === 1 || rows[i].score < rows[i - 1].score, rows[i].id + " keeps its place")
+            verify(rows[i].icon.length > 0)
+        }
+    }
+    function test_rows_keep_the_web_fallbacks_when_cursor_is_preferred_but_absent() {
+        var rows = Ai.rows({ provider: "cursor", mode: "desktop" }, { "claude-desktop": true }, "hi")
+        compare(ids(rows), ["google", "chatgpt", "claude"])
+        compare(rows[1].action.url, "https://chatgpt.com/?prompt=hi")
+        compare(rows[2].action.argv[0], "claude-desktop")
     }
 }

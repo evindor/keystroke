@@ -22,20 +22,29 @@
 //   chatgpt.com                ?prompt= prefills; ?q= sends immediately.
 //   claude.ai                  /new?q= prefills; there is no auto-send form.
 //   cursor 3.21.9              cursor://anysphere.cursor-deeplink/prompt?text=
-//                              prefills the composer (optional &workspace=).
+//                              prefills the composer; the app never sends it
+//                              (Cursor's deeplink reference, limit 10,000 chars).
+//                              &workspace= is not in that reference; it is kept
+//                              because the contributor saw 3.21.9 honour it.
 //                              Open with `cursor --open-url` when the binary is
 //                              on PATH, otherwise xdg-open via the scheme handler.
-//   agent (cursor-agent)       positional prompt; optional --workspace before
-//                              the prompt (verified with agent --help).
+//   agent (Cursor CLI)         positional prompt; --workspace <path> before it
+//                              (Cursor CLI parameter reference). The name is
+//                              generic, so detection also checks that the binary
+//                              resolves inside a cursor install.
 //
 // Nothing here runs at query time except string building; activation is always
 // an explicit Enter.
 
 var MAX_PROMPT = 2000
 
+// A leading "/" is padded because Claude's URL validator refuses it; a leading
+// "-" because the CLIs would parse a one-word prompt such as "-p" or "--yolo"
+// as an option. The prompt is otherwise passed through untouched.
 function clip(prompt) {
   var text = String(prompt === undefined || prompt === null ? "" : prompt).trim().slice(0, MAX_PROMPT)
-  return text.charAt(0) === "/" ? " " + text : text
+  var first = text.charAt(0)
+  return first === "/" || first === "-" ? " " + text : text
 }
 
 function encode(prompt) { return encodeURIComponent(clip(prompt)) }
@@ -47,21 +56,18 @@ function claudeWebUrl(prompt) { return "https://claude.ai/new?q=" + encode(promp
 function chatgptWebUrl(prompt, autoSend) { return "https://chatgpt.com/?" + (autoSend ? "q=" : "prompt=") + encode(prompt) }
 function googleUrl(query) { return "https://www.google.com/search?q=" + encodeURIComponent(String(query || "").trim()).replace(/%20/g, "+") }
 
-function cursorPromptUrl(prompt, workspace) {
-  var params = "text=" + encode(prompt)
-  var folder = workspace === undefined || workspace === null ? "" : String(workspace).trim()
-  if (folder) params += "&workspace=" + encodeURIComponent(folder)
-  return "cursor://anysphere.cursor-deeplink/prompt?" + params
-}
+function folderOf(workspace) { return workspace === undefined || workspace === null ? "" : String(workspace).trim() }
 
-function cursorOpenEffect(url, available) {
-  return available && available.cursor ? { type: "exec", argv: ["cursor", "--open-url", url] } : { type: "url", url: url }
+function cursorPromptUrl(prompt, workspace) {
+  var folder = folderOf(workspace)
+  return "cursor://anysphere.cursor-deeplink/prompt?text=" + encode(prompt) + (folder ? "&workspace=" + encodeURIComponent(folder) : "")
 }
 
 // Prefer the app's own launcher when it is on PATH (the scheme handler may not
 // be registered in mimeapps.list); otherwise let xdg-open resolve the scheme.
-function openLink(bin, url, available) {
-  return available && available[bin] ? { type: "exec", argv: [bin, url] } : { type: "url", url: url }
+// `args` go between the binary and the URL (Cursor wants --open-url).
+function openLink(bin, url, available, args) {
+  return available && available[bin] ? { type: "exec", argv: [bin].concat(args || [], [url]) } : { type: "url", url: url }
 }
 
 // One row plan per assistant. `available` maps binary name -> true for
@@ -96,28 +102,55 @@ function plan(assistant, mode, autoSend, available, prompt) {
            effect: { type: "url", url: chatgptWebUrl(prompt, autoSend) } }
 }
 
-// Cursor Agent CLI (`agent`) and Cursor desktop (`cursor --open-url` deeplink).
-// `available` maps agent, cursor -> true when detected on PATH.
+// Cursor CLI (`agent`) and Cursor desktop (`cursor --open-url` deeplink).
+// `available` maps agent, cursor -> true when detected. Cursor has no web
+// composer, so this is the one plan that can be null: nothing installed.
 function cursorPlan(mode, available, prompt, workspace) {
   var avail = available || {}
-  var folder = workspace === undefined || workspace === null ? "" : String(workspace).trim()
-  if (mode === "cli") {
-    if (avail.agent) {
-      var argv = ["omarchy-launch-terminal", "agent"]
-      if (folder) argv.push("--workspace", folder)
-      argv.push(clip(prompt))
-      return { id: "cursor", target: "cursor-agent-cli", title: "Ask Cursor Agent",
-               subtitle: "Terminal · agent with your prompt", verb: "Open terminal",
-               effect: { type: "exec", argv: argv } }
-    }
+  var folder = folderOf(workspace)
+  if (mode === "cli" && avail.agent) {
+    var argv = ["omarchy-launch-terminal", "agent"]
+    if (folder) argv.push("--workspace", folder)
+    argv.push(clip(prompt))
+    return { id: "cursor", target: "cursor-agent-cli", title: "Ask Cursor Agent",
+             subtitle: "Terminal · agent with your prompt", verb: "Open terminal",
+             effect: { type: "exec", argv: argv } }
   }
-  if (mode === "desktop" || mode === "browser" || mode === "cli") {
-    if (avail.cursor) {
-      var why = mode === "cli" ? " · CLI not installed" : (mode === "browser" ? " · no browser hand-off" : "")
-      return { id: "cursor", target: "cursor-desktop", title: "Ask Cursor",
-               subtitle: "Cursor · prompt ready in the composer" + why, verb: "Open Cursor",
-               effect: cursorOpenEffect(cursorPromptUrl(prompt, folder), avail) }
-    }
+  if (avail.cursor) {
+    var why = mode === "cli" ? " · CLI not installed" : (mode === "browser" ? " · no browser hand-off" : "")
+    return { id: "cursor", target: "cursor-desktop", title: "Ask Cursor",
+             subtitle: "Cursor · prompt ready in the composer" + why, verb: "Open Cursor",
+             effect: openLink("cursor", cursorPromptUrl(prompt, folder), avail, ["--open-url"]) }
   }
   return null
+}
+
+var ASSISTANTS = ["chatgpt", "claude", "cursor"]
+var ICONS = { google: "󰊭", chatgpt: "󰭹", claude: "󰛄", cursor: "󰨞" }
+
+// The preferred assistant first, then the others in their fixed order; an
+// unknown preference means the default.
+function order(preferred) {
+  var first = ASSISTANTS.indexOf(preferred) >= 0 ? preferred : ASSISTANTS[0]
+  return [first].concat(ASSISTANTS.filter(function(a) { return a !== first }))
+}
+
+// The "Continue with" rows for one query: Google, then every assistant that
+// has a plan. Scores keep the preferred one first and every assistant above
+// Google (2); the ranking stays within the fallback tier.
+function rows(settings, available, prompt) {
+  var s = settings || {}
+  var out = [{ id: "google", title: "Search Google", subtitle: prompt, icon: ICONS.google, section: "Continue with",
+               verb: "Search", tier: "fallback", score: 2, action: { type: "url", url: googleUrl(prompt) } }]
+  var seq = order(s.provider)
+  for (var i = 0; i < seq.length; i++) {
+    var a = seq[i]
+    var p = a === "cursor" ? cursorPlan(s.mode, available, prompt, s.cursorWorkspace)
+                           : plan(a, a === "chatgpt" ? "browser" : s.mode, s.autoSend === true, available, prompt)
+    if (!p) continue
+    out.push({ id: p.id, title: p.title, subtitle: p.subtitle, icon: ICONS[a], section: "Continue with",
+               verb: p.verb, tier: "fallback", score: 3 - i * 0.25, action: p.effect,
+               preview: prompt, previewLabel: "PROMPT", previewDetail: "Opens with this prompt in the composer" })
+  }
+  return out
 }

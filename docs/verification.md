@@ -9,6 +9,21 @@
 - `bin/keystroke validate` passes. `tests/tst_ai.qml` (10 tests) passes
   offscreen. Full `bin/keystroke test` QML suite passes; integration checks
   unchanged. Not exercised: live hand-off on a machine without Cursor installed.
+- Review fixes (2026-09-20, no Cursor on the reviewing machine): the
+  "Continue with" rows are now planned by `AiTargets.rows` (Google, then every
+  assistant with a plan, preferred first) so preferring Cursor no longer drops
+  Claude and ChatGPT, and an absent Cursor leaves the web fallbacks in place.
+  `clip` pads a leading `-` like it pads `/`, so a one-word query such as `-p`
+  or `--yolo` cannot reach `claude`, `codex` or `agent` as an option. Detection
+  only reports `agent` when `readlink -f` resolves it inside a `*cursor*` path,
+  checked by running the exact detect command against a fake
+  `~/.local/share/cursor-agent/versions/…/cursor-agent` symlink (reported) and an
+  unrelated `agent` script (not reported). Cursor's CLI parameter reference
+  confirms the positional prompt and `--workspace <path>`; its deeplink
+  reference documents only `text=` for prompt links, so `workspace=` on the
+  deeplink rests on the contributor's 3.21.9 check. `tests/tst_ai.qml`: 13
+  tests; full QML suite 270 passed; `tests/lint.sh` adds nothing for
+  `providers/AiWeb.qml`; `bin/keystroke validate` passes.
 
 ## Browser search review fixes (2026-09-12)
 
