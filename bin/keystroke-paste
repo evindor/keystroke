@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Paste into the focused window after Keystroke has released keyboard focus.
+set -euo pipefail
+
+force_shift_insert=false
+if [[ ${1:-} == --shift-insert ]]; then
+  force_shift_insert=true
+  shift
+fi
+
+if [[ ${1:-} == --file ]]; then
+  (( $# == 3 )) || exit 2
+  [[ -r $3 ]] || exit 1
+  wl-copy --type "$2" < "$3"
+  sleep 0.15
+elif (( $# != 0 )); then
+  exit 2
+fi
+
+if [[ $force_shift_insert == true ]]; then
+  exec wtype -M shift -k Insert -m shift
+fi
+
+window=$(hyprctl activewindow -j 2>/dev/null) || exit 1
+class=$(jq -r '.class // ""' <<< "$window")
+[[ -n $class ]] || exit 1
+
+is_terminal=false
+if jq -e 'any(.tags[]?; sub("\\*$"; "") == "terminal")' <<< "$window" >/dev/null; then
+  is_terminal=true
+else
+  # Desktop files identify terminal emulators that Omarchy has not tagged yet.
+  data_dirs=${XDG_DATA_DIRS:-/usr/local/share:/usr/share}
+  for base in "${XDG_DATA_HOME:-$HOME/.local/share}" ${data_dirs//:/ }; do
+    for desktop in "$base"/applications/*.desktop; do
+      [[ -f $desktop ]] || continue
+      if [[ ${desktop##*/} == "$class.desktop" ]] || grep -Fxq "StartupWMClass=$class" "$desktop"; then
+        if grep -Eq '^Categories=([^;]*;)*TerminalEmulator(;|$)' "$desktop"; then
+          is_terminal=true
+          break 2
+        fi
+      fi
+    done
+  done
+fi
+
+if [[ $is_terminal == true ]]; then
+  exec wtype -M ctrl -M shift -k v -m shift -m ctrl
+fi
+exec wtype -M ctrl -k v -m ctrl

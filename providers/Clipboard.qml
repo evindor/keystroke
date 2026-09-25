@@ -10,6 +10,7 @@ Item {
   property var host: null
   property var entries: []
   readonly property string omarchyPath: Quickshell.env("OMARCHY_PATH")
+  readonly property string pasteHelperPath: Qt.resolvedUrl("../bin/keystroke-paste").toString().replace("file://", "")
   readonly property string historyPath: Quickshell.env("HOME") + "/.local/state/omarchy/clipboard-history.json"
 
   readonly property var provider: ({
@@ -19,7 +20,14 @@ Item {
     icon: "󰅌",
     color: "#8dbaec",
     description: "Uses Omarchy's existing history",
-    settings: [{ key: "limit", type: "number", label: "Maximum entries", "default": 100, min: 1, max: 300, integer: true }],
+    settings: [
+      { key: "limit", type: "number", label: "Maximum entries", "default": 100, min: 1, max: 300, integer: true },
+      { key: "pasteOnSelect", type: "boolean", label: "Paste on selection", "default": false,
+        description: "Paste selected entries into the previous window" },
+      { key: "pasteShortcut", type: "enum", label: "Paste shortcut", "default": "auto",
+        options: ["auto", "shift-insert"], optionLabels: { "auto": "Automatic", "shift-insert": "Shift+Insert" },
+        description: "Automatic uses Ctrl+Shift+V for terminals and Ctrl+V elsewhere" }
+    ],
     query: function(ctx) { return root.query(ctx) }
   })
 
@@ -59,6 +67,7 @@ Item {
     }
     var rows = []
     var limit = ctx.settings.limit
+    var paste = ctx.settings.pasteOnSelect === true
     for (var i = 0; i < root.entries.length && i < limit; i++) {
       var e = root.entries[i]
       var image = e.type === "image"
@@ -69,11 +78,13 @@ Item {
       if (!score) continue
       rows.push({
         id: Qt.md5(image ? e.path : text), title: title, subtitle: image ? "Image" : text.length + " characters", icon: "󰅌",
-        section: "Clipboard", verb: "Copy", tier: "item", score: score, order: i,
-        action: image ? { type: "exec", argv: [root.omarchyPath + "/bin/omarchy-clipboard-paste-file", "--copy-only", e.mime, e.path] }
-                      : { type: "copy", text: text },
+        section: "Clipboard", verb: paste ? "Paste" : "Copy", tier: "item", score: score, order: i,
+        action: image ? { type: "exec", argv: paste
+                              ? [root.pasteHelperPath].concat(ctx.settings.pasteShortcut === "shift-insert" ? ["--shift-insert"] : []).concat(["--file", e.mime, e.path])
+                              : [root.omarchyPath + "/bin/omarchy-clipboard-paste-file", "--copy-only", e.mime, e.path] }
+                      : paste ? { type: "dictation-copy", text: text, paste: true, pasteShortcut: ctx.settings.pasteShortcut } : { type: "copy", text: text },
         preview: text.slice(0, 12000), previewImage: image ? e.path : "", previewLabel: "CLIPBOARD",
-        previewDetail: "Copied locally · never included in global search"
+        previewDetail: (paste ? "Pastes into the previous window" : "Copied locally") + " · never included in global search"
       })
     }
     return rows

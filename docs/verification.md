@@ -1067,3 +1067,26 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
   `omarchy plugin validate` exit 0; `git diff --check` clean. The engine
   workflow and the extension check are green on the same commit. Not
   exercised here: the attest job, which first runs on the `v1.4.2` tag.
+
+## Clipboard paste on selection (2026-09-25)
+
+- Clipboard History gains a schema setting, **Paste on selection**, off by
+  default. Text uses the existing copy/close/paste transfer; images use a
+  shared local helper. The default copy actions remain unchanged.
+- **Paste shortcut** defaults to Automatic: `Ctrl+Shift+V` for terminal windows
+  identified by Omarchy tags or desktop metadata, and `Ctrl+V` elsewhere.
+  `Shift+Insert` remains available as an override.
+- `tests/clipboard_provider_check.py` passed: defaults, text and image copy
+  actions, text and image paste actions, and shortcut setting. The new
+  `tests/clipboard_paste_shortcut_check.py` passed normal, tagged-terminal,
+  desktop-categorized terminal, override, and image-copy cases. The existing
+  `tests/clipboard_transfer_check.py` passed copy-before-paste ordering,
+  cancellation and failure checks.
+- Offscreen `bin/keystroke test` reached 265 QML tests and the palette motion
+  check with no failures, then stopped because `uv` is unavailable here.
+  The clipboard, dictation and extension integration checks passed separately.
+  `omarchy plugin validate` and `tests/lint.sh` exited 0.
+- The local installation was verified through the running shell after a shell
+  restart: its Clipboard History settings listed **Paste on selection** and
+  **Paste shortcut**. Interactive paste into individual applications was not
+  exercised by the automated checks.
