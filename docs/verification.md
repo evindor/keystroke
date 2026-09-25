@@ -1067,3 +1067,18 @@ Keystroke menu. The stable `main` / `v1-voice` checkpoint is unchanged.
   `omarchy plugin validate` exit 0; `git diff --check` clean. The engine
   workflow and the extension check are green on the same commit. Not
   exercised here: the attest job, which first runs on the `v1.4.2` tag.
+
+## Clipboard paste on selection (2026-09-25)
+
+- Clipboard History gains a schema setting, **Paste on selection**, off by
+  default. Text uses the existing copy/close/paste transfer; images use
+  Omarchy's clipboard paste helper without `--copy-only`. The default copy
+  actions remain unchanged.
+- `tests/clipboard_provider_check.py` passed: defaults, text and image copy
+  actions, and text and image paste actions. The existing
+  `tests/clipboard_transfer_check.py` passed copy-before-paste ordering,
+  cancellation and failure checks.
+- Offscreen `bin/keystroke test` reached 265 QML tests and the palette motion
+  check with no failures, then stopped because `uv` is unavailable here.
+  The clipboard, dictation and extension integration checks passed separately.
+  `omarchy plugin validate` and `tests/lint.sh` exited 0.
