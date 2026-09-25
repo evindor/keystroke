@@ -86,6 +86,7 @@ case "${1:-help}" in
     uv run --with-requirements "$ROOT/matching/requirements.lock" python "$ROOT/tests/matching_engine_check.py"
     python3 "$ROOT/tests/voice_session_check.py"
     python3 "$ROOT/tests/clipboard_provider_check.py"
+    python3 "$ROOT/tests/clipboard_paste_shortcut_check.py"
     python3 "$ROOT/tests/clipboard_transfer_check.py"
     python3 "$ROOT/tests/codex_session_check.py"
     python3 "$ROOT/tests/palette_dictation_check.py"

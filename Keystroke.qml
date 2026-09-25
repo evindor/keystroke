@@ -317,6 +317,7 @@ Item {
   property string dictationPending: ""   // explicit Enter intent: copy | paste
   ClipboardTransfer {
     id: clipboardTransfer
+    pasteCommand: [Qt.resolvedUrl("bin/keystroke-paste").toString().replace("file://", "")]
     onCopied: root.cancel(true)
     onFailed: function(message) {
       if (root.opened) root.errorMessage = message
@@ -328,7 +329,10 @@ Item {
     if (voice.active) {
       if (!root.dictationPending) root.dictationPending = alternate ? "paste" : "copy"
       root.voiceStop()
-    } else clipboardTransfer.submit(search.text, alternate)
+    } else {
+      clipboardTransfer.pasteCommand = [Qt.resolvedUrl("bin/keystroke-paste").toString().replace("file://", "")]
+      clipboardTransfer.submit(search.text, alternate)
+    }
   }
   property string voiceRawText: ""
   readonly property bool liveText: voice.active && search.text.length > 0
@@ -383,7 +387,10 @@ Item {
       var pendingCopy = root.dictationPending
       root.dictationPending = ""
       root.statusMessage = "Enter copies · Ctrl+Enter pastes"
-      if (pendingCopy) clipboardTransfer.submit(text, pendingCopy === "paste")
+      if (pendingCopy) {
+        clipboardTransfer.pasteCommand = [Qt.resolvedUrl("bin/keystroke-paste").toString().replace("file://", "")]
+        clipboardTransfer.submit(text, pendingCopy === "paste")
+      }
     } else root.statusMessage = "Transcribed · press ↵ to run"
   }
   function isSuperKey(key) { return key === Qt.Key_Super_L || key === Qt.Key_Super_R || key === Qt.Key_Meta || key === Qt.Key_Hyper_L || key === Qt.Key_Hyper_R }
@@ -1150,7 +1157,12 @@ Item {
       if (!root.voiceBegin("tap")) root.errorMessage = "Voice is unavailable; check Settings › Voice"
       return
     }
-    if (type === "dictation-copy") { clipboardTransfer.submit(effect.text, effect.paste); return }
+    if (type === "dictation-copy") {
+      clipboardTransfer.pasteCommand = [Qt.resolvedUrl("bin/keystroke-paste").toString().replace("file://", "")]
+        .concat(effect.pasteShortcut === "shift-insert" ? ["--shift-insert"] : [])
+      clipboardTransfer.submit(effect.text, effect.paste)
+      return
+    }
     if (type === "query") { root.typeQuery(effect.text); return }
     if (type === "navigate") { root.navigate(effect.scope, effect.title || row.title); return }
     if (type === "setting") {

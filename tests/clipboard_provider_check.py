@@ -20,6 +20,7 @@ ShellRoot {
   Timer { interval: 100; running: true; onTriggered: {
     var settings = Settings.values(Settings.empty(), ["providers", "clipboard"], clipboard.provider.settings)
     check(settings.pasteOnSelect === false, "paste must default off")
+    check(settings.pasteShortcut === "auto", "paste shortcut must default to automatic")
     clipboard.entries = [
       { type: "text", text: "hello", search: "hello" },
       { type: "image", path: "/tmp/example.png", mime: "image/png", capturedAt: "today" }
@@ -31,7 +32,11 @@ ShellRoot {
     settings.pasteOnSelect = true
     rows = clipboard.query(ctx)
     check(rows[0].verb === "Paste" && rows[0].action.type === "dictation-copy" && rows[0].action.paste === true, "text must paste")
-    check(rows[1].verb === "Paste" && rows[1].action.argv.length === 3, "image must paste")
+    check(rows[1].verb === "Paste" && rows[1].action.argv[0].endsWith("/bin/keystroke-paste") && rows[1].action.argv[1] === "--file", "image must use the paste helper")
+    settings.pasteShortcut = "shift-insert"
+    rows = clipboard.query(ctx)
+    check(rows[0].action.pasteShortcut === "shift-insert", "text override must be passed to the transfer")
+    check(rows[1].action.argv[1] === "--shift-insert", "image override must reach the paste helper")
     console.log("PASS clipboard provider copy and paste actions"); Qt.quit()
   } }
 }
