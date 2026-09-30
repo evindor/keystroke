@@ -1,6 +1,6 @@
 {
   "name": "Browser search",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Keystroke contributors",
   "description": "Search your default browser's history and bookmarks",
   "apiVersion": 1,

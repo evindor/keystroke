@@ -1,5 +1,21 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Browser search 1.1.0: Helium (2026-09-30)
+
+- `helium.desktop` (the ID Helium's deb, rpm, tarball and the AUR
+  `helium-browser-bin` package install) is now a Chromium-family browser whose
+  profiles live under `$XDG_CONFIG_HOME/net.imput.helium`. Before, a Helium
+  default browser got "Default browser is not supported" and no results.
+- New fixture test `test_helium_reads_its_own_profile`: Helium ignores a
+  Chromium profile, then returns the bookmarks from its own `Default`. It fails
+  on the previous `search.py` (verified by reverting the line) and passes now.
+- Passed: nine Python fixture tests; `bin/keystroke check-extensions
+  extensions/browser-search`; the browser palette check. One live query
+  against a real Helium 0.18.1.1 profile (Asahi Linux, arm64) returned its
+  bookmarks in the running palette. Host QML unit tests and the wider
+  integration suite were not re-run; nothing outside `extensions/browser-search`
+  and this log changed.
+
 ## Release 1.5.0 (2026-09-29)
 
 - Contents since 1.4.4, all merged from contributor PRs on 2026-09-29: the

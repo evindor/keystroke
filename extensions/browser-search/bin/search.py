@@ -22,6 +22,7 @@ BROWSERS = {
     "vivaldi-stable.desktop": ("Vivaldi", "vivaldi"),
     "vivaldi.desktop": ("Vivaldi", "vivaldi"),
     "microsoft-edge.desktop": ("Microsoft Edge", "microsoft-edge"),
+    "helium.desktop": ("Helium", "net.imput.helium"),
     "firefox.desktop": ("Firefox", None),
     "firefox-esr.desktop": ("Firefox ESR", None),
 }
