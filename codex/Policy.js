@@ -1,7 +1,8 @@
 .pragma library
 
-// Tested against Codex 0.153.2. Keep transport and permission policy explicit.
-var VERSION = "0.153.2"
+// Keep transport and permission policy explicit.
+// Minimum stable CLI version accepted by helpers/codex-start.sh.
+var VERSION = "0.159.2"
 var MODEL = "gpt-5.6-luna"
 var QUICK_INSTRUCTIONS = "You are the quick-answer assistant inside Keystroke, an Omarchy command palette. "
     + "Answer the user's question directly and concisely, in their language. Use readable Markdown and source links when useful. "

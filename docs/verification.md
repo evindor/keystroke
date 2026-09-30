@@ -33,7 +33,8 @@
   `cursor://anysphere.cursor-deeplink/prompt?text=…` via `cursor --open-url`;
   CLI mode runs `agent` in a terminal with the prompt as a literal argv and an
   optional workspace from Settings → Cursor workspace folder.
-- `bin/keystroke validate` passes. `tests/tst_ai.qml` (10 tests) passes
+- `bin/keystroke validate` and `tests/lint.sh` pass; lint emits the known
+  Omarchy/Quickshell metadata and unqualified-access warnings. `tests/tst_ai.qml` (10 tests) passes
   offscreen. Full `bin/keystroke test` QML suite passes; integration checks
   unchanged. Not exercised: live hand-off on a machine without Cursor installed.
 - Review fixes (2026-09-20, no Cursor on the reviewing machine): the
@@ -1147,3 +1148,32 @@ Contributed by Pablo Pineda (#16); reworked on the PR branch in review.
   the helper receives `--shift-insert`. `tests/clipboard_transfer_check.py`
   is unchanged and passes.
 - Not exercised: a real paste into applications, which needs the live desktop.
+
+
+## Codex minimum-version gate (2026-09-30)
+
+The exact 0.153.2 gate rejected an installed stable Codex 0.159.2 before
+app-server could start. Accept stable CLI versions >= 0.159.2 using numeric
+major/minor/patch comparison; keep missing, malformed and prerelease versions
+rejected. The UI and README describe the minimum consistently.
+
+- `bash -n helpers/codex-start.sh` and `python3 tests/codex_start_check.py`
+  pass. The regression covers the boundary, newer minor/major versions,
+  numeric ordering, invalid/missing CLI output, unchanged app-server argv,
+  and rejection before state-directory creation. It runs in `bin/keystroke test`.
+- `bin/keystroke validate` and `tests/lint.sh` pass; lint emits the known
+  Omarchy/Quickshell metadata and unqualified-access warnings.
+- `QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=generic
+  QT_QUICK_BACKEND=software bin/keystroke test`: 270 QML tests pass, and all
+  integration checks before `hotkeys_check.py` pass, including the Codex
+  session/streaming/approval/cancellation/handoff fixture. The hotkey check
+  fails on this machine's bindings (fullscreen ranking/shortcut expectations);
+  the same failures reproduce on unchanged upstream `dev` (48e26de).
+- A real app-server smoke check through the updated helper with Codex 0.159.2
+  passes initialize, config/read, model/list, account/read, quick-mode thread
+  creation, a streamed question and a context-preserving follow-up using
+  gpt-6.1-sol/Fast. The test thread is ephemeral with local tools and MCP disabled.
+
+The minimum gate permits future stable releases; it does not establish their
+protocol compatibility. Desktop handoff and a live palette interaction were
+not exercised in this check.
