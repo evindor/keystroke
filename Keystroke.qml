@@ -484,6 +484,14 @@ Item {
   property bool closing: false
   property double flashUntil: 0             // wall clock at which the activated row's flash peaks
   signal flashed(string uid)
+  // Hidden at once, with no fade left running.
+  function snapWindow() {
+    hideDelay.stop()
+    revealAnim.stop()
+    root.closing = false
+    root.reveal = 0
+    root.flashUntil = 0
+  }
   onOpenedChanged: {
     hideDelay.stop()
     revealAnim.stop()
@@ -496,7 +504,7 @@ Item {
       root.closing = true
       hideDelay.interval = Math.max(0, root.flashUntil - Date.now())
       hideDelay.restart()
-    } else { root.reveal = 0; root.closing = false }
+    } else root.snapWindow()
   }
   Timer { id: hideDelay; onTriggered: { if (root.opened) return; revealAnim.to = 0; revealAnim.duration = root.windowDuration; revealAnim.restart() } }
   // Most of the change lands in the first frames: a reveal that ramps up
@@ -635,6 +643,7 @@ Item {
     root.confirmPending = null
     root.errorMessage = ""
     root.statusMessage = ""
+    root.graphicsLossReported = false
     if (payload && payload.scope !== undefined) {
       root.scope = String(payload.scope)
       root.scopeTitle = String(payload.title || "")
@@ -685,6 +694,9 @@ Item {
     root.dmenuMaxHeight = Math.max(0, Number(payload.maxHeight || 0))
     root.scope = ""; root.scopeTitle = root.dmenuPrompt; root.history = []
     root.confirmPending = null
+    root.errorMessage = ""
+    root.statusMessage = ""
+    root.graphicsLossReported = false
     search.text = ""
     root.resetSelection()
     root.applyRows([])
@@ -715,6 +727,25 @@ Item {
     root.confirmPending = null
     root.pending = false
     debounce.stop()
+  }
+
+  // A compositor close or allocation failure must not leave a logically open
+  // palette (or a dmenu caller waiting). There is no surface left to animate.
+  function windowClosed() {
+    if (!root.opened && !root.closing) return
+    root.cancel()
+    root.snapWindow()
+  }
+  // The two signals may arrive in either order, so the report does not depend
+  // on the palette still being open; it is made once until the next open.
+  property bool graphicsLossReported: false
+  function graphicsLost() {
+    root.windowClosed()
+    if (root.graphicsLossReported) return
+    root.graphicsLossReported = true
+    root.errorMessage = "The launcher window lost its graphics resources. GPU memory may be exhausted; free some and try again."
+    console.warn("keystroke: " + root.errorMessage)
+    Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-notification-send", "Keystroke closed", root.errorMessage])
   }
 
   // ---------------------------------------------------------------- queries
@@ -1234,6 +1265,12 @@ Item {
     var count = resultModel.count || 2
     var maxRows = root.dmenuMaxHeight > 0 ? Math.max(1, Math.floor(Style.space(root.dmenuMaxHeight) / (rowHeight + rowSpacing))) : 12
     return Math.min(count, maxRows) * (rowHeight + rowSpacing)
+  }
+
+  Connections {
+    target: panel
+    function onResourcesLost() { root.graphicsLost() }
+    function onClosed() { root.windowClosed() }
   }
 
   PanelWindow {
