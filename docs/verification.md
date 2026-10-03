@@ -1147,3 +1147,25 @@ Contributed by Pablo Pineda (#16); reworked on the PR branch in review.
   the helper receives `--shift-insert`. `tests/clipboard_transfer_check.py`
   is unchanged and passes.
 - Not exercised: a real paste into applications, which needs the live desktop.
+
+## Converter target inferred from the source (2026-10-04)
+
+- `core/Units.js`: the target is optional. `35 lb` answers in kilograms,
+  `180 cm` in inches, `100 F` in °C, `60 mph` in km/h: each unit names the
+  other system's everyday unit as its counterpart. Metres have none, so
+  Timer's bare `10m` keeps its row; time, data, millilitres and kelvin have
+  none either and still need a target.
+- `tests/tst_units.qml` covers the counterparts, an explicit target after a
+  bare-looking source, the units without one, and `10 in london` staying a
+  time-zone query. qmltestrunner: 271 passed, 0 failed.
+- `bin/keystroke test` on aarch64: every check before the hotkeys check
+  passed; the hotkeys check fails identically on `dev` without this change
+  (it reads the live bindings, where Terminal is not on `Super + Return`).
+  `tests/lint.sh` exit 0, `omarchy plugin validate` exit 0, `git diff --check`
+  clean.
+- Live, on the desktop: `core/Units.js` copied into the installed plugin and
+  the shell restarted. Over IPC, `35 lb` → `15.87573295 kg`, `180 cm` →
+  `70.86614173 in`, `100 f` → `37.77777778 °C`, `60 mph` → `96.56064 km/h`,
+  each the selected answer; `2m in feet`, `10 in london` and `45 usd`
+  (Currency) answered as before; `10m` produced no converter row. Not
+  exercised: `10m` with Timer turned on.

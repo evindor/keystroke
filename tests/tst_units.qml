@@ -17,6 +17,24 @@ TestCase {
         try { Units.convert("-1 K to C") } catch (e2) { threw = true }
         verify(threw)
     }
+    function test_counterpart_target() {
+        compare(Units.convert("35 lb"), { value: 15.87573295, unit: "kg" })
+        compare(Units.convert("180cm").unit, "in")
+        compare(Units.convert("5 miles").unit, "km")
+        compare(Units.convert("2 l").unit, "gal")
+        compare(Units.convert("60 mph").unit, "km/h")
+        compare(Units.convert("100 °F"), { value: 37.77777777777778, unit: "°C" })
+        compare(Units.convert("20 celsius").unit, "°F")
+        compare(Units.convert("35 lb to g").unit, "g")
+        // Metres would take Timer's "10m"; time, data and kelvin have no counterpart;
+        // "10 in london" must stay a time-zone query.
+        var unanswered = ["10m", "10 min", "2 h", "5 gb", "300 k", "45 usd", "10 in london"]
+        for (var i = 0; i < unanswered.length; i++) {
+            var threw = false
+            try { Units.convert(unanswered[i]) } catch (e) { threw = true }
+            verify(threw, unanswered[i])
+        }
+    }
     function test_time_gate() {
         verify(Units.isTimeQuery("10 am in London"))
         verify(Units.isTimeQuery("11 pm in new york to tokyo on 2026-09-06"))
