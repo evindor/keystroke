@@ -1,0 +1,33 @@
+{
+  "name": "TOTP",
+  "version": "1.0.0",
+  "author": "brianvu",
+  "description": "Generate and copy time-based one-time passwords: totp",
+  "apiVersion": 1,
+  "icon": "󰌆",
+  "color": "#4ec9b0",
+  "homepage": "https://github.com/imbriandev/raycast-totp",
+  "license": "MIT",
+  "commands": [
+    {
+      "id": "totp",
+      "prefix": "totp",
+      "title": "TOTP Authenticator",
+      "summary": "Copy or generate time-based one-time passwords",
+      "args": [
+        {
+          "name": "query",
+          "hint": "account name to filter, or secret/URI for quick OTP",
+          "optional": true,
+          "rest": true
+        }
+      ],
+      "examples": [
+        "totp",
+        "totp github",
+        "totp add otpauth://totp/GitHub:user?secret=JBSWY3DP",
+        "totp quick JBSWY3DPEHPK3PXP"
+      ]
+    }
+  ]
+}

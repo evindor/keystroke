@@ -1,0 +1,299 @@
+#!/usr/bin/env python3
+"""CLI utility to manage TOTP accounts and convert/import Raycast TOTP backups.
+
+Usage:
+  totp-cli list
+  totp-cli add <secret|otpauth> [name] [issuer]
+  totp-cli export [output.json] [--passphrase <pass>]
+  totp-cli import <input.json> [--passphrase <pass>]
+"""
+import argparse
+import base64
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "keystroke" / "totp"
+ACCOUNTS_FILE = STATE_DIR / "accounts.json"
+
+
+def load_accounts():
+    if not ACCOUNTS_FILE.exists():
+        return []
+    try:
+        return json.loads(ACCOUNTS_FILE.read_text())
+    except Exception:
+        return []
+
+
+def save_accounts(accounts):
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    accounts = sorted(accounts, key=lambda a: (a.get("name", "").lower(), a.get("id", "")))
+    ACCOUNTS_FILE.write_text(json.dumps(accounts, indent=2) + "\n")
+
+
+def cmd_list(args):
+    accounts = load_accounts()
+    if not accounts:
+        print("No TOTP accounts saved.")
+        return 0
+    print(f"Saved TOTP accounts ({len(accounts)}):")
+    for acc in accounts:
+        issuer = f" [{acc['issuer']}]" if acc.get("issuer") else ""
+        print(f"  - {acc.get('name', 'Unknown')}{issuer} (digits: {acc.get('digits', 6)}, period: {acc.get('period', 30)}s, algo: {acc.get('algorithm', 'SHA1')})")
+    return 0
+
+
+def cmd_add(args):
+    secret_or_uri = args.secret.strip()
+    # Normalize or parse
+    node_script = """
+const { parseInput } = require('./core/TOTP.js');
+"""
+    # Simple parse in python or delegate
+    accounts = load_accounts()
+    # If otpauth URI
+    name = args.name or "New Account"
+    issuer = args.issuer or ""
+    algo = "SHA1"
+    digits = 6
+    period = 30
+    secret = secret_or_uri
+
+    if secret_or_uri.lower().startswith("otpauth://"):
+        import urllib.parse
+        url = urllib.parse.urlparse(secret_or_uri)
+        query = urllib.parse.parse_qs(url.query)
+        secret = query.get("secret", [""])[0].upper().replace(" ", "").replace("-", "")
+        issuer = args.issuer or query.get("issuer", [""])[0]
+        label = urllib.parse.unquote(url.path.lstrip("/"))
+        if ":" in label:
+            parts = label.split(":", 1)
+            issuer = issuer or parts[0].strip()
+            name = parts[1].strip()
+        else:
+            name = label.strip() or name
+        digits = int(query.get("digits", [6])[0])
+        period = int(query.get("period", [30])[0])
+        algo = query.get("algorithm", ["SHA1"])[0].upper()
+    else:
+        secret = secret.upper().replace(" ", "").replace("-", "")
+
+    new_acc = {
+        "id": f"totp-{int(time.time())}-{os.urandom(3).hex()}",
+        "name": name,
+        "issuer": issuer,
+        "secret": secret,
+        "digits": digits,
+        "period": period,
+        "algorithm": algo
+    }
+    accounts.append(new_acc)
+    save_accounts(accounts)
+    print(f"Added account '{name}' successfully.")
+    return 0
+
+
+def cmd_delete(args):
+    accounts = load_accounts()
+    query = args.query.lower().strip()
+    match_index = -1
+    for i, a in enumerate(accounts):
+        if a.get("id") == args.query or query in a.get("name", "").lower() or query in a.get("issuer", "").lower():
+            match_index = i
+            break
+    if match_index < 0:
+        print(f"No account found matching '{args.query}'.", file=sys.stderr)
+        return 1
+    removed = accounts.pop(match_index)
+    save_accounts(accounts)
+    print(f"Deleted account '{removed.get('name')}' successfully.")
+    return 0
+
+
+def cmd_edit(args):
+    accounts = load_accounts()
+    query = args.query.lower().strip()
+    match = None
+    for a in accounts:
+        if a.get("id") == args.query or query in a.get("name", "").lower() or query in a.get("issuer", "").lower():
+            match = a
+            break
+    if not match:
+        print(f"No account found matching '{args.query}'.", file=sys.stderr)
+        return 1
+
+    if args.name:
+        match["name"] = args.name.strip()
+    if args.issuer is not None:
+        match["issuer"] = args.issuer.strip()
+    if args.secret:
+        match["secret"] = args.secret.upper().replace(" ", "").replace("-", "")
+    if args.digits:
+        match["digits"] = int(args.digits)
+    if args.period:
+        match["period"] = int(args.period)
+    if args.algorithm:
+        match["algorithm"] = args.algorithm.upper()
+
+    save_accounts(accounts)
+    print(f"Updated account '{match.get('name')}' successfully.")
+    return 0
+
+
+def cmd_export(args):
+    accounts = load_accounts()
+    out_path = Path(args.output or (STATE_DIR / "backup.json"))
+    if args.passphrase:
+        # Encrypt with Raycast-compatible format (AES-256-GCM + scrypt)
+        node_code = f"""
+const crypto = require('crypto');
+const fs = require('fs');
+
+const password = {json.dumps(args.passphrase)};
+const accounts = {json.dumps(accounts)};
+
+const salt = crypto.randomBytes(16);
+const iv = crypto.randomBytes(12);
+const key = crypto.scryptSync(password, salt, 32);
+const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+const ciphertext = Buffer.concat([cipher.update(JSON.stringify(accounts), 'utf8'), cipher.final()]);
+
+const backup = {{
+  version: 1,
+  salt: salt.toString('base64'),
+  iv: iv.toString('base64'),
+  tag: cipher.getAuthTag().toString('base64'),
+  ciphertext: ciphertext.toString('base64')
+}};
+
+fs.writeFileSync({json.dumps(str(out_path))}, JSON.stringify(backup, null, 2) + '\\n');
+console.log('Encrypted backup exported to ' + {json.dumps(str(out_path))});
+"""
+        proc = subprocess.run(["node", "-e", node_code], capture_output=True, text=True)
+        if proc.returncode != 0:
+            print(f"Error encrypting backup: {proc.stderr}", file=sys.stderr)
+            return 1
+        print(proc.stdout.strip())
+    else:
+        out_path.write_text(json.dumps(accounts, indent=2) + "\n")
+        print(f"Exported {len(accounts)} accounts to {out_path}")
+    return 0
+
+
+def cmd_import(args):
+    in_path = Path(args.input)
+    if not in_path.is_file():
+        print(f"File not found: {in_path}", file=sys.stderr)
+        return 1
+
+    content = in_path.read_text()
+    data = json.loads(content)
+    accounts_to_add = []
+
+    if isinstance(data, dict) and data.get("version") == 1 and "ciphertext" in data:
+        # Raycast encrypted backup
+        if not args.passphrase:
+            print("This is an encrypted Raycast backup file. Please provide --passphrase <password>", file=sys.stderr)
+            return 1
+        node_code = f"""
+const crypto = require('crypto');
+const fs = require('fs');
+
+const password = {json.dumps(args.passphrase)};
+const backup = {json.dumps(data)};
+
+const tag = Buffer.from(backup.tag, 'base64');
+const decipher = crypto.createDecipheriv(
+  'aes-256-gcm',
+  crypto.scryptSync(password, Buffer.from(backup.salt, 'base64'), 32),
+  Buffer.from(backup.iv, 'base64'),
+  {{ authTagLength: 16 }}
+);
+decipher.setAuthTag(tag);
+const plaintext = Buffer.concat([decipher.update(Buffer.from(backup.ciphertext, 'base64')), decipher.final()]);
+process.stdout.write(plaintext.toString('utf8'));
+"""
+        proc = subprocess.run(["node", "-e", node_code], capture_output=True, text=True)
+        if proc.returncode != 0:
+            print(f"Decryption failed: wrong passphrase or corrupted file.", file=sys.stderr)
+            return 1
+        accounts_to_add = json.loads(proc.stdout)
+    elif isinstance(data, list):
+        accounts_to_add = data
+    else:
+        print("Unrecognized backup format.", file=sys.stderr)
+        return 1
+
+    existing = load_accounts()
+    existing_keys = {f"{a.get('name')}:{a.get('issuer')}:{a.get('secret')}" for a in existing}
+    added = 0
+    for acc in accounts_to_add:
+        key = f"{acc.get('name')}:{acc.get('issuer')}:{acc.get('secret')}"
+        if key not in existing_keys:
+            if "id" not in acc:
+                acc["id"] = f"totp-{int(time.time())}-{os.urandom(3).hex()}"
+            existing.append(acc)
+            existing_keys.add(key)
+            added += 1
+
+    save_accounts(existing)
+    print(f"Successfully imported {added} new account(s). Total: {len(existing)}")
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Keystroke TOTP CLI")
+    subparsers = parser.add_subparsers(dest="command")
+
+    subparsers.add_parser("list", help="List all saved accounts")
+
+    add_parser = subparsers.add_parser("add", help="Add account")
+    add_parser.add_argument("secret", help="Base32 secret or otpauth:// URI")
+    add_parser.add_argument("name", nargs="?", default="", help="Account name")
+    add_parser.add_argument("issuer", nargs="?", default="", help="Issuer")
+
+    delete_parser = subparsers.add_parser("delete", help="Delete an account by name or id")
+    delete_parser.add_argument("query", help="Account name or ID to delete")
+
+    edit_parser = subparsers.add_parser("edit", help="Edit an account")
+    edit_parser.add_argument("query", help="Account name or ID to edit")
+    edit_parser.add_argument("--name", help="New account name")
+    edit_parser.add_argument("--issuer", help="New issuer")
+    edit_parser.add_argument("--secret", help="New Base32 secret key")
+    edit_parser.add_argument("--digits", help="Number of digits (6 or 8)")
+    edit_parser.add_argument("--period", help="Period in seconds (e.g. 30)")
+    edit_parser.add_argument("--algorithm", help="Algorithm (SHA1, SHA256, SHA512)")
+
+    export_parser = subparsers.add_parser("export", help="Export backup")
+    export_parser.add_argument("output", nargs="?", default="", help="Output file path")
+    export_parser.add_argument("--passphrase", help="Encrypt with passphrase (Raycast format)")
+
+    import_parser = subparsers.add_parser("import", help="Import backup")
+    import_parser.add_argument("input", help="Input file path")
+    import_parser.add_argument("--passphrase", help="Passphrase for encrypted backup")
+
+    args = parser.parse_args()
+    if args.command == "list":
+        return cmd_list(args)
+    elif args.command == "add":
+        return cmd_add(args)
+    elif args.command == "delete":
+        return cmd_delete(args)
+    elif args.command == "edit":
+        return cmd_edit(args)
+    elif args.command == "export":
+        return cmd_export(args)
+    elif args.command == "import":
+        return cmd_import(args)
+    else:
+        parser.print_help()
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
