@@ -22,8 +22,10 @@ the command prefix can also be renamed there.
   explicit command; it never falls back to another browser's data.
 - Chromium-family browsers: reads `Default` and `Profile *` directories under
   their standard configuration directory. Honors `XDG_CONFIG_HOME`,
-  `CHROME_CONFIG_HOME` and `CHROME_USER_DATA_DIR`. Guest and system profiles
-  are excluded. Firefox: reads the profiles declared in `profiles.ini`,
+  `CHROME_CONFIG_HOME` and `CHROME_USER_DATA_DIR`. Modern Chrome versions use
+  `AccountBookmarks`; older versions use `Bookmarks`, and the modern file is
+  preferred when both exist. Guest and system profiles are excluded. Firefox:
+  reads the profiles declared in `profiles.ini`,
   including absolute profile paths. Up to 32 profiles of the detected browser
   are searched; results open using the browser's normal profile selection.
 - Custom desktop launchers, command-line profile/data-directory overrides,
@@ -41,7 +43,8 @@ Needs Python 3 (standard-library SQLite and JSON) and `xdg-utils`, with no
 setup or download. QML runs one asynchronous `python3 bin/search.py` child
 per distinct eligible query and source combination, after the host's typing
 pause. New queries cancel obsolete work. The child detects the browser and
-reads Chromium's `History` SQLite database and/or `Bookmarks` JSON, or
+reads Chromium's `History` SQLite database and/or its bookmarks JSON
+(`AccountBookmarks` on modern Chrome, else `Bookmarks`), or
 Firefox's `places.sqlite`; disabled sources are not queried. SQLite is opened
 read-only. Chromium and Firefox hold an exclusive lock on these databases while
 they run, so a locked database is reopened with `immutable=1`, which reads the

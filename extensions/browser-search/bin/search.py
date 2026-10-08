@@ -85,6 +85,17 @@ def profiles(desktop, home, config):
     return "firefox", name, found[:32]
 
 
+def bookmark_path(profile):
+    # Newer Chrome stores synced bookmarks in AccountBookmarks; older
+    # Chromium-family builds use Bookmarks. Prefer the modern file when both
+    # exist, and return None when neither does so the source is simply skipped.
+    modern = profile / "AccountBookmarks"
+    if modern.is_file():
+        return modern
+    legacy = profile / "Bookmarks"
+    return legacy if legacy.is_file() else None
+
+
 def web_url(url):
     if not isinstance(url, str) or len(url) > 16384 or any(ord(c) < 32 for c in url):
         return False
@@ -176,8 +187,11 @@ def search(query, history=True, bookmarks=True, *, desktop=None, home=None, conf
         for source, enabled in (("bookmarks", bookmarks), ("history", history)):
             if not enabled:
                 continue
-            path = profile / ("places.sqlite" if family == "firefox" else "Bookmarks" if source == "bookmarks" else "History")
-            if not path.is_file():
+            if source == "bookmarks" and family == "chromium":
+                path = bookmark_path(profile)
+            else:
+                path = profile / ("places.sqlite" if family == "firefox" else "History")
+            if not path or not path.is_file():
                 continue
             try:
                 rows = bookmark_rows(path, terms, deadline) if family == "chromium" and source == "bookmarks" else database_rows(path, family, source, terms, deadline)
