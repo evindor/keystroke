@@ -102,7 +102,7 @@ Item {
         if (restart) Qt.callLater(root.ensure)
         return
       }
-      root.fail(code === 65 ? "Codex version mismatch. Keystroke requires " + Policy.VERSION : "Codex stopped. Your conversation is saved; reopen it to continue.")
+      root.fail(code === 65 ? "Codex version mismatch. Keystroke requires a stable Codex CLI " + Policy.VERSION + " or newer" : "Codex stopped. Your conversation is saved; reopen it to continue.")
     }
   }
   Timer { id: startup; interval: 45000; onTriggered: root.fail("Codex startup timed out. Check your login and connection.") }

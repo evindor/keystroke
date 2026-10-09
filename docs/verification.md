@@ -1,5 +1,55 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Codex minimum-version gate (2026-09-30, merged 2026-10-09)
+
+Contributed by Christian Dandachi (#20).
+
+The exact 0.153.2 gate rejected an installed stable Codex 0.159.2 before
+app-server could start. Accept stable CLI versions >= 0.153.2 (0.159.2 as
+first proposed, lowered in review) using numeric major/minor/patch comparison;
+keep missing, malformed and prerelease versions rejected. The UI and README describe the minimum consistently.
+
+- `bash -n helpers/codex-start.sh` and `python3 tests/codex_start_check.py`
+  pass. The regression covers the boundary, newer minor/major versions,
+  numeric ordering, invalid/missing CLI output, unchanged app-server argv,
+  and rejection before state-directory creation. It runs in `bin/keystroke test`.
+- `bin/keystroke validate` and `tests/lint.sh` pass; lint emits the known
+  Omarchy/Quickshell metadata and unqualified-access warnings.
+- `QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=generic
+  QT_QUICK_BACKEND=software bin/keystroke test`: 270 QML tests pass, and all
+  integration checks before `hotkeys_check.py` pass, including the Codex
+  session/streaming/approval/cancellation/handoff fixture. The hotkey check
+  fails on this machine's bindings (fullscreen ranking/shortcut expectations);
+  the same failures reproduce on unchanged upstream `dev` (48e26de).
+- A real app-server smoke check through the updated helper with Codex 0.159.2
+  passes initialize, config/read, model/list, account/read, quick-mode thread
+  creation, a streamed question and a context-preserving follow-up using
+  gpt-6.1-sol/Fast. The test thread is ephemeral with local tools and MCP disabled.
+
+The minimum gate permits future stable releases; it does not establish their
+protocol compatibility. Desktop handoff and a live palette interaction were
+not exercised in this check.
+
+- Review (2026-10-09): the floor is 0.153.2, the version the README, site
+  and guide had told people to install. The upstream app-server schemas for
+  0.153.2, 0.155.1, 0.159.2 and 0.162.0 were compared: every method,
+  notification, param, approval schema and feature flag Keystroke uses is
+  unchanged apart from added optional fields, including the experimental
+  `environments: []` on `thread/start`/`turn/start` that keeps quick mode off
+  local environments. With a throwaway HOME and Keystroke's exact argv,
+  `initialize`, `config/read` and quick-mode `thread/start` succeed on real
+  0.153.2, 0.155.1, 0.159.2 and 0.162.0 binaries (read-only sandbox,
+  `approvalPolicy` never). Not established: future releases. If one drops
+  `environments`, quick mode is left with the feature flags, the read-only
+  sandbox and `approvalPolicy: never`.
+- `tests/codex_start_check.py` now asserts that the helper's minimum and
+  `Policy.VERSION` agree, and covers 0.152.9/0.153.1 (rejected), 0.153.2,
+  0.153.10 and 0.155.1 (accepted), a prerelease, `+build` and a wrong program
+  name; it fails when the two numbers differ. The palette's message says a
+  stable CLI is required. Passed after merging dev: the check, `bash -n`,
+  the QML suite, `tests/codex_session_check.py`, `tests/lint.sh`,
+  `bin/keystroke validate` and `site/check.py`.
+
 ## Qt 6.12 palette name collision (2026-10-09)
 
 - Qt 6.12 adds a `Color` singleton to QtQuick (`QtQuick/Color 6.12`:
