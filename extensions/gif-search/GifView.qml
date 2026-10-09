@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 
 Item {
@@ -7,10 +8,10 @@ Item {
   objectName: "gifSearchView"
   property var host: null
   property var service: null
-  readonly property color foreground: host ? host.foreground : Color.menu.text
-  readonly property color muted: host ? host.muted : Color.menu.text
-  readonly property color accent: host ? host.accent : Color.menu.text
-  readonly property color hairline: host ? host.hairline : Color.menu.text
+  readonly property color foreground: host ? host.foreground : Commons.Color.menu.text
+  readonly property color muted: host ? host.muted : Commons.Color.menu.text
+  readonly property color accent: host ? host.accent : Commons.Color.menu.text
+  readonly property color hairline: host ? host.hairline : Commons.Color.menu.text
   readonly property string family: host ? host.fontFamily : Style.font.menuFamily
   readonly property int labelSize: host ? host.fontLabel : Style.font.bodySmall
   function focusInput() { search.forceActiveFocus() }

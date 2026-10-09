@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "ui"
 import "providers"
@@ -451,7 +452,7 @@ Item {
   property var confirmPending: null       // { message, detail, confirmText, cancelText, run }
   readonly property var current: rows.length && selected >= 0 && selected < rows.length ? rows[selected] : ({})
   readonly property bool compact: paletteSettings.density !== "comfortable"
-  readonly property color accent: paletteSettings.accent === "ember" ? "#ee987e" : paletteSettings.accent === "violet" ? "#b5a0ef" : paletteSettings.accent === "mint" ? "#8bceb4" : Color.accent
+  readonly property color accent: paletteSettings.accent === "ember" ? "#ee987e" : paletteSettings.accent === "violet" ? "#b5a0ef" : paletteSettings.accent === "mint" ? "#8bceb4" : Commons.Color.accent
   readonly property bool clipboardChoice: root.dictationMode || !!(root.current.action && root.current.action.type === "dictation-copy")
   // Every key that acts on the selection, for the footer: ↵ first and
   // brightest, then what the row or the screen offers beyond it. The rows
@@ -484,6 +485,14 @@ Item {
   property bool closing: false
   property double flashUntil: 0             // wall clock at which the activated row's flash peaks
   signal flashed(string uid)
+  // Hidden at once, with no fade left running.
+  function snapWindow() {
+    hideDelay.stop()
+    revealAnim.stop()
+    root.closing = false
+    root.reveal = 0
+    root.flashUntil = 0
+  }
   onOpenedChanged: {
     hideDelay.stop()
     revealAnim.stop()
@@ -496,7 +505,7 @@ Item {
       root.closing = true
       hideDelay.interval = Math.max(0, root.flashUntil - Date.now())
       hideDelay.restart()
-    } else { root.reveal = 0; root.closing = false }
+    } else root.snapWindow()
   }
   Timer { id: hideDelay; onTriggered: { if (root.opened) return; revealAnim.to = 0; revealAnim.duration = root.windowDuration; revealAnim.restart() } }
   // Most of the change lands in the first frames: a reveal that ramps up
@@ -531,13 +540,13 @@ Item {
   }
 
   // Theme surfaces, same tokens as the stock menu.
-  readonly property color background: Color.menu.background
-  readonly property color foreground: Color.menu.text
-  readonly property color scrim: Color.menu.scrim
-  readonly property color selectedBackground: Color.menu.selectedBackground
-  readonly property color selectedText: Color.menu.selectedText
-  readonly property var borderSpec: Border.surfaceSpec("menu", "border", Color.menu.border, Math.max(1, Style.space(2)))
-  readonly property var selectedBorderSpec: Border.surfaceSpec("menu", "selected-border", Color.menu.selectedBorder, 0)
+  readonly property color background: Commons.Color.menu.background
+  readonly property color foreground: Commons.Color.menu.text
+  readonly property color scrim: Commons.Color.menu.scrim
+  readonly property color selectedBackground: Commons.Color.menu.selectedBackground
+  readonly property color selectedText: Commons.Color.menu.selectedText
+  readonly property var borderSpec: Border.surfaceSpec("menu", "border", Commons.Color.menu.border, Math.max(1, Style.space(2)))
+  readonly property var selectedBorderSpec: Border.surfaceSpec("menu", "selected-border", Commons.Color.menu.selectedBorder, 0)
   readonly property color hairline: Util.alpha(foreground, 0.12)
   readonly property color muted: Util.alpha(foreground, 0.55)
 
@@ -635,6 +644,7 @@ Item {
     root.confirmPending = null
     root.errorMessage = ""
     root.statusMessage = ""
+    root.graphicsLossReported = false
     if (payload && payload.scope !== undefined) {
       root.scope = String(payload.scope)
       root.scopeTitle = String(payload.title || "")
@@ -685,6 +695,9 @@ Item {
     root.dmenuMaxHeight = Math.max(0, Number(payload.maxHeight || 0))
     root.scope = ""; root.scopeTitle = root.dmenuPrompt; root.history = []
     root.confirmPending = null
+    root.errorMessage = ""
+    root.statusMessage = ""
+    root.graphicsLossReported = false
     search.text = ""
     root.resetSelection()
     root.applyRows([])
@@ -715,6 +728,27 @@ Item {
     root.confirmPending = null
     root.pending = false
     debounce.stop()
+  }
+
+  // A compositor close or allocation failure must not leave a logically open
+  // palette (or a dmenu caller waiting). There is no surface left to animate.
+  function windowClosed() {
+    if (!root.opened && !root.closing) return
+    // A palette already leaving was canceled when it started to; a second
+    // cancel would drop the paste that close left running.
+    if (root.opened) root.cancel()
+    root.snapWindow()
+  }
+  // The two signals may arrive in either order, so the report does not depend
+  // on the palette still being open; it is made once until the next open.
+  property bool graphicsLossReported: false
+  function graphicsLost() {
+    root.windowClosed()
+    if (root.graphicsLossReported) return
+    root.graphicsLossReported = true
+    root.errorMessage = "The launcher window lost its graphics resources. GPU memory may be exhausted; free some and try again."
+    console.warn("keystroke: " + root.errorMessage)
+    Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-notification-send", "Keystroke closed", root.errorMessage])
   }
 
   // ---------------------------------------------------------------- queries
@@ -1236,6 +1270,12 @@ Item {
     return Math.min(count, maxRows) * (rowHeight + rowSpacing)
   }
 
+  Connections {
+    target: panel
+    function onResourcesLost() { root.graphicsLost() }
+    function onClosed() { root.windowClosed() }
+  }
+
   PanelWindow {
     id: panel
     visible: root.opened || root.closing
@@ -1615,7 +1655,7 @@ Item {
                 : voice.phase === "transcribing" ? "Finishing transcript…" : voice.phase === "starting" ? "Starting voxtype…"
                 : root.pending && root.showLoading ? "Searching…" : root.errorMessage ? "Needs attention: " + root.errorMessage : root.statusMessage || (root.current.providerName ? root.current.providerName : "Keystroke")
             textFormat: Text.PlainText; elide: Text.ElideRight; width: Math.min(implicitWidth, card.width * 0.5)
-            color: root.errorMessage ? Color.urgent : root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
+            color: root.errorMessage ? Commons.Color.urgent : root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
             anchors.verticalCenter: parent.verticalCenter
           }
         }

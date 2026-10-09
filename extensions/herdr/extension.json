@@ -1,0 +1,16 @@
+{
+  "name": "Herdr",
+  "version": "1.0.0",
+  "author": "Justin Garza",
+  "description": "Jump to a Herdr agent, workspace, tab or pane: % claude",
+  "apiVersion": 1,
+  "icon": "󱚣",
+  "color": "#c678dd",
+  "license": "MIT",
+  "commands": [{
+    "id": "herdr", "prefix": "%", "title": "Go to a Herdr agent or pane",
+    "summary": "Agents, workspaces, tabs, panes and sessions of every running Herdr session",
+    "args": [{ "name": "target", "hint": "an agent, workspace, tab or pane name", "rest": true }],
+    "examples": ["%", "% claude", "% api"]
+  }]
+}

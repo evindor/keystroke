@@ -1,5 +1,323 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.5.1 (2026-10-09)
+
+- Contents since 1.5.0, all merged from contributor PRs on 2026-10-09: the
+  Qt 6.12 `Commons.Color` fix (#30, Nero Song; `Keystroke.qml`, `ui/*`,
+  `codex/ConversationView.qml`, the Translate and GIF Search views,
+  `tools/showcase/offscreen.py`, CONTRIBUTING and `docs/providers.md`),
+  graphics-loss recovery (#23, Thomas Torggler; `Keystroke.qml`, new
+  `tests/palette_graphics_loss_check.py`), the Omarchy menu `text()` fix
+  (#22, Thomas Torggler; `providers/OmarchyMenu.qml`), the Windows and Herdr
+  extensions (#26, #27, Justin Garza; `extensions/windows`,
+  `extensions/herdr`), the converter's inferred target (#24, Hemal;
+  `core/Units.js`), the Codex minimum version 0.153.2 (#20, Christian
+  Dandachi; `helpers/codex-start.sh`, `codex/Policy.js`, new
+  `tests/codex_start_check.py`) and Helium in Browser search (#19, bultot).
+  Extension versions: Browser search 1.1.0, GIF Search 1.1.2, Translate
+  1.0.1, Windows and Herdr 1.0.0. `manifest.json` 1.5.0 → 1.5.1; the
+  extensions screenshot re-rendered with `tools/showcase/offscreen.py`.
+  Nothing under `matching/` changed since the verified 1.4.2 commit (engine
+  SHA-256 `192ef1ec…`).
+- `bin/keystroke test` on `891d478` (offscreen, Qt 6.11.2, Quickshell
+  0.3.1): exit 0. 272 QML tests passed, 0 failed; every integration check
+  passed, including `palette_dictation_check.py` on the first run, the new
+  graphics-loss and Codex start checks, `tools/check_extensions.py` for all
+  ten extensions and the hotkeys check; `tests/lint.sh` exit 0. Also passed:
+  `bin/keystroke validate`, `python3 site/check.py` (35 screenshots), the
+  Windows and Browser search palette checks and the Herdr and Browser search
+  Python tests.
+- Qt 6.12: the #30 review ran the palette checks offscreen against Qt 6.12.0
+  and Quickshell 0.3.2 unpacked from the Omarchy edge mirror (with Omarchy's
+  Commons from omacom/omarchy b83d3df); see the Qt 6.12 entry below. Not
+  exercised: a live omarchy-shell on Qt 6.12, a real GPU resource loss,
+  focusing real windows or Herdr panes on the desktop, and a real Helium
+  profile.
+
+## Codex minimum-version gate (2026-09-30, merged 2026-10-09)
+
+Contributed by Christian Dandachi (#20).
+
+The exact 0.153.2 gate rejected an installed stable Codex 0.159.2 before
+app-server could start. Accept stable CLI versions >= 0.153.2 (0.159.2 as
+first proposed, lowered in review) using numeric major/minor/patch comparison;
+keep missing, malformed and prerelease versions rejected. The UI and README describe the minimum consistently.
+
+- `bash -n helpers/codex-start.sh` and `python3 tests/codex_start_check.py`
+  pass. The regression covers the boundary, newer minor/major versions,
+  numeric ordering, invalid/missing CLI output, unchanged app-server argv,
+  and rejection before state-directory creation. It runs in `bin/keystroke test`.
+- `bin/keystroke validate` and `tests/lint.sh` pass; lint emits the known
+  Omarchy/Quickshell metadata and unqualified-access warnings.
+- `QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=generic
+  QT_QUICK_BACKEND=software bin/keystroke test`: 270 QML tests pass, and all
+  integration checks before `hotkeys_check.py` pass, including the Codex
+  session/streaming/approval/cancellation/handoff fixture. The hotkey check
+  fails on this machine's bindings (fullscreen ranking/shortcut expectations);
+  the same failures reproduce on unchanged upstream `dev` (48e26de).
+- A real app-server smoke check through the updated helper with Codex 0.159.2
+  passes initialize, config/read, model/list, account/read, quick-mode thread
+  creation, a streamed question and a context-preserving follow-up using
+  gpt-6.1-sol/Fast. The test thread is ephemeral with local tools and MCP disabled.
+
+The minimum gate permits future stable releases; it does not establish their
+protocol compatibility. Desktop handoff and a live palette interaction were
+not exercised in this check.
+
+- Review (2026-10-09): the floor is 0.153.2, the version the README, site
+  and guide had told people to install. The upstream app-server schemas for
+  0.153.2, 0.155.1, 0.159.2 and 0.162.0 were compared: every method,
+  notification, param, approval schema and feature flag Keystroke uses is
+  unchanged apart from added optional fields, including the experimental
+  `environments: []` on `thread/start`/`turn/start` that keeps quick mode off
+  local environments. With a throwaway HOME and Keystroke's exact argv,
+  `initialize`, `config/read` and quick-mode `thread/start` succeed on real
+  0.153.2, 0.155.1, 0.159.2 and 0.162.0 binaries (read-only sandbox,
+  `approvalPolicy` never). Not established: future releases. If one drops
+  `environments`, quick mode is left with the feature flags, the read-only
+  sandbox and `approvalPolicy: never`.
+- `tests/codex_start_check.py` now asserts that the helper's minimum and
+  `Policy.VERSION` agree, and covers 0.152.9/0.153.1 (rejected), 0.153.2,
+  0.153.10 and 0.155.1 (accepted), a prerelease, `+build` and a wrong program
+  name; it fails when the two numbers differ. The palette's message says a
+  stable CLI is required. Passed after merging dev: the check, `bash -n`,
+  the QML suite, `tests/codex_session_check.py`, `tests/lint.sh`,
+  `bin/keystroke validate` and `site/check.py`.
+
+## Qt 6.12 palette name collision (2026-10-09)
+
+- Qt 6.12 adds a `Color` singleton to QtQuick (`QtQuick/Color 6.12`:
+  `rgba`, `fromString`, `blend`, ...). In a file that imports `QtQuick` and
+  `qs.Commons`, a bare `Color` now resolves to it, so `Color.menu.*` is
+  undefined: the palette loses its surfaces and accent, and `Keystroke.qml`
+  throws `Cannot read property 'background' of undefined`. Every palette read
+  now goes through `import qs.Commons as Commons` and `Commons.Color`
+  (contributor PR #30, the pattern of omacom/omarchy#14553):
+  `Keystroke.qml`, `codex/ConversationView.qml`, `ui/` (ConfirmSheet,
+  Keycap, PreviewPane, ResultRow, VoiceWave), the GIF Search (1.1.2) and
+  Translate (1.0.1) views, and the inline QML of
+  `tools/showcase/offscreen.py`. CONTRIBUTING.md and `docs/providers.md` tell
+  extension authors to do the same. `Style`, `Border` and `Util` are
+  unaffected (Color is the only name QtQuick, QtQml or Quickshell 0.3.2 add);
+  no QML file or inline test QML in the repository reads a bare `Color`.
+- Qt 6.11.2 (this machine), merged with dev: `bin/keystroke test` passes
+  (272 QML tests, every integration check, nine extensions, lint exit 0
+  with the same 265 warnings as dev) and so do the Translate and GIF Search
+  palette checks. `tools/showcase/offscreen.py` renders all 35 screens.
+- Qt 6.12.0, offscreen only: qt6-base, -declarative, -svg, -wayland 6.12.0
+  and quickshell 0.3.2 from the Omarchy edge mirror unpacked into a
+  temporary prefix (nothing installed), with Omarchy's Commons and Ui from
+  omacom/omarchy b83d3df (4.0.4's own `Border.surfaceSpec` throws under
+  6.12). A bare `Color` there is QtQuick's (`Color.menu` undefined,
+  `Color.fromString` a function) and `Commons.Color.menu.background` is the
+  theme's. Merged with dev, all 23 Quickshell checks (21 from `tests/`, the
+  Translate and GIF Search palette checks) pass; on dev without the change,
+  eleven of the seventeen run there fail with the TypeError above. The 35
+  showcase screens render without a warning, 34 of them pixel-identical to
+  the 6.11 render (the bar countdown differs in glyph spacing).
+- Not exercised: a live `omarchy-shell` on Qt 6.12 (this machine is on the
+  stable channel); the contributor ran the change in their edge shell.
+
+## Windows extension (#26, 2026-10-09)
+
+- New `extensions/windows` (Justin Garza): `>` lists every Hyprland window,
+  most recently used first, from one `hyprctl clients -j` per palette open;
+  Enter closes the palette, then 80 ms later sends `hl.dsp.focus({ window =
+  "address:0x…" })` (or `focuswindow address:0x…` on a hyprlang config)
+  through Quickshell's Hyprland IPC with a hex-validated address. Hyprland
+  0.56 refuses window focus while an exclusive layer surface holds the
+  keyboard (`CFocusState::rawWindowFocus`), which is why it closes first.
+- Review fixes: the last focused window counts as the one you came from only
+  on the focused workspace (or a special one over it), so an empty workspace
+  no longer hides the most recently used window; the root cap ranks
+  word-start, then substring, then scattered matches before cutting, so five
+  long titles holding `c…h…r` no longer crowd Chromium out of `chr` (both
+  reproduced in the new palette check on the submitted code, then fixed).
+- New `extensions/windows/tests/palette_check.py`: the real palette offscreen
+  with a fake `hyprctl` and Quickshell's Hyprland IPC pointed at sockets the
+  script serves (`HYPRLAND_INSTANCE_SIGNATURE`, `XDG_RUNTIME_DIR`), so the
+  dispatch is observed without reaching the compositor. On the branch merged
+  with dev at `18e260d` it passed, as did 11 unit tests,
+  `tools/check_extensions.py` for all nine extensions, the host QML suite
+  (272 passed), `tests/palette_extensions_check.py`,
+  `tests/palette_commands_check.py`, `tests/lint.sh` (existing metadata
+  warnings only) and `bin/keystroke validate`. The full `bin/keystroke test`
+  was not run; nothing outside `extensions/windows` and the docs changed.
+- Not exercised: focusing a real window on the desktop (special workspace,
+  fullscreen, another monitor, the 80 ms delay under load); Hyprland's
+  source shows `focus` opening a special workspace on the current monitor
+  and handling a fullscreen workspace through `on_focus_under_fullscreen`.
+  Windows hidden inside a group are not listed.
+
+## Herdr extension (2026-10-09)
+
+- New `extensions/herdr` (#27, by Justin Garza): `%` lists the agents,
+  workspaces, tabs, panes and sessions of every running Herdr session; agent
+  and workspace names also match at the root from two characters on. The
+  helper runs once per palette open, reads `herdr session list --json` and one
+  `session.snapshot` per session socket, and focuses with `workspace.focus`,
+  `tab.focus` or `pane.focus` before raising the terminal window through
+  `hyprctl dispatch`, or opening `herdr session attach <name>` in a new one.
+- Against real Herdr 0.8.2 (two headless servers, `default` and `work`, under a
+  throwaway `XDG_CONFIG_HOME`; `hyprctl` and `omarchy-launch-terminal` faked):
+  the request and response shapes match the bundled `herdr api schema`; the
+  helper listed both sessions in about 40 ms; focusing a tab, a workspace and a
+  pane in another workspace moved Herdr's focus there; with fake Hyprland
+  clients it dispatched `hl.dsp.focus` to the right window and fell back to
+  `focuswindow` when the Lua form was refused; with no window it launched the
+  attach. A workspace labelled `infra; rm -rf ~` stayed a title, its argv only
+  ids.
+- Offscreen palette run with the same servers: nothing ran while the
+  extension was off (one `herdr session list` per open after it was turned
+  on, none per keystroke); `%` grouped agents first; `% logs` found the tab;
+  `web` at the root offered the workspace and no tabs, panes or sessions; a
+  one-letter root query showed nothing; `200 - 15%` stayed with the
+  calculator. A failing or missing `herdr` gave one disabled row after `%` and
+  nothing at the root. 1000 `%` queries over this state took about 70 ms.
+- Review fixes: a client started with `herdr --session=work` was taken for one
+  showing `default`, so Enter could raise the wrong window (also `--remote`
+  and `--no-session` clients, which show no local session); unnamed tabs,
+  which Herdr labels with their number, read "1" instead of "Tab 1";
+  workspace counts are singular for one; the helper carries Everything's
+  copyright notice.
+- Passed: 4 helper unit tests, 8 extension QML tests, `check-extensions` for
+  all nine extensions, all 272 host QML tests, `bin/keystroke validate`, the
+  palette extensions and commands checks. Not exercised: a real terminal
+  window running a Herdr client (the window lookup ran against fake processes
+  and fake `hyprctl` clients), a real coding agent detected by Herdr (an agent
+  state was reported with `herdr pane report-agent`), Herdr 0.9, and a
+  session chosen through `HERDR_SESSION` instead of the command line.
+
+## Omarchy menu FileView text() (2026-10-09)
+
+- The two menu FileViews in `providers/OmarchyMenu.qml` read their file with
+  `defaultMenuFile.text()` and `userMenuFile.text()` instead of a bare
+  `text()`. In the contributor's running Omarchy shell the bare call threw
+  "Property 'text' of object FileView_QMLTYPE_6 is not a function" on every
+  load, so neither `omarchy-menu.jsonc` was parsed and Omarchy entries such as
+  the theme switcher stopped opening. The shell has not logged it since the
+  change; a standalone headless quickshell loaded the menu with and without it.
+- Review: not reproduced on Qt 6.11.2, Quickshell 0.3.1, Omarchy 4.0.4.
+  Offscreen, `dev` without the change parsed both files (333 default items, 1
+  user item) and kept them over 25 reloads with the provider hosted plainly,
+  next to an id, a root property and a root function named `text`, inside a
+  Loader, across a Quickshell soft reload, and with the whole `Keystroke.qml`
+  in an asynchronous Loader beside a window, as omarchy-shell hosts it. The
+  error names the FileView as the receiver, so the name was found on the
+  FileView itself (Quickshell's `FileView.qml` declares `text()` as a QML
+  function), not shadowed by an outer object: Qt checks the handler's own ids,
+  then its scope object, before any outer context. The cause is still open;
+  the qualified call reaches the same function through the id and changes
+  nothing where the bare one works. The other bare `text()` calls are left as
+  they are.
+- Ran: `tests/catalog_check.py`, 270 QML tests, `tests/lint.sh` (no new
+  warnings), `bin/keystroke validate`.
+
+## Converter target inferred from the source (2026-10-04)
+
+Contributed by Hemal (#24).
+
+- `core/Units.js`: the target is optional. `35 lb` answers in kilograms,
+  `180 cm` in inches, `100 F` in °C, `60 mph` in km/h: each unit names the
+  other system's everyday unit as its counterpart. Metres have none, so
+  Timer's bare `10m` keeps its row; time, data, millilitres and kelvin have
+  none either and still need a target.
+- `tests/tst_units.qml` covers the counterparts, an explicit target after a
+  bare-looking source, the units without one, and `10 in london` staying a
+  time-zone query. qmltestrunner: 271 passed, 0 failed.
+- `bin/keystroke test` on aarch64: every check before the hotkeys check
+  passed; the hotkeys check fails identically on `dev` without this change
+  (it reads the live bindings, where Terminal is not on `Super + Return`).
+  `tests/lint.sh` exit 0, `omarchy plugin validate` exit 0, `git diff --check`
+  clean.
+- Live, on the desktop: `core/Units.js` copied into the installed plugin and
+  the shell restarted. Over IPC, `35 lb` → `15.87573295 kg`, `180 cm` →
+  `70.86614173 in`, `100 f` → `37.77777778 °C`, `60 mph` → `96.56064 km/h`,
+  each the selected answer; `2m in feet`, `10 in london` and `45 usd`
+  (Currency) answered as before; `10m` produced no converter row. Not
+  exercised: `10m` with Timer turned on.
+- In review, offscreen: the real palette at the root with Timer and Currency
+  on (fake `curl` serving a rate table), Files off, and a fake app library
+  holding names that start with a number (`1C Enterprise`, `4G Modem
+  Manager`, `5G Toolkit`, `3D Slicer`, `1Password`, `10 Minute Mail`), run
+  over 80 queries with this `core/Units.js` and with `dev`'s. Every query
+  that answered on `dev` answers the same (`2m in feet`, `72 F to C`,
+  `35 lb to g`, `10 in london`, `45 usd`, `129usd`). `10m`, `10 m`,
+  `10 min`, `45s`, `1h` keep Timer's row with no converter row; `2 min`,
+  `5 s`, `3 cups`, `1 password`, `5 meters`, `250 ml`, `300 k`, `5 gb`,
+  `4k` are unchanged. New answers come only from a number and a unit with a
+  counterpart, and they take the selected row: `1c` and `4g` now answer
+  33.8 °F and 0.14 oz above the app of that name, and a bare hex colour of
+  digits ending in `c` or `f` (`00f`, `20c`) answers as a temperature with
+  the colour row second (`#00f` is unchanged). While an explicit target is
+  being typed, the inferred answer shows at `35 lb`, goes at `35 lb t` and
+  returns at `35 lb to kg`.
+- `tests/tst_units.qml` also walks the whole table: every alias of a unit
+  with a counterpart converts to it. qmltestrunner: 272 passed, 0 failed.
+  `tests/palette_currency_check.py`, `tests/palette_extensions_check.py`,
+  `tests/palette_commands_check.py`, `tests/palette_route_check.py`,
+  `tests/tz_helper_check.py` (52/52), `tools/check_extensions.py` for
+  timer, currency and keyboard-cleaner, `tests/lint.sh`,
+  `bin/keystroke validate` and `git diff --check`: pass.
+
+## Graphics-loss recovery (2026-10-02)
+
+- A compositor close or a lost graphics resource on the palette's layer surface
+  now cancels the palette, stops the closing animation and completes pending
+  dmenu requests (`windowClosed()` in `Keystroke.qml`). Resource loss is logged
+  and notified once; the next open retries and clears the error, including a
+  picker opened straight after the failure. Before, the palette stayed logically
+  open with no surface, and a waiting `omarchy-menu-select` never returned.
+  Found on a two-monitor machine where the full-screen surface ran out of GPU
+  memory.
+- The two signals may arrive in either order: a loss after the close is still
+  reported, once until the next open. `snapWindow()` is the one place that
+  hides the window at once, shared with the instant transition.
+- `tests/palette_graphics_loss_check.py` emits the close and resource-loss
+  signals from an offscreen Window: immediate unmap despite the slide animation,
+  inspectable error, retry, a stray close with nothing open, both signal orders, picker completion
+  without a selection, one notification per failure. It fails on `main` without
+  the change (checked).
+- Ran: the check above, 270 QML tests, `tests/lint.sh`.
+- Not exercised: a real GPU allocation failure (the signals are injected).
+- Review: a close or loss while the palette is already leaving only snaps the
+  window; it no longer cancels a second time, which dropped the paste that
+  Ctrl+Enter's copy-and-close leaves running. The check covers it and fails
+  without the change. Against Quickshell 0.3.1's own `ProxyWindowBase` (a
+  `FloatingWindow` in place of the `PanelWindow`, offscreen), `QWindow.close()`
+  on the backing window emitted `closed` once and closed the palette at once,
+  `sceneGraphError` emitted `resourcesLost` alone and finished a waiting picker
+  with no selection, and normal fade, instant and `close()` IPC closes emitted
+  neither.
+
+## Browser search 1.1.0: Helium (2026-09-30)
+
+- `helium.desktop` (the ID Helium's deb, rpm, tarball and the AUR
+  `helium-browser-bin` package install) is now a Chromium-family browser whose
+  profiles live under `$XDG_CONFIG_HOME/net.imput.helium`. Before, a Helium
+  default browser got "Default browser is not supported" and no results.
+- New fixture test `test_helium_reads_its_own_profile`: Helium ignores a
+  Chromium profile, then returns the bookmarks from its own `Default`. It fails
+  on the previous `search.py` (verified by reverting the line) and passes now.
+- Passed: nine Python fixture tests; `bin/keystroke check-extensions
+  extensions/browser-search`; the browser palette check. One live query
+  against a real Helium 0.18.1.1 profile (Asahi Linux, arm64) returned its
+  bookmarks in the running palette. Host QML unit tests and the wider
+  integration suite were not re-run; nothing outside `extensions/browser-search`
+  and this log changed.
+- Review follow-up: Helium's Linux branding patch reads `HELIUM_CONFIG_HOME`
+  where Chrome reads `CHROME_CONFIG_HOME` (`CHROME_USER_DATA_DIR` is
+  untouched), so the reader now does the same for Helium. With
+  `CHROME_CONFIG_HOME` set, it had looked for Helium profiles in a directory
+  Helium never uses. New test `test_helium_config_home` fails on the first
+  version and passes now. Passed: ten Python fixture tests, `check-extensions`
+  and the browser palette check. An offscreen palette run (fake HOME, fake
+  `xdg-mime` and `xdg-settings` answering `helium.desktop`, a synthetic Helium
+  profile next to Chromium and `CHROME_CONFIG_HOME` decoys) listed only the
+  Helium history and bookmark, for `browser fixture` and at the root, and named
+  Helium in the "No matching pages" row. No real Helium install was available
+  for the review.
+
 ## Release 1.5.0 (2026-09-29)
 
 - Contents since 1.4.4, all merged from contributor PRs on 2026-09-29: the

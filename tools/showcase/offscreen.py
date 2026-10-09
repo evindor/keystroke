@@ -89,6 +89,7 @@ FIXTURE = ["apps", "codex", "voice"]
 RUNNER = '''import QtQuick
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import "%(project)s"
 ShellRoot {
  id: test
@@ -154,8 +155,8 @@ BAR = '''QtObject { id: paletteLoader; property var item: palette }
    id: fakeBar
    property var shell: fakeShell
    property string fontFamily: Style.font.family
-   property color barForeground: Color.bar.text
-   property color urgent: Color.urgent
+   property color barForeground: Commons.Color.bar.text
+   property color urgent: Commons.Color.urgent
    property bool vertical: false
    property int barSize: Style.bar.sizeHorizontal
    property bool foregroundAnimationEnabled: false
@@ -166,7 +167,7 @@ BAR = '''QtObject { id: paletteLoader; property var item: palette }
    function unregisterClickTarget(item) { }
    function moduleWidgets(id) { return [widget] }
  }
- Window { id: barWindow; visible: true; width: 200; height: Style.bar.sizeHorizontal; color: Color.bar.background
+ Window { id: barWindow; visible: true; width: 200; height: Style.bar.sizeHorizontal; color: Commons.Color.bar.background
    BarWidget { id: widget; bar: fakeBar; x: 8 } }'''
 
 

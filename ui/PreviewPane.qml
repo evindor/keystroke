@@ -1,13 +1,14 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 // Right-hand detail for the selected row: label, swatch, text or image, hint.
 Item {
   id: root
   property var row: ({})
   property bool compact: true
-  property color accent: Color.accent
-  property color foreground: Color.menu.text
+  property color accent: Commons.Color.accent
+  property color foreground: Commons.Color.menu.text
   readonly property bool clipboard: (row.previewLabel || "") === "CLIPBOARD" || (row.previewLabel || "") === "DICTATION"
   readonly property bool emoji: row.emoji === true
   readonly property string imagePath: String(row.previewImage || "")

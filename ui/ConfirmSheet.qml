@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 // Keystroke's confirmation: a sheet that rises from the bottom of the card
@@ -18,11 +19,11 @@ Item {
   property string detail: ""
   property string cancelText: "Cancel"
   property string confirmText: "Confirm"
-  property color background: Color.background
-  property color foreground: Color.foreground
-  property color muted: Util.alpha(Color.foreground, 0.6)
-  property color scrim: Util.alpha(Color.background, 0.7)
-  property color selectedText: Color.accent
+  property color background: Commons.Color.background
+  property color foreground: Commons.Color.foreground
+  property color muted: Util.alpha(Commons.Color.foreground, 0.6)
+  property color scrim: Util.alpha(Commons.Color.background, 0.7)
+  property color selectedText: Commons.Color.accent
   property string fontFamily: Style.font.family
   property int cornerRadius: Style.cornerRadius
 

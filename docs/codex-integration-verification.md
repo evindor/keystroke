@@ -14,7 +14,8 @@ Codex CLI 0.153.2 and desktop 26.901.20858. The v1 voice tag is unchanged.
 - Generic optional provider views; local queries remain synchronous. A single
   owned app-server warms without model inference and exits after ten idle minutes.
 - Model, tier, desktop/CLI destination and working-folder settings. Default:
-  GPT-5.6 Luna / low / Fast, managed Codex login, exact CLI version gate.
+  GPT-5.6 Luna / low / Fast, managed Codex login, exact CLI version gate
+  (since 2026-10: a stable CLI 0.153.2 or newer, see `docs/verification.md`).
 - Quick mode disables local execution/environments, inherited MCP, connected apps,
   plugins and hooks through actual configuration. Web search remains available.
 - Explicit scoped tasks in the Codex provider: desktop settings (`~/.config`) or
