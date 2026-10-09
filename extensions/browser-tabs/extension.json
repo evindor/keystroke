@@ -1,0 +1,16 @@
+{
+  "name": "Browser tabs",
+  "version": "1.0.0",
+  "author": "Justin Garza",
+  "description": "Switch to an open browser tab: @ github",
+  "apiVersion": 1,
+  "icon": "",
+  "color": "#61afef",
+  "license": "MIT",
+  "commands": [{
+    "id": "tabs", "prefix": "@", "title": "Switch to a browser tab",
+    "summary": "Open tabs of Chromium, Chrome, Brave, Edge, Vivaldi, Firefox, Zen and LibreWolf",
+    "args": [{ "name": "tab", "hint": "words from a tab title", "rest": true }],
+    "examples": ["@", "@ github", "@ inbox"]
+  }]
+}
