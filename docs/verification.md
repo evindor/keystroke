@@ -1,5 +1,39 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+## Release 1.5.1 (2026-10-09)
+
+- Contents since 1.5.0, all merged from contributor PRs on 2026-10-09: the
+  Qt 6.12 `Commons.Color` fix (#30, Nero Song; `Keystroke.qml`, `ui/*`,
+  `codex/ConversationView.qml`, the Translate and GIF Search views,
+  `tools/showcase/offscreen.py`, CONTRIBUTING and `docs/providers.md`),
+  graphics-loss recovery (#23, Thomas Torggler; `Keystroke.qml`, new
+  `tests/palette_graphics_loss_check.py`), the Omarchy menu `text()` fix
+  (#22, Thomas Torggler; `providers/OmarchyMenu.qml`), the Windows and Herdr
+  extensions (#26, #27, Justin Garza; `extensions/windows`,
+  `extensions/herdr`), the converter's inferred target (#24, Hemal;
+  `core/Units.js`), the Codex minimum version 0.153.2 (#20, Christian
+  Dandachi; `helpers/codex-start.sh`, `codex/Policy.js`, new
+  `tests/codex_start_check.py`) and Helium in Browser search (#19, bultot).
+  Extension versions: Browser search 1.1.0, GIF Search 1.1.2, Translate
+  1.0.1, Windows and Herdr 1.0.0. `manifest.json` 1.5.0 → 1.5.1; the
+  extensions screenshot re-rendered with `tools/showcase/offscreen.py`.
+  Nothing under `matching/` changed since the verified 1.4.2 commit (engine
+  SHA-256 `192ef1ec…`).
+- `bin/keystroke test` on `891d478` (offscreen, Qt 6.11.2, Quickshell
+  0.3.1): exit 0. 272 QML tests passed, 0 failed; every integration check
+  passed, including `palette_dictation_check.py` on the first run, the new
+  graphics-loss and Codex start checks, `tools/check_extensions.py` for all
+  ten extensions and the hotkeys check; `tests/lint.sh` exit 0. Also passed:
+  `bin/keystroke validate`, `python3 site/check.py` (35 screenshots), the
+  Windows and Browser search palette checks and the Herdr and Browser search
+  Python tests.
+- Qt 6.12: the #30 review ran the palette checks offscreen against Qt 6.12.0
+  and Quickshell 0.3.2 unpacked from the Omarchy edge mirror (with Omarchy's
+  Commons from omacom/omarchy b83d3df); see the Qt 6.12 entry below. Not
+  exercised: a live omarchy-shell on Qt 6.12, a real GPU resource loss,
+  focusing real windows or Herdr panes on the desktop, and a real Helium
+  profile.
+
 ## Codex minimum-version gate (2026-09-30, merged 2026-10-09)
 
 Contributed by Christian Dandachi (#20).
