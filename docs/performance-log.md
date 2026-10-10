@@ -17,7 +17,23 @@ Timings are single runs on one machine and are indicative, not a benchmark.
 | 5 | Recent projects and Browser profiles rescan at most once a minute instead of every open (the first query still scans on demand). | `extensions/{recent-projects,browser-profiles}/Service.qml` | Saves a Python helper spawn (about 90-120 ms each) per open. |
 | 6 | The Herdr helper walks `/proc` and asks Hyprland only when a session is running. | `extensions/herdr/bin/herdr.py` | The helper was about 85-155 ms with no sessions. |
 
+## Measured (tools/bench_open.py, offscreen, 8 steady-state opens per run, 3 runs each, medians)
+
+| Metric | Before (`d84b822`) | After (`a557a11`) |
+|--------|--------------------|-------------------|
+| `open()` blocking the UI thread | 37 / 37.5 / 42 ms | 27 / 33.5 ms |
+| CPU per open (Quickshell + children) | 1835 / 1785 / 1875 ms | 1660 / 1665 ms |
+| Processes spawned per open | 157 / 157 / 156 | 143 / 147 |
+| `bash -lc exec` (Codex start) per 8 opens | 34 | 0 |
+
+Roughly 7-10% less CPU and 7% fewer processes per open. The offscreen harness cannot reproduce the real
+layer-shell reveal, so wall-clock-to-visible is not measured. Processes are sampled from /proc, so very short ones can be missed.
+Most of what remains is the Omarchy menu guard batch (`bash -c declare ...`, which calls omarchy-network-status, omarchy-hw-*, omarchy-dns
+and others) plus `xdg-mime` and `xdg-terminal-exec` lookups. That is the next target.
+
 ## Not done yet (candidates)
+
+- Omarchy menu guards: re-evaluate on a TTL instead of on every open; this is the largest remaining cost (about 100+ processes per open).
 
 - Files provider: require 3+ characters at the root, longer debounce for spawning providers.
 - Windows extension: use `Quickshell.Hyprland.toplevels` instead of spawning `hyprctl` on open; cache icon lookups by window class.
