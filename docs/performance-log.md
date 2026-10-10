@@ -31,6 +31,36 @@ layer-shell reveal, so wall-clock-to-visible is not measured. Processes are samp
 Most of what remains is the Omarchy menu guard batch (`bash -c declare ...`, which calls omarchy-network-status, omarchy-hw-*, omarchy-dns
 and others) plus `xdg-mime` and `xdg-terminal-exec` lookups. That is the next target.
 
+## Second run: 4 interleaved runs x 8 opens (32 opens per side)
+
+```
+open() blocking the UI thread (ms, median)
+  before ████████████████████████████████████████████    61
+  after  █████████████████████████████████████████       56   -7.4%
+
+CPU per open, Quickshell + children (ms, median)
+  before ████████████████████████████████████████████  1920
+  after  █████████████████████████████████████████     1795   -6.5%
+
+Processes spawned per open (median)
+  before ████████████████████████████████████████████   175
+  after  █████████████████████████████████████████      165   -5.7%
+
+CPU per open, median of each run (ms)
+  run 1: before 1810  after 1635  (-9.7%)
+  run 2: before 1910  after 1740  (-8.9%)
+  run 3: before 1915  after 2025  (+5.7%)
+  run 4: before 2105  after 2020  (-4.0%)
+```
+
+Spread within a side is wide (CPU per open, after: 630-3300 ms; before: 1740-2180 ms), so the machine's background load
+swamps a gain this small. Read the result as "a few percent lower, direction consistent in 3 of 4 runs", not a precise figure.
+The Codex launch is gone entirely (34 `bash -lc exec` per 8 opens before, 0 after).
+
+Keystroke cost (`tools/profile_palette.py`, 41 keystrokes) did not change: total median 104 ms before, 105 ms after
+(p90 202 vs 180 ms). Both are well above the 10 ms in `docs/verification.md`, which points to a busy machine during the run.
+These changes do not touch the typing path.
+
 ## Not done yet (candidates)
 
 - Omarchy menu guards: re-evaluate on a TTL instead of on every open; this is the largest remaining cost (about 100+ processes per open).
