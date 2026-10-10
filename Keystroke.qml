@@ -563,6 +563,22 @@ Item {
   // host leaves this undefined, so a view can still fall back.
   readonly property bool paintsViewBackdrop: true
 
+  // Background work the user can see is still going: a provider waiting on a
+  // reply, the extension scan, the matching engine starting, or a provider
+  // that reports its own process through setBusy(). Shown after the same
+  // short delay as the loading text, so a fast open never flickers.
+  property var busyKeys: ({})
+  function setBusy(key, on) {
+    var next = Object.assign({}, busyKeys)
+    if (on) next[key] = true
+    else delete next[key]
+    busyKeys = next
+  }
+  readonly property bool busy: opened && (pending || providerRegistry.scanning || matchingSession.starting || Object.keys(busyKeys).length > 0)
+  property bool showBusy: false
+  onBusyChanged: { if (busy) busyDelay.restart(); else { busyDelay.stop(); showBusy = false } }
+  Timer { id: busyDelay; interval: 180; onTriggered: root.showBusy = root.busy }
+
   onPendingChanged: { if (pending) loadingDelay.restart(); else { loadingDelay.stop(); showLoading = false } }
   Timer { id: loadingDelay; interval: 180; onTriggered: root.showLoading = root.pending }
   Timer { id: debounce; interval: 25; onTriggered: root.runQuery() }
@@ -659,12 +675,21 @@ Item {
     root.resetSelection()
     root.applyRows([])
     root.opened = true
-    root.notifyOpened()
-    root.runQuery()
+    openWork.restart()
     Qt.callLater(function() {
       search.forceActiveFocus()
       if (root.opened && root.dictationMode && payload && payload.dictate === true) root.voiceBegin("tap")
     })
+  }
+
+  // The window and its input come first: the provider hooks, the catalog and
+  // the first query run one frame later, so the surface can map and take the
+  // keyboard before the UI thread is busy. A key typed meanwhile only
+  // restarts the debounce; the text itself is never touched here.
+  Timer {
+    id: openWork
+    interval: 16
+    onTriggered: { if (!root.opened) return; root.notifyOpened(); root.runQuery() }
   }
 
   function notifyOpened() {
@@ -1496,6 +1521,29 @@ Item {
         Keycap { id: escCap; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; label: "esc"; foreground: root.foreground }
       }
       Rectangle { x: 0; y: root.headerHeight; width: parent.width; height: 1; color: root.hairline }
+      // Loading bar: a short segment sliding along the field's bottom edge
+      // while background work runs. A still, faint line when animations are off.
+      Item {
+        id: loadBar
+        x: 0; y: root.headerHeight - 1; width: parent.width; height: 2
+        visible: root.showBusy
+        clip: true
+        Rectangle {
+          id: loadSegment
+          width: root.motion.level === 0 ? parent.width : parent.width * 0.28
+          height: parent.height
+          radius: 1
+          color: Util.alpha(root.accent, root.motion.level === 0 ? 0.45 : 0.9)
+          x: -width
+          NumberAnimation on x {
+            running: loadBar.visible && root.motion.level > 0
+            loops: Animation.Infinite
+            from: -loadSegment.width; to: loadBar.width
+            duration: 1100
+            easing.type: Easing.InOutSine
+          }
+        }
+      }
 
       // Breadcrumb line (palette mode)
       Row {

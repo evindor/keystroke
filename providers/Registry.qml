@@ -93,6 +93,7 @@ Item {
   property var scanProblems: []
   property string scanStamp: ""
 
+  readonly property bool scanning: scanner.running
   Process {
     id: scanner
     command: ExtensionsModel.scanArgv(root.builtinDir, root.localDir)

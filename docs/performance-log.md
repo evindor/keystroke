@@ -61,9 +61,63 @@ Keystroke cost (`tools/profile_palette.py`, 41 keystrokes) did not change: total
 (p90 202 vs 180 ms). Both are well above the 10 ms in `docs/verification.md`, which points to a busy machine during the run.
 These changes do not touch the typing path.
 
+## Third change set: window first, guards on a TTL, loading bar
+
+Goal: every key typed after SUPER+SPACE is captured; plugins load in the background; results stream in; the user sees that work is running.
+
+| # | Change | Files |
+|---|--------|-------|
+| 7 | `open()` sets `opened = true` and returns. `notifyOpened()` and the first `runQuery()` run one frame (16 ms) later from a timer, so the surface can map before the UI thread is busy. A key typed in between only restarts the debounce. | `Keystroke.qml` (`openWork`) |
+| 8 | Omarchy menu guards (about 100 processes) re-run on open at most every 45 s. They still run on first load and when the menu files change. | `providers/OmarchyMenu.qml` (`guardsAt`) |
+| 9 | Loading bar: a 2 px segment sliding along the search field's bottom edge while background work runs, shown after the 180 ms delay so fast opens never flicker. Still, faint line when animations are off. Driven by `busy` = pending provider, extension scan, matching engine starting, or a provider reporting through the new `host.setBusy(key, on)` (used by the guards and Hotkeys). | `Keystroke.qml`, `providers/Registry.qml` (`scanning`), `providers/OmarchyMenu.qml`, `providers/Hotkeys.qml` |
+| 10 | Test: keys typed in the same turn as `open()` all reach the field (12 rounds), the first query runs on them, and the bar follows `setBusy()`. | `tests/palette_open_typing_check.py` |
+
+### Results: 3 variants, 4 interleaved runs x 8 opens each
+
+```
+32 opens per variant (4 interleaved runs x 8)
+
+Longest UI stall in first 400 ms after open (ms, median) - keys wait this long
+  baseline d84b822           ████████████████████████████████████          50
+  + first 6 fixes            █████████████████████████████████             46  -8%
+  + deferred open, TTL, bar  ████████████████████████████████████████      56  +12%
+  spread min/max             44/91   41/98   46/103
+
+open() blocking the UI thread (ms, median)
+  baseline d84b822           ████████████████████████████████████████      34
+  + first 6 fixes            ████████████████████████                      20  -40%
+  + deferred open, TTL, bar  █                                              1  -97%
+  spread min/max             22/72   16/60   1/4
+
+CPU per open (ms, median)
+  baseline d84b822           ████████████████████████████████████████    1805
+  + first 6 fixes            ████████████████████████████████████        1610  -11%
+  + deferred open, TTL, bar  ██████████████                               620  -66%
+  spread min/max             1690/2280   1560/2010   600/750
+
+Processes spawned per open (median)
+  baseline d84b822           ████████████████████████████████████████     154
+  + first 6 fixes            ███████████████████████████████████          136  -11%
+  + deferred open, TTL, bar  ████                                          16  -90%
+  spread min/max             137/169   129/162   12/23
+```
+
+How to read it:
+- **CPU and processes drop a lot (-66%, -90%)**, mostly from the guard TTL. The benchmark opens every 2.5 s, so the guards are skipped
+  after the first. A cold open (more than 45 s since the last) still pays the full guard batch, now after the window has mapped.
+  Real-world savings depend on how often the palette is opened.
+- **`open()` itself now returns in about 1 ms** (-97%), because the work moved out of it.
+- **The longest UI stall in the first 400 ms did not improve** (50 -> 56 ms median, within noise). The work moved about one frame later;
+  it did not shrink. A key typed during that stall is queued, not lost, and appears when it ends. The remaining stall is the first
+  `runQuery()`, catalog enumeration and `applyRows`. Shrinking it is the next job (chunk the catalog, prewarm at startup).
+- **Keys sent before the layer surface is mapped and focused still go to the previously focused window.** That gap (hotkey ->
+  `bin/keystroke` -> `omarchy-shell` -> `quickshell ipc` -> surface map -> keyboard enter) is outside the plugin. The offscreen harness
+  cannot measure it. A real-compositor check (`bin/keystroke toggle`, then `wtype`, then read the field back) has not been run.
+
 ## Not done yet (candidates)
 
-- Omarchy menu guards: re-evaluate on a TTL instead of on every open; this is the largest remaining cost (about 100+ processes per open).
+- Cut the first-query stall after open (about 50 ms): prewarm the catalog at startup, chunk enumeration, cheaper `applyRows`.
+- Real-compositor key-loss measurement (`wtype` right after `bin/keystroke toggle`) and a lighter launch chain / persistent mapped surface.
 
 - Files provider: require 3+ characters at the root, longer debounce for spawning providers.
 - Windows extension: use `Quickshell.Hyprland.toplevels` instead of spawning `hyprctl` on open; cache icon lookups by window class.

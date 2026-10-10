@@ -49,14 +49,25 @@ import "project"
 ShellRoot {
  id: test
  property int n: 0
+ property real openAt: 0
+ property real lastTick: 0
+ property real worst: 0
  Keystroke { id: palette; omarchyPath: "/usr/share/omarchy" }
+ // Longest stretch the UI thread was unavailable in the 400 ms after open(): a key
+ // typed in it waits at least that long before the field sees it.
+ Timer { interval: 1; repeat: true; running: true; onTriggered: {
+   var now = Date.now()
+   if (test.openAt && now - test.openAt < 400 && test.lastTick && now - test.lastTick > test.worst) test.worst = now - test.lastTick
+   test.lastTick = now
+ } }
  Timer { id: start; interval: 3000; running: true; onTriggered: { palette.shell = ({ pluginId: "bench" }); step.start() } }
  Timer { id: step; interval: 2500; repeat: true; onTriggered: {
-   if (test.n > 0) { console.log("MARK end " + test.n); palette.cancel() }
+   if (test.n > 0) { console.log("MARK stall " + test.n + " " + test.worst); console.log("MARK end " + test.n); palette.cancel() }
+   test.worst = 0
    if (test.n >= %d + 1) { step.stop(); console.log("MARK done"); Qt.quit(); return }
    test.n++
    console.log("MARK start " + test.n)
-   var t = Date.now(); palette.open('{}'); console.log("MARK open " + test.n + " " + (Date.now() - t))
+   var t = Date.now(); test.openAt = t; test.lastTick = t; palette.open('{}'); console.log("MARK open " + test.n + " " + (Date.now() - t))
  } }
  Timer { interval: 60000; running: true; onTriggered: { console.log("MARK timeout"); Qt.quit() } }
 }
@@ -81,12 +92,15 @@ ShellRoot {
 
     cpu0, rows = 0, []
     open_ms = {}
+    stall_ms = {}
     for line in proc.stdout:
         m = re.search(r'MARK (\w+)\s*(\d*)\s*(\d*)', line)
         if not m: continue
         kind, n, extra = m.group(1), int(m.group(2) or 0), m.group(3)
         if kind == 'start':
             state['n'] = n; state['live'] = True; cpu0 = cpu_ms(proc.pid)
+        elif kind == 'stall':
+            stall_ms[n] = int(extra)
         elif kind == 'open':
             open_ms[n] = int(extra)
         elif kind == 'end':
@@ -108,6 +122,7 @@ def short(cmd):
 per_open = {n: [v[0] for v in seen.values() if v[1] == n] for n, _ in steady}
 print(f'[{label}] opens measured: {len(steady)} (first open discarded)')
 print(f'open() blocked UI thread, ms   median {st.median(open_ms[n] for n, _ in steady):6.1f}   max {max(open_ms[n] for n, _ in steady):6.1f}')
+print(f'longest UI stall in first 400 ms, ms   median {st.median(stall_ms[n] for n, _ in steady):6.1f}   max {max(stall_ms[n] for n, _ in steady):6.1f}')
 print(f'CPU per open (self+children), ms   median {st.median(c for _, c in steady):6.1f}   max {max(c for _, c in steady):6.1f}')
 print(f'processes spawned per open     median {st.median(len(v) for v in per_open.values()):6.1f}')
 kinds = {}
@@ -116,4 +131,4 @@ for n, cmds in per_open.items():
 print('spawned processes (total over measured opens):')
 for k, v in sorted(kinds.items(), key=lambda kv: -kv[1])[:14]:
     print(f'  {v:4d}  {k}')
-print('RESULT ' + json.dumps({'label': label, 'open_ms': [open_ms[n] for n, _ in steady], 'cpu_ms': [c for _, c in steady], 'spawned': [len(v) for v in per_open.values()]}))
+print('RESULT ' + json.dumps({'label': label, 'open_ms': [open_ms[n] for n, _ in steady], 'stall_ms': [stall_ms[n] for n, _ in steady], 'cpu_ms': [c for _, c in steady], 'spawned': [len(v) for v in per_open.values()]}))

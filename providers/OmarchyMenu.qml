@@ -59,7 +59,8 @@ Item {
     ],
     query: function(ctx) { return root.query(ctx) },
     catalog: function(ctx) { return root.catalog(ctx) },
-    opened: function() { root.evaluateGuards() }
+    // The answers (network, hardware, installed tools) rarely change: ask again at most every 45 s on open.
+    opened: function() { if (Date.now() - root.guardsAt > 45000) root.evaluateGuards() }
   })
 
   // ---------------------------------------------------------------- model
@@ -106,11 +107,13 @@ Item {
   // ---------------------------------------------------------------- guards
   // One batch per (re)load and per open, never per query. The menu shows the
   // previous answers until the batch lands, exactly like the stock menu.
+  property real guardsAt: 0
   function evaluateGuards() {
     if (guardProc.running) { root.guardsPending = true; return }
     root.guardsPending = false
     var script = MenuModel.guardScript(root.items)
     if (!script) { root.whenResults = ({}); root.checkedResults = ({}); return }
+    root.guardsAt = Date.now()
     guardProc.collected = ""
     guardProc.command = ["bash", "-c", script]
     guardProc.running = true
@@ -119,6 +122,7 @@ Item {
   Process {
     id: guardProc
     property string collected: ""
+    onRunningChanged: if (root.host && root.host.setBusy) root.host.setBusy("omarchy-guards", running)
     stdout: SplitParser { onRead: function(data) { guardProc.collected += data + "\n" } }
     onExited: function(exitCode, exitStatus) {
       if (exitCode !== 0 || exitStatus !== 0) {

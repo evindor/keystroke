@@ -48,6 +48,7 @@ Item {
 
   Process {
     id: loader
+    onRunningChanged: if (root.host && root.host.setBusy) root.host.setBusy("hotkeys", running)
     stdout: StdioCollector {
       onStreamFinished: {
         var parsed = Hotkeys.parse(text)
