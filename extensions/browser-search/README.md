@@ -42,7 +42,8 @@ Needs Python 3 (standard-library SQLite and JSON) and `xdg-utils`, with no
 setup or download. QML runs one asynchronous `python3 bin/search.py` child
 per distinct eligible query and source combination, after the host's typing
 pause. New queries cancel obsolete work. The child detects the browser and
-reads Chromium's `History` SQLite database and/or `Bookmarks` JSON, or
+reads Chromium's `History` SQLite database and/or its bookmarks JSON
+(`AccountBookmarks` on modern Chrome, else `Bookmarks`), or
 Firefox's `places.sqlite`; disabled sources are not queried. SQLite is opened
 read-only. Chromium and Firefox hold an exclusive lock on these databases while
 they run, so a locked database is reopened with `immutable=1`, which reads the
