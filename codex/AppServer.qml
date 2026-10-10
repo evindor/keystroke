@@ -11,6 +11,7 @@ Item {
   property bool expectedExit: false
   property bool restartRequested: false
   property string error: ""
+  property bool versionMismatch: false
   property string diagnostic: ""
   property int sequence: 0
   property var pending: ({})
@@ -102,6 +103,7 @@ Item {
         if (restart) Qt.callLater(root.ensure)
         return
       }
+      if (code === 65) root.versionMismatch = true
       root.fail(code === 65 ? "Codex version mismatch. Keystroke requires " + Policy.VERSION : "Codex stopped. Your conversation is saved; reopen it to continue.")
     }
   }

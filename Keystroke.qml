@@ -669,8 +669,7 @@ Item {
 
   function notifyOpened() {
     root.invalidateCatalog()
-    providerRegistry.rebuild()
-    providerRegistry.scan()
+    providerRegistry.scan()   // sync() rebuilds the registry when the scan finds a change
     for (var i = 0; i < providerRegistry.entries.length; i++) {
       var p = providerRegistry.entries[i].provider
       if (typeof p.opened === "function") { try { p.opened() } catch (e) { console.warn("keystroke: provider opened() threw", e) } }

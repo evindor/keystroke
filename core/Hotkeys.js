@@ -18,13 +18,13 @@ var ARROW = " → "
 function script(omarchyPath) { return String(omarchyPath || "/usr/share/omarchy") + "/bin/omarchy-menu-keybindings" }
 
 function loadArgv(omarchyPath) {
-  return ["bash", "-lc", "source \"$0\" --print >/dev/null && output_binding_records", script(omarchyPath)]
+  return ["bash", "-c", "source \"$0\" --print >/dev/null && output_binding_records", script(omarchyPath)]
 }
 
 // The dispatcher and its argument travel as literal argv elements; the
 // script's own function decides how they reach Hyprland.
 function dispatchArgv(omarchyPath, dispatcher, arg) {
-  return ["bash", "-lc", "source \"$0\" --print >/dev/null; dispatch_binding \"$1\" \"$2\"", script(omarchyPath), String(dispatcher || ""), String(arg || "")]
+  return ["bash", "-c", "source \"$0\" --print >/dev/null; dispatch_binding \"$1\" \"$2\"", script(omarchyPath), String(dispatcher || ""), String(arg || "")]
 }
 
 function slug(text) {

@@ -112,7 +112,7 @@ Item {
     var script = MenuModel.guardScript(root.items)
     if (!script) { root.whenResults = ({}); root.checkedResults = ({}); return }
     guardProc.collected = ""
-    guardProc.command = ["bash", "-lc", script]
+    guardProc.command = ["bash", "-c", script]
     guardProc.running = true
   }
 
@@ -140,9 +140,11 @@ Item {
         if (tag === "w") nextWhen[id] = value
         else if (tag === "c") nextChecked[id] = value
       }
+      // Same answers as the last batch: nothing to re-enumerate or re-rank.
+      var guardsChanged = JSON.stringify([nextWhen, nextChecked]) !== JSON.stringify([root.whenResults, root.checkedResults])
       root.whenResults = nextWhen
       root.checkedResults = nextChecked
-      if (root.host) root.host.requery({ provider: root.provider.id })
+      if (guardsChanged && root.host) root.host.requery({ provider: root.provider.id })
       if (root.guardsPending) Qt.callLater(function() { root.evaluateGuards() })
     }
   }
@@ -161,7 +163,7 @@ Item {
     providerProc.providerKey = entry.provider
     providerProc.revision = root.providerRevision
     providerProc.collected = ""
-    providerProc.command = ["bash", "-lc", spec.script]
+    providerProc.command = ["bash", "-c", spec.script]
     providerProc.running = true
   }
 
