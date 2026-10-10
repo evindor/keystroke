@@ -39,7 +39,7 @@ Item {
   // install (the installer links ~/.local/bin/agent to .../cursor-agent/...).
   Process {
     id: detect
-    command: ["bash", "-lc", "for c in claude-desktop chatgpt claude codex cursor; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done; a=$(command -v agent 2>/dev/null) && case \"$(readlink -f \"$a\")\" in *cursor*) echo agent;; esac"]
+    command: ["bash", "-c", "for c in claude-desktop chatgpt claude codex cursor; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done; a=$(command -v agent 2>/dev/null) && case \"$(readlink -f \"$a\")\" in *cursor*) echo agent;; esac"]
     running: true
     stdout: StdioCollector {
       onStreamFinished: {

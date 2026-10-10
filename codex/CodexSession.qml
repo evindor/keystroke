@@ -73,7 +73,7 @@ Item {
     historyFile.setText(JSON.stringify({version: 1, recent: recent}, null, 2) + "\n")
     changed()
   }
-  function warm() { rpc.ensure() }
+  function warm() { if (!rpc.versionMismatch) rpc.ensure() }
   function whenReady(fn) {
     if (rpc.ready) fn()
     else { afterReady = fn; rpc.ensure() }

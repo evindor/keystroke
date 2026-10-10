@@ -33,7 +33,7 @@ Item {
 
   Process {
     id: zoneProbe
-    command: ["bash", "-lc", "timedatectl show -p Timezone --value 2>/dev/null || readlink /etc/localtime | sed 's|.*/zoneinfo/||'"]
+    command: ["bash", "-c", "timedatectl show -p Timezone --value 2>/dev/null || readlink /etc/localtime | sed 's|.*/zoneinfo/||'"]
     running: true
     stdout: StdioCollector { onStreamFinished: root.systemZone = text.trim() }
   }

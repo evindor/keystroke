@@ -168,11 +168,11 @@ def list_command():
     if found is None:
         print(json.dumps({"sessions": [], "error": "Herdr is not installed or did not answer"}))
         return 0
-    shown = hosts(proc_table(), hyprland_clients())
+    running = [s for s in found if s.get("running") is True]
+    # Walking /proc and asking Hyprland is only worth it when a session is up.
+    shown = hosts(proc_table(), hyprland_clients()) if running else {}
     out = []
-    for s in found:
-        if s.get("running") is not True:
-            continue
+    for s in running:
         name = str(s.get("name") or "default")
         path = s.get("socket_path")
         if not safe_socket(path):

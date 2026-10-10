@@ -48,7 +48,7 @@ Item {
 
   Process {
     id: probe
-    command: ["bash", "-lc", "command -v fd"]
+    command: ["bash", "-c", "command -v fd"]
     running: true
     onExited: function(code) { root.available = code === 0 }
   }
