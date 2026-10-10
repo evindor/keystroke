@@ -152,7 +152,7 @@ The palette is the view's theme and its keyboard context. These members are part
 
 | Member | Meaning |
 | --- | --- |
-| `background`, `foreground`, `accent`, `muted`, `hairline` (colors), `fontFamily` (string), `compact` (bool) | The palette's theme, already resolved against the active Omarchy theme and Keystroke's appearance settings. Use them instead of `Color.menu.*` so the accent choice applies to you too. |
+| `background`, `foreground`, `accent`, `muted`, `hairline` (colors), `fontFamily` (string), `compact` (bool) | The palette's theme, already resolved against the active Omarchy theme and Keystroke's appearance settings. Use them instead of `Commons.Color.menu.*` so the accent choice applies to you too. |
 | `fontInput`, `fontTitle`, `fontBody`, `fontLabel`, `fontCaption` (ints) | The palette's own type scale, density bump included. Use these instead of `Style.font.*` so a view reads at the size of the results it replaced -- see below. |
 | `paintsViewBackdrop` (bool) | True on a host that paints the backdrop behind your view. Undefined on older builds, which is the only case where a view should paint its own. |
 | `cancel()` | Close the palette (what `Esc` does). |
@@ -163,7 +163,7 @@ The palette is the view's theme and its keyboard context. These members are part
 | `isModifierKey(key)`, `isSuperKey(key)` | Key classification for the hold-to-talk release. |
 | `home`, `omarchyPath`, `shell`, `appLibrary`, `config` (read-only) | The same values `ctx` carries. |
 
-The view runs inside `omarchy-shell`, so `import qs.Commons` and `import qs.Ui` work: `Style.space`, `Style.font.*`, `Style.cornerRadius`, `Util.alpha`, `Ui.Button`, `Ui.BorderSurface` and `Ui.TextField` are the kit the bundled views are made of.
+The view runs inside `omarchy-shell`, so `import qs.Commons` and `import qs.Ui` work: `Style.space`, `Style.font.*`, `Style.cornerRadius`, `Util.alpha`, `Ui.Button`, `Ui.BorderSurface` and `Ui.TextField` are the kit the bundled views are made of. A palette token the host does not pass, such as `urgent` for an error line, is read as `Commons.Color.urgent` with `import qs.Commons as Commons` next to the plain import; Qt 6.12 adds a `Color` type to QtQuick that hides a bare `Color`.
 
 ### Styling a view
 

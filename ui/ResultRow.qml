@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 // One result. Fixed roles only; the host updates delegates in place while
@@ -29,10 +30,10 @@ BorderSurface {
   property int flashRise: 0
   property int flashFall: 0
   property bool compact: true
-  property color accent: Color.accent
-  property color foreground: Color.menu.text
-  property color selectedBackground: Color.menu.selectedBackground
-  property color selectedText: Color.menu.selectedText
+  property color accent: Commons.Color.accent
+  property color foreground: Commons.Color.menu.text
+  property color selectedBackground: Commons.Color.menu.selectedBackground
+  property color selectedText: Commons.Color.menu.selectedText
   property var selectedBorderSpec: Border.none()
   signal activated()
   signal hovered(var item, var mouse)

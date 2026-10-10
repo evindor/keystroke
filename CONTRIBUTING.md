@@ -32,7 +32,7 @@ There is no build step. The shell loads the QML files as they are.
 - **Stable row ids.** `id` drives in-place delegate updates and frecency. Never put query text in an id.
 - **Literal argv, never shell strings**, unless the string is entirely yours (`{type:"shell"}` is for trusted constants). Pass user input as separate argv elements, after `--` where the tool supports it.
 - **Confirm anything destructive or trust-expanding** with the row's `confirm` field: removals, installs, config resets, shutdown.
-- **Theme tokens only.** Colors, fonts, radii and spacing come from Omarchy's `Color`, `Style`, `Border` (`import qs.Commons`). No hard-coded colors in UI; a provider's `color`/`tint` is an accent, applied through `Util.alpha`.
+- **Theme tokens only.** Colors, fonts, radii and spacing come from Omarchy's `Color`, `Style`, `Border` (`import qs.Commons`). Read the palette as `Commons.Color`, with `import qs.Commons as Commons` next to the plain import: Qt 6.12 adds a `Color` type to QtQuick that hides a bare `Color`. No hard-coded colors in UI; a provider's `color`/`tint` is an accent, applied through `Util.alpha`.
 - **Match the house style**: two-space indent, `var`, `function` expressions, no semicolons at line ends, short comments that explain why. Keep files ASCII except glyphs from the Omarchy icon font.
 - **Settings are schemas**, not UI. Declare `settings: [{ key, type, label, default, … }]` on the provider; screens, search and persistence are generated.
 - **Never start a second Quickshell process, never `sudo`, never write outside `~/.config/omarchy/keystroke.json`, `~/.local/state/keystroke/` and `~/.cache/keystroke/`** without a clear, documented reason. Keystroke and its extensions run unsandboxed in the user's shell.
@@ -44,7 +44,7 @@ bin/keystroke validate      # omarchy plugin validate on the checkout
 bin/keystroke test          # qmltestrunner (tests/), integration checks, qmllint
 ```
 
-`tests/lint.sh` prints known noise from Quickshell metadata (`PanelWindow is not creatable`, `member not found on QObject` for `Style.font.*`/`Color.menu.*`); anything else is yours. Run the unit tests offscreen: `cd tests && QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input .`.
+`tests/lint.sh` prints known noise from Quickshell metadata (`PanelWindow is not creatable`, `member not found on QObject` for `Style.font.*`/`Commons.Color.menu.*`); anything else is yours. Run the unit tests offscreen: `cd tests && QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software /usr/lib/qt6/bin/qmltestrunner -input .`.
 
 To see a change in the running shell: `bin/keystroke install` copies the checkout into `~/.config/omarchy/plugins/evindor.keystroke` (no symlinks) and enables it; because the plugin is `keepLoaded`, a code change usually needs `omarchy-restart-shell` afterwards. Drive it headlessly with `bin/keystroke open "<query>"` and `omarchy-shell shell call omarchy.menu inspect '{}'`, which prints the current rows, selection and state as JSON. Do not simulate key presses on the user's desktop as a test.
 

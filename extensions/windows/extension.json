@@ -1,0 +1,16 @@
+{
+  "name": "Windows",
+  "version": "1.0.0",
+  "author": "Justin Garza",
+  "description": "Switch to any open window: > firefox",
+  "apiVersion": 1,
+  "icon": "",
+  "color": "#98c379",
+  "license": "MIT",
+  "commands": [{
+    "id": "windows", "prefix": ">", "title": "Switch to a window",
+    "summary": "Every open Hyprland window, most recently used first",
+    "args": [{ "name": "window", "hint": "a window title or application", "rest": true }],
+    "examples": [">", "> firefox", "> readme"]
+  }]
+}

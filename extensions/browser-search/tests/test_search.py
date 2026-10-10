@@ -21,7 +21,7 @@ class SearchTests(unittest.TestCase):
         self.config = self.home / ".config"
         self.profile = self.config / "chromium/Default"
         self.profile.mkdir(parents=True)
-        self.env = patch.dict(os.environ, {"CHROME_CONFIG_HOME": "", "CHROME_USER_DATA_DIR": ""})
+        self.env = patch.dict(os.environ, {"CHROME_CONFIG_HOME": "", "CHROME_USER_DATA_DIR": "", "HELIUM_CONFIG_HOME": ""})
         self.env.start()
         self.addCleanup(self.env.stop)
 
@@ -168,6 +168,27 @@ class SearchTests(unittest.TestCase):
         path.mkdir(parents=True)
         self.bookmarks(path)
         self.assertEqual(len(self.search(desktop="org.chromium.Chromium.desktop")["results"]), 2)
+
+    def test_helium_reads_its_own_profile(self):
+        self.bookmarks()
+        self.assertEqual(self.search(desktop="helium.desktop")["error"], "No browser profiles found in the standard location")
+        path = self.config / "net.imput.helium/Default"
+        path.mkdir(parents=True)
+        self.bookmarks(path)
+        result = self.search(desktop="helium.desktop", history=False)
+        self.assertEqual(result["browser"], "Helium")
+        self.assertEqual([item["url"] for item in result["results"]], ["https://example.org/saved", "https://example.org/docs"])
+        self.assertTrue(all(item["bookmark"] and item["profile"] == "Default" for item in result["results"]))
+
+    def test_helium_config_home(self):
+        moved = self.home / "moved"
+        (moved / "net.imput.helium/Default").mkdir(parents=True)
+        self.bookmarks(moved / "net.imput.helium/Default")
+        # Helium reads HELIUM_CONFIG_HOME; CHROME_CONFIG_HOME belongs to Chrome and Chromium.
+        with patch.dict(os.environ, {"CHROME_CONFIG_HOME": str(moved)}):
+            self.assertIn("No browser profiles", self.search(desktop="helium.desktop")["error"])
+        with patch.dict(os.environ, {"HELIUM_CONFIG_HOME": str(moved)}):
+            self.assertEqual(len(self.search(desktop="helium.desktop")["results"]), 2)
 
     def test_firefox(self):
         base = self.home / ".mozilla/firefox"

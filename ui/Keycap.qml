@@ -1,11 +1,12 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Rectangle {
   id: root
   property string label: ""
   property bool bright: false
-  property color foreground: Color.menu.text
+  property color foreground: Commons.Color.menu.text
   implicitWidth: key.implicitWidth + Style.space(12)
   implicitHeight: Style.space(22)
   radius: Math.min(Style.cornerRadius, Style.space(5))

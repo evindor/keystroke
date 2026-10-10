@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "../ui"
 import "../voice"
@@ -123,7 +124,7 @@ Item {
     id: status
     x: Style.space(22); y: inputBox.y - height - Style.space(10); width: parent.width - x * 2
     text: host && host.voice.active ? (host.voice.phase === "transcribing" ? "Finishing transcript…" : "Listening…") : session.error || root.localStatus || session.activity
-    color: session.error ? Color.urgent : root.muted; elide: Text.ElideRight
+    color: session.error ? Commons.Color.urgent : root.muted; elide: Text.ElideRight
     font.family: root.fontFamily; font.pixelSize: root.fontLabel
   }
   Ui.BorderSurface {

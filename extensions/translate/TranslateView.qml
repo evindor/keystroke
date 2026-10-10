@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "core/Translate.js" as Translate
 
@@ -224,7 +225,7 @@ Item {
           Text {
             visible: !block.modelData.text
             text: block.modelData.error || "Translating…"
-            color: block.modelData.error ? Color.urgent : root.muted; font.family: root.fontFamily; font.pixelSize: root.fontTitle
+            color: block.modelData.error ? Commons.Color.urgent : root.muted; font.family: root.fontFamily; font.pixelSize: root.fontTitle
           }
           Text {
             visible: !!block.modelData.detail; width: parent.width; wrapMode: Text.Wrap

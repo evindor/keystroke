@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 // The query field while dictating: a string pinned at both ends, plucked by
 // the microphone. Recent loudness flows in from the right, so speech travels
@@ -10,8 +11,8 @@ Item {
   property string mode: "listening"      // starting | listening | transcribing
   property real level: 0
   property var history: []
-  property color accent: Color.accent
-  property color foreground: Color.menu.text
+  property color accent: Commons.Color.accent
+  property color foreground: Commons.Color.menu.text
   property real phase: 0
   property real smoothed: 0
 

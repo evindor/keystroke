@@ -89,7 +89,7 @@ Item {
     path: root.defaultMenuPath
     watchChanges: true
     printErrors: false
-    onLoaded: { root.defaultMenuItems = MenuModel.parseMenuJsonc(text()); root.rebuildItemsFromSources() }
+    onLoaded: { root.defaultMenuItems = MenuModel.parseMenuJsonc(defaultMenuFile.text()); root.rebuildItemsFromSources() }
     onFileChanged: reload()
   }
 
@@ -98,7 +98,7 @@ Item {
     path: root.userMenuPath
     watchChanges: true
     printErrors: false
-    onLoaded: { root.userMenuItems = MenuModel.parseMenuJsonc(text()); root.rebuildItemsFromSources() }
+    onLoaded: { root.userMenuItems = MenuModel.parseMenuJsonc(userMenuFile.text()); root.rebuildItemsFromSources() }
     onLoadFailed: { root.userMenuItems = []; root.rebuildItemsFromSources() }
     onFileChanged: reload()
   }
