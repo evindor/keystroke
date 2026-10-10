@@ -114,6 +114,20 @@ How to read it:
   `bin/keystroke` -> `omarchy-shell` -> `quickshell ipc` -> surface map -> keyboard enter) is outside the plugin. The offscreen harness
   cannot measure it. A real-compositor check (`bin/keystroke toggle`, then `wtype`, then read the field back) has not been run.
 
+## Security notes
+
+Reviewed by the author, not independently audited. No new path from outside input to a shell, file path or network call.
+
+- **`bash -lc` -> `bash -c`:** removes profile sourcing. Scripts still take inputs as positional arguments (`$0`, `$1`). `PATH` now comes from Quickshell's environment, which is the same user-controlled value a login shell would build; the risk is a missing tool, not a hijack.
+- **Codex lazy start:** fewer unprompted processes. The version pin in `helpers/codex-start.sh` is unchanged, and a remembered mismatch fails closed (an unpinned `codex` is never run).
+- **Guards re-run every 45 s on open:** guards decide which menu items are shown or checked; they do not authorize anything. Stale results can show an item that no longer applies for up to 45 s; activating it runs the same command as before.
+- **Registry rebuild no longer runs on open:** relies on \`sync()\` rebuilding when an extension is turned on or off. This was reasoned from the code, not covered by a test; if wrong, a just-disabled extension could stay loaded until the next config reload.
+- **Deferred open work (16 ms):** \`applyRows([])\` clears old rows before the window appears, so Enter in that gap cannot run a stale result. A key can arrive before the first query has run (a correctness trade-off).
+- **60 s scan caches (recent projects, browser profiles) and the lazy Herdr helper:** read the same data less often; nothing new is read or exposed.
+- **`host.setBusy(key, on)`:** new function callable by providers and extensions. A bad extension could keep the loading bar on or add many keys. Extensions already run with the user's full privileges, so this is cosmetic.
+- **Tools:** `tools/bench_open.py` and `tests/palette_open_typing_check.py` run `quickshell` on a temporary copy of the repo and read `/proc`. No network calls; nothing is written outside the temp directory.
+- **Unchanged and out of scope:** extensions and the Codex integration run with the user's privileges.
+
 ## Not done yet (candidates)
 
 - Cut the first-query stall after open (about 50 ms): prewarm the catalog at startup, chunk enumeration, cheaper `applyRows`.
