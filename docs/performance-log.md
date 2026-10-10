@@ -8,6 +8,8 @@ Timings are single runs on one machine and are indicative, not a benchmark.
 
 ## Changes
 
+Note: the benchmarks below were taken before upstream relaxed the Codex check to "0.153.2 or newer". With the installed codex 0.160.1 the old exact pin failed at once on every open; on current `main` the app-server would actually start on every open (about 131 MiB), so the lazy start should save more there than the benchmark shows.
+
 | # | Change | Files | Effect |
 |---|--------|-------|--------|
 | 1 | Codex app-server no longer starts on every open. It warms when the Codex scope is entered or the query starts with `?`. A version mismatch (exit 65) is remembered for the session, so it is not respawned. | `providers/Codex.qml`, `codex/AppServer.qml`, `codex/CodexSession.qml` | Removes a `bash -lc` + `codex --version` + app-server spawn (about 131 MiB PSS when it runs) from each open. |
@@ -119,7 +121,7 @@ How to read it:
 Reviewed by the author, not independently audited. No new path from outside input to a shell, file path or network call.
 
 - **`bash -lc` -> `bash -c`:** removes profile sourcing. Scripts still take inputs as positional arguments (`$0`, `$1`). `PATH` now comes from Quickshell's environment, which is the same user-controlled value a login shell would build; the risk is a missing tool, not a hijack.
-- **Codex lazy start:** fewer unprompted processes. The version pin in `helpers/codex-start.sh` is unchanged, and a remembered mismatch fails closed (an unpinned `codex` is never run).
+- **Codex lazy start:** fewer unprompted processes. The minimum-version check in `helpers/codex-start.sh` is unchanged, and a remembered mismatch fails closed (an unsupported `codex` is never run).
 - **Guards re-run every 45 s on open:** guards decide which menu items are shown or checked; they do not authorize anything. Stale results can show an item that no longer applies for up to 45 s; activating it runs the same command as before.
 - **Registry rebuild no longer runs on open:** relies on `sync()` rebuilding when an extension is turned on or off. This was reasoned from the code, not covered by a test; if wrong, a just-disabled extension could stay loaded until the next config reload.
 - **Deferred open work (16 ms):** `applyRows([])` clears old rows before the window appears, so Enter in that gap cannot run a stale result. A key can arrive before the first query has run (a correctness trade-off).
