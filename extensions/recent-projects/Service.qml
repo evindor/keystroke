@@ -25,11 +25,14 @@ QtObject {
     description: "Reopen a recent VS Code or Cursor project",
     settings: Projects.SETTINGS,
     query: function(ctx) { return root.query(ctx) },
-    opened: function() { root.scan() }
+    // The list barely changes between opens: rescan at most once a minute.
+    opened: function() { if (!root.data || Date.now() - root.scannedAt > 60000) root.scan() }
   })
 
+  property real scannedAt: 0
   function scan() {
     if (worker.running) return
+    root.scannedAt = Date.now()
     root.output = ""
     root.outputDone = false
     root.exitCode = -1

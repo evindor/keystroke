@@ -24,7 +24,6 @@ Item {
     view: root.view,
     query: ctx => root.query(ctx),
     activate: (row, ctx) => root.activate(row, ctx),
-    opened: function() { if (root.active) session.warm() },
     dismiss: function() { session.dismiss() }
   })
   CodexSession {
@@ -36,7 +35,7 @@ Item {
   }
   Process {
     id: detect
-    command: ["bash", "-lc", "for c in chatgpt codex; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done"]
+    command: ["bash", "-c", "for c in chatgpt codex; do command -v \"$c\" >/dev/null 2>&1 && echo \"$c\"; done"]
     running: true
     stdout: StdioCollector { onStreamFinished: { var a = {}; text.trim().split("\n").forEach(x => a[x] = true); root.available = a } }
   }
@@ -49,6 +48,7 @@ Item {
   function raw(ctx) { return String(ctx.rawQuery === undefined ? ctx.query || "" : ctx.rawQuery).replace(/^\?\s*/, "") }
   function query(ctx) {
     if (ctx.scope && ctx.scope !== "codex") return []
+    if (root.active && (ctx.scope === "codex" || /^\?/.test(ctx.query || ""))) session.warm()
     var text = raw(ctx), rows = [], scoped = ctx.scope === "codex"
     if (text.trim()) {
       rows.push({id: "ask", title: "Ask Codex here", subtitle: text, icon: "✳", section: "Continue with", tier: /^\?/.test(ctx.query) ? "answer" : "fallback", score: root.preferredScore(), verb: "Ask", altVerb: "Open task in Codex", action: {type: "provider-view", provider: "codex", text: text}, altAction: {type: "codex-external", text: text}})

@@ -15,6 +15,7 @@ Item {
   property var binds: []
   property bool loaded: false
   property real loadedAt: 0
+  property bool bindsChanged_: false
   readonly property string omarchyPath: Quickshell.env("OMARCHY_PATH")
 
   readonly property var provider: ({
@@ -47,17 +48,21 @@ Item {
 
   Process {
     id: loader
+    onRunningChanged: if (root.host && root.host.setBusy) root.host.setBusy("hotkeys", running)
     stdout: StdioCollector {
       onStreamFinished: {
         var parsed = Hotkeys.parse(text)
         // A failed hyprctl prints nothing: keep the previous list rather than an empty screen.
-        if (parsed.length || !root.loaded) root.binds = parsed
+        if ((parsed.length || !root.loaded) && JSON.stringify(parsed) !== JSON.stringify(root.binds)) { root.binds = parsed; root.bindsChanged_ = true }
       }
     }
     onExited: {
+      var firstLoad = !root.loaded
       root.loaded = true
       root.loadedAt = Date.now()
-      if (root.host) root.host.requery({ provider: root.provider.id })
+      var changed = root.bindsChanged_ || firstLoad
+      root.bindsChanged_ = false
+      if (changed && root.host) root.host.requery({ provider: root.provider.id })
     }
   }
 
