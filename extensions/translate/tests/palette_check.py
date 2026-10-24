@@ -48,7 +48,9 @@ import json, sys, urllib.parse
 args = sys.argv[1:]
 url = args[-1]
 text = None
-if "--data-urlencode" in args: text = args[args.index("--data-urlencode") + 1][2:]
+assert args[args.index("--data-urlencode") + 1] == "q@-"
+text = sys.stdin.read()
+assert text and text not in " ".join(args) and urllib.parse.quote(text, safe="") not in " ".join(args)
 qs = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
 sl, tl = qs.get("sl", [""])[0], qs.get("tl", [""])[0]
 if text is None: text = qs.get("q", [""])[0]

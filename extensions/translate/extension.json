@@ -1,6 +1,6 @@
 {
   "name": "Translate",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "Arseniy Zarechnev",
   "description": "Google Translate without an account: tr bonjour, bonjour to english",
   "apiVersion": 1,

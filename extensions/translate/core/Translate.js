@@ -26,7 +26,6 @@ var PREFIXES = ["tr", "translate"]
 var MIN_CHARS = 2
 var MAX_CHARS = 5000        // what the web page accepts
 var TTS_MAX_CHARS = 200
-var URL_LIMIT = 2048        // longer than this goes as a POST body
 var DEBOUNCE_MS = 350
 var TIMEOUT_S = 20
 var BACKOFF_MS = 60000      // after an HTTP 429
@@ -190,9 +189,7 @@ function requestArgv(text, from, to, proxy) {
              + "&ie=UTF-8&oe=UTF-8&otf=1&ssel=0&tsel=0&kc=7"
   var argv = ["curl", "-sS", "--max-time", String(TIMEOUT_S), "-w", "\n__STATUS__%{http_code}"]
   if (proxy) argv.push("--proxy", String(proxy))
-  var url = ENDPOINT + "?" + params + "&q=" + encodeURIComponent(text)
-  if (url.length > URL_LIMIT) argv.push("--data-urlencode", "q=" + text, ENDPOINT + "?" + params)
-  else argv.push(url)
+  argv.push("--data-urlencode", "q@-", ENDPOINT + "?" + params)
   return argv
 }
 

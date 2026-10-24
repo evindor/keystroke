@@ -105,7 +105,7 @@ QtObject {
     for (i = 0; i < list.length; i++) {
       var r = list[i]
       if (lookup(r.text, r.from, r.to) !== undefined || inflight[r.key]) continue
-      var proc = fetcher.createObject(root, { key: r.key })
+      var proc = fetcher.createObject(root, { key: r.key, payload: r.text })
       proc.command = Translate.requestArgv(r.text, r.from, r.to, settings.proxy)
       inflight[r.key] = proc
       fetches++
@@ -117,6 +117,9 @@ QtObject {
     Process {
       id: proc
       property string key: ""
+      property string payload: ""
+      stdinEnabled: true
+      onStarted: { write(payload); stdinEnabled = false }
       property bool cancelled: false
       property bool done: false
       stdout: StdioCollector { onStreamFinished: root.finished(proc, text) }
