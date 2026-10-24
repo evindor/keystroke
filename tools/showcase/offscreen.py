@@ -227,7 +227,9 @@ import json, sys, urllib.parse
 args = sys.argv[1:]
 url = args[-1]
 text = None
-if "--data-urlencode" in args: text = args[args.index("--data-urlencode") + 1][2:]
+if "--data-urlencode" in args:
+    data = args[args.index("--data-urlencode") + 1]
+    text = sys.stdin.read() if data == "q@-" else data[2:]
 qs = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
 tl = qs.get("tl", [""])[0]
 if text is None: text = qs.get("q", [""])[0]

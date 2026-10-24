@@ -1,3 +1,10 @@
+## Translation lookup text over stdin (2026-10-24)
+
+- Both short and long translation lookups use curl POST with `--data-urlencode q@-`; Service.qml sends raw input over stdin. The offscreen showcase curl fixture supports the same transport. Explicit browser/TTS actions are unchanged.
+- Passed `python3 tools/check_extensions.py extensions/translate`, the real offscreen `extensions/translate/tests/palette_check.py` with a fake curl asserting text is absent from argv, and the main QML suite (279 tests).
+- Generated and inspected the offscreen `translate` and `translate-view` showcase scenes; the fake curl returns Hello for bonjour rather than translating a literal dash. Whitespace checks passed.
+- Not exercised: Google's live endpoint, a cross-account process observer, or the live desktop. No installed plugin was changed.
+
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
 
