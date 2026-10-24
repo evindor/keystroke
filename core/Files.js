@@ -53,7 +53,7 @@ function cacheKey(query, settings) {
   var ws = words(query)
   if (!ws.length || ws.join("").length < MIN_QUERY || String(query).length > MAX_QUERY || ws.length > 8 || /[\u0000-\u001f]/.test(query)) return null
   if (!settings.files && !settings.folders) return null
-  return ws.join(" ").toLowerCase() + "\n" + (settings.files ? "f" : "") + (settings.folders ? "d" : "") + (settings.hidden ? "h" : "") + (settings.fuzzy ? "z" : "")
+  return ws.join(" ").toLowerCase() + "\n" + (settings.files ? "f" : "") + (settings.folders ? "d" : "") + (settings.hidden ? "h" : "") + (settings.fuzzy ? "z" : "") + (settings.searchMounts ? "m" : "")
 }
 
 function escapeRegex(word) {
@@ -72,6 +72,9 @@ function argv(query, home, settings) {
   var ws = words(query)
   var out = ["fd", "--ignore-case", "--full-path", "--color", "never", "--absolute-path",
              "--base-directory", home, "--max-results", String(CANDIDATES), "--threads", "2", "--print0"]
+  // A FUSE request can become uninterruptible while its daemon freezes for
+  // sleep. Avoid entering other filesystems unless the user opts in.
+  if (!settings.searchMounts) out.push("--one-file-system")
   if (settings.hidden) out.push("--hidden", "--exclude", ".git")
   if (settings.files && !settings.folders) out.push("--type", "f")
   if (settings.folders && !settings.files) out.push("--type", "d")

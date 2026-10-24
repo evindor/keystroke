@@ -323,7 +323,7 @@ Item {
     onCopied: root.cancel(true)
     onFailed: function(message) {
       if (root.opened) root.errorMessage = message
-      else Quickshell.execDetached(["notify-send", "Keystroke dictation", message])
+      else Quickshell.execDetached(["notify-send", "Keystroke", message])
     }
   }
   function dictationAccept(alternate) {
@@ -715,7 +715,20 @@ Item {
     if (selection === null || selection === undefined)
       Quickshell.execDetached(["bash", "-c", ": > " + Util.shellQuote(donePath)])
     else
-      Quickshell.execDetached(["bash", "-c", "printf '%s\\n' " + Util.shellQuote(selection) + " > " + Util.shellQuote(selectionPath) + "; : > " + Util.shellQuote(donePath)])
+      selectionWriter.createObject(root, { payload: String(selection) + "\n",
+        command: ["bash", "-c", 'cat > "$1"; : > "$2"', "keystroke-select", selectionPath, donePath] })
+  }
+  // The selection (typed input included) goes over stdin, not argv, where any
+  // local user could read it in /proc/<pid>/cmdline.
+  Component {
+    id: selectionWriter
+    Process {
+      property string payload: ""
+      stdinEnabled: true
+      running: true
+      onStarted: { write(payload); stdinEnabled = false }
+      onExited: function(code) { destroy() }
+    }
   }
 
   function cancel(preserveTransfer) {
@@ -1194,6 +1207,13 @@ Item {
       else clipboardTransfer.submit(effect.text, true, paste)
       return
     }
+    // Copied text reaches wl-copy over stdin, like a paste: as an argument it
+    // would be readable by every local user in /proc/<pid>/cmdline. The palette
+    // closes once wl-copy has it.
+    if (type === "copy") {
+      if (!clipboardTransfer.submit(effect.text === undefined ? "" : effect.text, false)) root.cancel()
+      return
+    }
     if (type === "query") { root.typeQuery(effect.text); return }
     if (type === "navigate") { root.navigate(effect.scope, effect.title || row.title); return }
     if (type === "setting") {
@@ -1222,7 +1242,6 @@ Item {
     if (type === "shell") Util.execDetached(String(effect.command || ""))
     else if (type === "exec") Util.execArgv((effect.argv || []).map(String))
     else if (type === "url") Util.execArgv(["xdg-open", String(effect.url || "")])
-    else if (type === "copy") Quickshell.execDetached(["wl-copy", "--", String(effect.text === undefined ? "" : effect.text)])
     else if (type === "app" && root.appLibrary) root.appLibrary.launch(effect.id, effect.name)
     else if (type === "edit") {
       if (!root.configError) configFile.setText(Settings.serialize(root.config))

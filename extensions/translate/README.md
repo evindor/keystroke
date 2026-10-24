@@ -56,7 +56,7 @@ Everything below only happens once the extension is turned on.
 
 - **Network**: `curl` to `https://translate.google.com/translate_a/single`, the undocumented endpoint the translate.google.com page uses (`client=dict-chrome-ex`), the same one the Raycast extension calls. It sends the text, the source and target codes and nothing else: no account, no key, no token. Requests go out 350 ms after you stop typing, one per (text, source, target); responses are cached for the session so backspacing and repeats are free. An HTTP 429 pauses requests for a minute. The `tk` token the Raycast port computes is not validated for this client and is not sent. Text over 2 KB in the URL goes as a POST body. *Speak* streams `https://translate.google.com/translate_tts` through `mpv`. *Open in Google Translate* opens the website with `xdg-open`.
 - **Processes on every palette open**: `wl-paste` to read the selection (off with *Offer the selected text*). Once, `command -v mpv` when playback is on.
-- **Paste**: `wl-copy` followed by `wtype -M shift -k Insert -m shift`, the same Shift+Insert Keystroke's dictation uses. The text is a positional argument, never part of a shell string.
+- **Paste**: `wl-copy` followed by `wtype -M shift -k Insert -m shift`, the same Shift+Insert Keystroke's dictation uses. The text reaches `wl-copy` over stdin, never as an argument or part of a shell string, so other local users cannot read it in `/proc`.
 - **Notifications**: `omarchy-notification-send` when a translated selection has been copied or pasted, or failed.
 - No files are written. Nothing runs before the switch. No sudo, no daemons, no downloads.
 

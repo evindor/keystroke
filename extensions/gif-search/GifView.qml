@@ -117,6 +117,9 @@ Item {
           required property int index
           width: grid.cellWidth
           height: grid.cellHeight
+          // Release decoded frames for offscreen tiles and when the view closes.
+          readonly property bool previewActive: root.visible && root.service.active
+            && y + height > grid.contentY && y < grid.contentY + grid.height
           Rectangle {
             anchors.fill: parent
             anchors.margins: Style.space(4)
@@ -127,10 +130,14 @@ Item {
             AnimatedImage {
               id: preview
               anchors { fill: parent; margins: Style.space(4); bottomMargin: title.height + Style.space(8) }
-              source: tile.modelData.preview
+              source: tile.previewActive ? tile.modelData.preview : ""
               asynchronous: true
-              cache: false
-              playing: visible && root.service.active
+              // Sequential network GIFs need cached frames to loop safely in Qt.
+              cache: true
+              // No sourceSize: AnimatedImage scales to exactly that size (stretching
+              // any other shape) and decodes no frames from a network stream when
+              // only one side is set. The preview rendition is already 100 px tall.
+              playing: tile.previewActive
               fillMode: Image.PreserveAspectFit
             }
             Text {

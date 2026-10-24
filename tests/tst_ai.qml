@@ -74,24 +74,66 @@ TestCase {
         compare(Ai.cursorPlan("browser", all, "x", "").subtitle, "Cursor · prompt ready in the composer · no browser hand-off")
         compare(Ai.cursorPlan("desktop", { claude: true }, "x", ""), null)
     }
+    function test_each_engine_has_its_own_url() {
+        compare(Ai.searchUrl("google", "rust lifetimes"), "https://www.google.com/search?q=rust+lifetimes")
+        compare(Ai.searchUrl("duckduckgo", "rust lifetimes"), "https://duckduckgo.com/?q=rust+lifetimes")
+        compare(Ai.searchUrl("brave", "rust lifetimes"), "https://search.brave.com/search?q=rust+lifetimes")
+        compare(Ai.searchUrl("bing", "rust lifetimes"), "https://www.bing.com/search?q=rust+lifetimes")
+        compare(Ai.searchUrl("startpage", "rust lifetimes"), "https://www.startpage.com/sp/search?query=rust+lifetimes")
+        compare(Ai.searchUrl("yahoo", "x"), "https://www.google.com/search?q=x")
+        compare(Ai.searchUrl(undefined, "x"), "https://www.google.com/search?q=x")
+    }
+    function test_search_text_cannot_add_parameters() {
+        compare(Ai.searchUrl("google", "a & b"), "https://www.google.com/search?q=a+%26+b")
+        compare(Ai.searchUrl("duckduckgo", "a+b#c?d=e/f"), "https://duckduckgo.com/?q=a%2Bb%23c%3Fd%3De%2Ff")
+        compare(Ai.searchUrl("google", "héllo"), "https://www.google.com/search?q=h%C3%A9llo")
+    }
+    function test_engine_labels_cover_every_option() {
+        compare(Ai.ENGINE_IDS, Object.keys(Ai.ENGINES))
+        compare(Ai.ENGINE_LABELS.duckduckgo, "DuckDuckGo")
+        for (var i = 0; i < Ai.ENGINE_IDS.length; i++) verify(Ai.ENGINE_LABELS[Ai.ENGINE_IDS[i]].length > 0)
+    }
+    function test_the_fallback_search_follows_the_engine_setting() {
+        var row = Ai.rows({ searchEngine: "duckduckgo" }, all, "a b")[0]
+        compare(row.id, "search")
+        compare(row.title, "Search DuckDuckGo")
+        compare(row.tier, "fallback")
+        compare(row.section, "Continue with")
+        compare(row.action.url, "https://duckduckgo.com/?q=a+b")
+        compare(row.altAction, { type: "copy", text: row.action.url })
+        compare(Ai.rows({}, all, "x")[0].title, "Search Google")
+        compare(Ai.rows({ searchEngine: "nonsense" }, all, "x")[0].action.url, "https://www.google.com/search?q=x")
+    }
+    function test_the_search_command_is_one_answer_or_nothing() {
+        var rows = Ai.commandRows({ searchEngine: "brave" }, "  how to center a div ")
+        compare(rows.length, 1)
+        compare(rows[0].title, "Search Brave")
+        compare(rows[0].subtitle, "how to center a div")
+        compare(rows[0].tier, "answer")
+        compare(rows[0].action.url, "https://search.brave.com/search?q=how+to+center+a+div")
+        compare(rows[0].altVerb, "Copy URL")
+        compare(Ai.commandRows({}, ""), [])
+        compare(Ai.commandRows({}, "   "), [])
+        compare(Ai.commandRows({}, undefined), [])
+    }
     function ids(rows) { return rows.map(function(r) { return r.id }) }
     function test_rows_list_every_assistant_with_the_preferred_one_first() {
-        compare(ids(Ai.rows({ provider: "cursor", mode: "cli" }, all, "hi")), ["google", "cursor", "chatgpt", "claude"])
-        compare(ids(Ai.rows({ provider: "claude", mode: "desktop" }, all, "hi")), ["google", "claude", "chatgpt", "cursor"])
-        compare(ids(Ai.rows({}, all, "hi")), ["google", "chatgpt", "claude", "cursor"])
-        compare(ids(Ai.rows({ provider: "nonsense" }, all, "hi")), ["google", "chatgpt", "claude", "cursor"])
+        compare(ids(Ai.rows({ provider: "cursor", mode: "cli" }, all, "hi")), ["search", "cursor", "chatgpt", "claude"])
+        compare(ids(Ai.rows({ provider: "claude", mode: "desktop" }, all, "hi")), ["search", "claude", "chatgpt", "cursor"])
+        compare(ids(Ai.rows({}, all, "hi")), ["search", "chatgpt", "claude", "cursor"])
+        compare(ids(Ai.rows({ provider: "nonsense" }, all, "hi")), ["search", "chatgpt", "claude", "cursor"])
         var rows = Ai.rows({ provider: "cursor", mode: "cli", cursorWorkspace: "/w" }, all, "hi")
         compare(rows[1].action.argv, ["omarchy-launch-terminal", "agent", "--workspace", "/w", "hi"])
         compare(rows[1].preview, "hi")
         for (var i = 1; i < rows.length; i++) {
-            verify(rows[i].score > rows[0].score, rows[i].id + " ranks above Google")
+            verify(rows[i].score > rows[0].score, rows[i].id + " ranks above the web search")
             verify(i === 1 || rows[i].score < rows[i - 1].score, rows[i].id + " keeps its place")
             verify(rows[i].icon.length > 0)
         }
     }
     function test_rows_keep_the_web_fallbacks_when_cursor_is_preferred_but_absent() {
         var rows = Ai.rows({ provider: "cursor", mode: "desktop" }, { "claude-desktop": true }, "hi")
-        compare(ids(rows), ["google", "chatgpt", "claude"])
+        compare(ids(rows), ["search", "chatgpt", "claude"])
         compare(rows[1].action.url, "https://chatgpt.com/?prompt=hi")
         compare(rows[2].action.argv[0], "claude-desktop")
     }

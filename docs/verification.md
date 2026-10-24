@@ -1,5 +1,93 @@
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
+
+## Release 1.5.2 (2026-10-24)
+
+- Contents since 1.5.1: #34 (file walks cancelled, mounts opt-in), #39 with
+  cb3f314 (GIF previews cached, unloaded off screen, no `sourceSize`), #31
+  with ec87e94 (both Chrome bookmark files), ce3cb4d (search engine setting
+  and `g`, from #36), and 56fa62c below. `matching/` is unchanged since
+  1.4.2 (SHA-256 `192ef1ec...` for the engine binary).
+- Security (56fa62c), from the marketplace review of 1.5.1
+  (omacom/omarchy-plugin-marketplace#10706): the `copy` effect passed its
+  text to `wl-copy` as an argument, readable in `/proc/<pid>/cmdline`. It now
+  goes through `ClipboardTransfer` on stdin, like paste and dictation; the
+  palette closes on `copied`. Same class, fixed together: `finishRequest`
+  wrote a dmenu selection through `bash -c "printf ... <selection>"`, now
+  `bash -c 'cat > "$1"; : > "$2"'` with the selection on stdin (identical
+  file bytes, `<selection>\n`); Translate's copy (`wl-copy -- <text>`) and
+  paste (`sh -c '... "$1"' <text>`) now write stdin (Translate 1.0.2, paste
+  is a private `translate-paste` effect delivered by `activate`).
+- `tests/palette_copy_check.py`, new: the real palette with `wl-copy` and
+  `bash` stand-ins that log argv. A calculator answer and a multi-line
+  secret reach `wl-copy` with no arguments and the exact bytes on stdin;
+  input typed at an `omarchy-menu-input`-style prompt lands in the
+  selection file byte for byte and never appears in a bash argument. The old
+  host fails on the copy (`['--', '5']`); a copy-fixed host with the old
+  `finishRequest` fails on the bash argv. Translate: its palette check now
+  rejects any `wl-copy` argument; a direct probe of `clipboard(text, true)`
+  showed `wl-copy` with no arguments, the text on stdin, then `wtype`.
+- Passed on Qt 6.11.2 / Quickshell 0.3.1: `bin/keystroke validate`;
+  `QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software bin/keystroke test`
+  (278 QML tests, every integration check, all ten extensions, lint with
+  only the known `QProcess::ExitStatus` signal-handler noise, now on the two
+  new `onExited` handlers too). Not exercised: Qt 6.12, a live install in the
+  running shell.
+
+## Web search engine and command (2026-10-24)
+
+- From the web search extension proposed in #36: instead of shipping it as
+  an extension, AI & Web Search gets a **Search engine** setting (Google,
+  DuckDuckGo, Brave, Bing, Startpage) and a `g` command. The setting drives
+  both the *Continue with* search row under every query and the command, so
+  the two can no longer disagree. `g <text>` is exclusive and returns one
+  answer row; the prefix is the provider's reserved, renameable `prefix`
+  setting. Ctrl+Enter copies the URL. The row id is now `search` (was
+  `google`).
+- `core/AiTargets.js` holds the engine table, which the enum options, its
+  labels and the URL builder all read. Text is percent-encoded with spaces
+  as `+`, so it cannot add parameters.
+- Passed: `tests/tst_ai.qml` (18, new: per-engine URLs, unknown engine falls
+  back to Google, encoding, labels cover every option, the fallback follows
+  the setting, the command is one answer or nothing);
+  `tests/palette_websearch_check.py`, new, drives the real palette offscreen:
+  `g` routing, the fallback, bare-prefix ghost, `/` help, engine setting,
+  renamed prefix (old one stops matching), Smart Match `all` with a blocked
+  request and arithmetic, the settings screen labels, and a literal
+  `xdg-open` launch captured at the bash boundary; full `bin/keystroke test`.
+- Not exercised: a live install in the running shell, and Ctrl+Enter's
+  `wl-copy`.
+
+## File-search lifecycle and mount boundaries (2026-10-11)
+
+- Based on upstream main `b7a10ca`. The Files provider now cancels an
+  outstanding walk when the palette closes, switches into a picker or
+  another provider scope, or clears the root query. Cancellation marks the
+  walk superseded, so partial output from the old search is not cached.
+- `tests/palette_files_lifecycle_check.py` exercises the real palette with a
+  slow, SIGTERM-aware search fixture. Close, action execution, empty query,
+  navigation and picker transitions all stop the process before its
+  three-second watchdog; cancelled output is discarded. The same test
+  fails on unmodified main at the first close transition.
+- Live Omarchy test with the provider-only patch: a real fd process was
+  observed while the palette was open and was gone immediately after IPC
+  cancellation. Existing local Codex customizations were preserved.
+- Searches now pass `--one-file-system` by default. The optional
+  **Search mounted filesystems** setting restores traversal across mounts.
+  Unit coverage checks both argv policies and separate cache keys. This
+  avoids entering other filesystems; cancellation alone cannot interrupt
+  an already uninterruptible FUSE request.
+- Final focused checks: 273 QML tests passed; real-fd integration and
+  palette lifecycle regression passed. Plugin validation and lint passed.
+- The full test command reached the hotkeys integration check, which fails
+  three expectations against this desktop's current bindings. The identical
+  failures reproduce on unmodified upstream main; preceding integration
+  checks pass.
+- Physical verification with the final patch: hibernate selected through
+  Keystroke completed successfully and restored the previous session on
+  the original Omarchy kernel. systemd reported a successful hibernate
+  return, and the kernel logged hibernation exit without a freezer timeout.
+
 ## Release 1.5.1 (2026-10-09)
 
 - Contents since 1.5.0, all merged from contributor PRs on 2026-10-09: the

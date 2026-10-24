@@ -21,6 +21,13 @@ TestCase {
         verify(Files.cacheKey("re", both) !== Files.cacheKey("re", { files: true, folders: false }))
     }
 
+    function test_mounted_filesystems_are_opt_in() {
+        verify(Files.argv("report", home, both).indexOf("--one-file-system") >= 0)
+        var mounted = Object.assign({}, both, { searchMounts: true })
+        compare(Files.argv("report", home, mounted).indexOf("--one-file-system"), -1)
+        verify(Files.cacheKey("report", both) !== Files.cacheKey("report", mounted))
+    }
+
     function test_prefix_and_search_modes() {
         compare(Files.request("~dwnlds",both,false).query,"dwnlds")
         compare(Files.request(" ~/docs rpt ",both,false).query,"docs rpt")

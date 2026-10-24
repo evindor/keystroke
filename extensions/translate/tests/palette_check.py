@@ -63,7 +63,8 @@ body = json.dumps([[[out, text, None, None, 10]], None, detected, None, None, No
 sys.stdout.write(body + "\\n__STATUS__200")
 ''')
     script("wl-paste", '#!/bin/sh\nprintf "Добрий день"\n')
-    script("wl-copy", f'#!/bin/sh\nprintf "%s\\n" "$@" >> {str(work / "copied.txt")!r}\n')
+    # Text must arrive on stdin; any argument is recorded and fails the check.
+    script("wl-copy", f'#!/bin/sh\n[ "$#" -eq 0 ] || printf "%s\\n" "$@" >> {str(work / "copy-args.txt")!r}\ncat >> {str(work / "copied.txt")!r}\necho >> {str(work / "copied.txt")!r}\n')
     script("wtype", f'#!/bin/sh\nprintf "%s\\n" "$@" >> {str(work / "typed.txt")!r}\n')
     script("mpv", '#!/bin/sh\nexit 0\n')
     (work / "omarchy" / "bin").mkdir(parents=True)
@@ -126,7 +127,7 @@ ShellRoot {
      if (palette.pending || !row("Bonjour le monde") || !row("Hello World")) return
      var main = palette.rows[0]
      test.check(main.title === "Bonjour le monde" && main.tier === "answer" && main.subtitle === "English → French", "answer row first: " + JSON.stringify([main.title, main.tier, main.subtitle]))
-     test.check(main.action.type === "copy" && main.action.text === "Bonjour le monde" && main.altAction.type === "exec", "copy on Enter, paste on Ctrl+Enter")
+     test.check(main.action.type === "copy" && main.action.text === "Bonjour le monde" && main.altAction.type === "translate-paste", "copy on Enter, paste on Ctrl+Enter")
      test.check(main.iconSource.indexOf("assets/icon.svg") > 0 && main.badge === "extension", "row carries the icon and the extension badge: " + main.iconSource + " " + main.badge)
      test.check(row("Hello World").subtitle.indexOf("Back to English") === 0, "reverse translation row: " + row("Hello World").subtitle)
      test.check(row("Open in the editor") !== null && row("Open in Google Translate") !== null, "follow-up rows: " + titles().join(" | "))
@@ -227,7 +228,8 @@ ShellRoot {
     selection = [r for r in requests if r[2] == "Добрий день"]
     assert selection == [["auto", "en", "Добрий день"]], requests   # the job stops at the main translation
     copied = (work / "copied.txt").read_text().splitlines()
-    assert copied == ["--", "Good day"], copied
+    assert copied == ["Good day"], copied
+    assert not (work / "copy-args.txt").exists(), (work / "copy-args.txt").read_text()
     assert not (work / "typed.txt").exists()
     notified = (work / "notified.txt").read_text()
     assert "Translation copied" in notified and "Good day" in notified, notified

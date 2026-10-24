@@ -19,8 +19,15 @@ Item {
     name: "AI & Web Search",
     icon: "✳",
     color: "#e79c85",
-    description: "Continue any query in Claude, ChatGPT, Cursor or Google",
+    description: "Continue any query in Claude, ChatGPT, Cursor or a web search",
+    commands: [
+      { id: "search", prefix: "g", title: "Search the web", summary: "Open your search engine with the text",
+        args: [{ name: "query", hint: "words to search for", rest: true }], examples: ["g rust lifetimes", "g omarchy wallpaper"] }
+    ],
     settings: [
+      { key: "searchEngine", type: "enum", label: "Search engine", "default": "google",
+        options: AiTargets.ENGINE_IDS, optionLabels: AiTargets.ENGINE_LABELS,
+        description: "For the search under every query and the search command (g)" },
       { key: "provider", type: "enum", label: "Preferred assistant", "default": "chatgpt",
         options: ["chatgpt", "claude", "cursor"],
         optionLabels: { chatgpt: "ChatGPT / Codex", claude: "Claude", cursor: "Cursor" },
@@ -59,6 +66,7 @@ Item {
   }
 
   function query(ctx) {
+    if (ctx.command) return AiTargets.commandRows(ctx.settings, ctx.command.rest)
     if (ctx.scope || !ctx.query.trim()) return []
     var q = String(ctx.rawQuery === undefined ? ctx.query : ctx.rawQuery).trim()
     return AiTargets.rows(ctx.settings, root.available, q)

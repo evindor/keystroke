@@ -42,7 +42,7 @@ Item {
     onStarted: { write(root.payload); root.payload = ""; stdinEnabled = false }
     onExited: function(code) {
       if (!root.busy) return
-      if (code !== 0) { root.fail("Could not copy dictation to the clipboard"); return }
+      if (code !== 0) { root.fail("Could not copy to the clipboard"); return }
       root.copied()
       if (!root.busy) return
       if (root.pasteAfterCopy) delay.restart()

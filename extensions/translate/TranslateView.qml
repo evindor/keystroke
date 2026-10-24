@@ -52,7 +52,7 @@ Item {
   }
   function deliver(paste, close) {
     if (!root.mainText) { root.status = root.result ? "No translation yet" : "Type something to translate"; return }
-    Quickshell.execDetached(paste ? Translate.pasteArgv(root.mainText) : ["wl-copy", "--", root.mainText])
+    service.clipboard(root.mainText, paste)
     if (close && root.host) root.host.cancel()
     else root.status = (paste ? "Pasted " : "Copied ") + Translate.ellipsis(root.mainText, 60)
   }

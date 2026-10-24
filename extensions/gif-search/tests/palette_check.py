@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix="keystroke-gifs-") as temp:
     if os.environ.get("KEYSTROKE_GIF_PREVIEW"):
         shutil.copyfile(os.environ["KEYSTROKE_GIF_PREVIEW"], preview)
     view = project / "extensions/gif-search/GifView.qml"
-    view.write_text(view.read_text().replace("source: tile.modelData.preview", "source: " + json.dumps(preview.as_uri())))
+    view.write_text(view.read_text().replace("tile.modelData.preview", json.dumps(preview.as_uri())))
     helper = project / "extensions/gif-search/bin/copy.py"
     helper.write_text(helper.read_text().replace("import subprocess", "import subprocess\nimport io").replace(
         "urllib.request.build_opener(MediaRedirect).open(url, timeout=20)",

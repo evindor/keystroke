@@ -88,6 +88,17 @@ def profiles(desktop, home, config):
     return "firefox", name, found[:32]
 
 
+def data_files(profile, family, source):
+    if family == "firefox":
+        return [profile / "places.sqlite"]
+    if source == "history":
+        return [profile / "History"]
+    # Chrome keeps bookmarks saved to the signed-in Google Account in
+    # AccountBookmarks and the ones only on this device in Bookmarks, and shows
+    # both together; older builds and other Chromium browsers have only Bookmarks.
+    return [profile / "AccountBookmarks", profile / "Bookmarks"]
+
+
 def web_url(url):
     if not isinstance(url, str) or len(url) > 16384 or any(ord(c) < 32 for c in url):
         return False
@@ -179,19 +190,19 @@ def search(query, history=True, bookmarks=True, *, desktop=None, home=None, conf
         for source, enabled in (("bookmarks", bookmarks), ("history", history)):
             if not enabled:
                 continue
-            path = profile / ("places.sqlite" if family == "firefox" else "Bookmarks" if source == "bookmarks" else "History")
-            if not path.is_file():
-                continue
-            try:
-                rows = bookmark_rows(path, terms, deadline) if family == "chromium" and source == "bookmarks" else database_rows(path, family, source, terms, deadline)
-                readable += 1
-                for title, url, stamp in rows:
-                    item = merged.setdefault(url, {"url": url, "title": str(title or url)[:2048], "profile": profile.name,
-                                                   "bookmark": False, "history": False, "stamp": 0})
-                    item["bookmark" if source == "bookmarks" else "history"] = True
-                    item["stamp"] = max(item["stamp"], stamp or 0)
-            except (OSError, ValueError, sqlite3.Error, TypeError):
-                errors.add(source)
+            for path in data_files(profile, family, source):
+                if not path.is_file():
+                    continue
+                try:
+                    rows = bookmark_rows(path, terms, deadline) if family == "chromium" and source == "bookmarks" else database_rows(path, family, source, terms, deadline)
+                    readable += 1
+                    for title, url, stamp in rows:
+                        item = merged.setdefault(url, {"url": url, "title": str(title or url)[:2048], "profile": profile.name,
+                                                       "bookmark": False, "history": False, "stamp": 0})
+                        item["bookmark" if source == "bookmarks" else "history"] = True
+                        item["stamp"] = max(item["stamp"], stamp or 0)
+                except (OSError, ValueError, sqlite3.Error, TypeError):
+                    errors.add(source)
     result["results"] = sorted(merged.values(), key=lambda item: (not item["bookmark"], -item["stamp"], item["url"]))[:30]
     if errors:
         result["error"] = "Could not read some " + " and ".join(sorted(errors)) + "; reopen the palette to retry"

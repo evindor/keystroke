@@ -258,8 +258,7 @@ TestCase {
         compare(main.tier, "answer")
         compare(main.verb, "Copy")
         compare(main.action, { type: "copy", text: "Bonjour le monde" })
-        compare(main.altAction.type, "exec")
-        compare(main.altAction.argv[main.altAction.argv.length - 1], "Bonjour le monde")
+        compare(main.altAction, { type: "translate-paste", text: "Bonjour le monde" })
         compare(main.previewLabel, "FRENCH")
         compare(main.section, "Translate")
         compare(rows[1].title, "Hello World")
@@ -270,7 +269,7 @@ TestCase {
         // Paste as the default action swaps the effects.
         var pasted = T.rows(ctxFor("tr hello world", c, { settings: { targets: "en,fr", source: "auto", defaultAction: "paste" } }))[0]
         compare(pasted.verb, "Paste")
-        compare(pasted.action.type, "exec")
+        compare(pasted.action.type, "translate-paste")
         compare(pasted.altAction, { type: "copy", text: "Bonjour le monde" })
         // Speak appears only when asked for and mpv is there.
         var speak = T.rows(ctxFor("tr hello world", c, { canSpeak: true, settings: { targets: "en,fr", source: "auto", defaultAction: "copy", speak: true } }))
@@ -340,11 +339,10 @@ TestCase {
 
     function test_effects_keep_user_text_out_of_command_strings() {
         var text = "$(rm -rf ~) `x` \"quoted\" & done"
-        var argv = T.pasteArgv(text)
-        compare(argv[0], "sh")
-        compare(argv[1], "-c")
-        verify(argv[2].indexOf(text) < 0, "the command string is a constant")
-        compare(argv[argv.length - 1], text)
+        // The text travels over stdin: no argument carries it.
+        compare(T.clipboardArgv(true), ["sh", "-c", "wl-copy && sleep 0.15 && wtype -M shift -k Insert -m shift"])
+        compare(T.clipboardArgv(false), ["wl-copy"])
+        compare(T.pasteEffect(text), { type: "translate-paste", text: text })
         compare(T.copyEffect(text), { type: "copy", text: text })
         verify(T.webUrl("a b&c", "auto", "fr").indexOf("text=a%20b%26c") > 0)
         compare(T.ttsUrl(new Array(400).join("x"), "fr").length < 300, true)

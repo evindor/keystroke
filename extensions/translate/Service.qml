@@ -169,12 +169,26 @@ QtObject {
     for (var i = 0; i < jobs.length; i++) {
       var job = jobs[i], v = Translate.resolveSubject(job, targets, settings, lookup, busy)
       if (v.main.text) {
-        Quickshell.execDetached(job.paste ? Translate.pasteArgv(v.main.text) : ["wl-copy", "--", v.main.text])
+        clipboard(v.main.text, job.paste)
         notify(job.paste ? "Pasted the translation" : "Translation copied", Translate.ellipsis(v.main.text, 120))
       } else if (v.main.error) notify("Translation failed", v.main.error)
       else keep.push(job)
     }
     if (keep.length !== jobs.length) jobs = keep
+  }
+  // Copy, or copy then paste: the text is written to stdin and the process
+  // object goes away when it exits.
+  readonly property Component clipboardWriter: Component {
+    Process {
+      property string payload: ""
+      stdinEnabled: true
+      running: true
+      onStarted: { write(payload); stdinEnabled = false }
+      onExited: function(code) { destroy() }
+    }
+  }
+  function clipboard(text, paste) {
+    clipboardWriter.createObject(root, { command: Translate.clipboardArgv(paste === true), payload: String(text) })
   }
   function notify(headline, body) {
     Quickshell.execDetached([omarchyPath + "/bin/omarchy-notification-send", "-g", Translate.ICON, headline, body])
@@ -243,6 +257,10 @@ QtObject {
       jobs = jobs.concat([{ text: String(effect.text || ""), from: Translate.sourceCode(settings), to: "", paste: effect.paste === true }])
       sync()
       deliverJobs()
+      return { type: "close" }
+    }
+    if (effect.type === "translate-paste") {
+      clipboard(effect.text, true)
       return { type: "close" }
     }
     if (effect.type === "translate-retry") {

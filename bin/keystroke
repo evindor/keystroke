@@ -75,6 +75,7 @@ case "${1:-help}" in
     (cd "$ROOT/tests" && /usr/lib/qt6/bin/qmltestrunner -silent -input .)
     python3 "$ROOT/tests/applications_check.py"
     python3 "$ROOT/tests/files_check.py"
+    python3 "$ROOT/tests/palette_files_lifecycle_check.py"
     python3 "$ROOT/tests/catalog_check.py"
     python3 "$ROOT/tests/matching_session_check.py"
     python3 "$ROOT/tests/palette_matching_check.py"
@@ -97,6 +98,8 @@ case "${1:-help}" in
     python3 "$ROOT/tests/palette_currency_check.py"
     python3 "$ROOT/tests/palette_commands_check.py"
     python3 "$ROOT/tests/palette_url_check.py"
+    python3 "$ROOT/tests/palette_websearch_check.py"
+    python3 "$ROOT/tests/palette_copy_check.py"
     python3 "$ROOT/tools/check_extensions.py"
     python3 "$ROOT/tests/hotkeys_check.py"
     "$ROOT/tests/lint.sh"

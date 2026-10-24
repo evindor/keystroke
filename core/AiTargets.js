@@ -54,7 +54,29 @@ function claudeCodeUrl(prompt) { return "claude://code/new?q=" + encode(prompt) 
 function codexDesktopUrl(prompt) { return "codex://threads/new?prompt=" + encode(prompt) }
 function claudeWebUrl(prompt) { return "https://claude.ai/new?q=" + encode(prompt) }
 function chatgptWebUrl(prompt, autoSend) { return "https://chatgpt.com/?" + (autoSend ? "q=" : "prompt=") + encode(prompt) }
-function googleUrl(query) { return "https://www.google.com/search?q=" + encodeURIComponent(String(query || "").trim()).replace(/%20/g, "+") }
+
+// Web search engines: the settings enum and the URL builder read this table,
+// so a choice in Settings always has a URL behind it. Spaces go as + the way
+// the engines' own forms send them; everything else stays percent-encoded, so
+// the text cannot add a parameter. (Table from the web search extension
+// proposed in #36.)
+var ENGINES = {
+  google: { name: "Google", url: "https://www.google.com/search?q=" },
+  duckduckgo: { name: "DuckDuckGo", url: "https://duckduckgo.com/?q=" },
+  brave: { name: "Brave", url: "https://search.brave.com/search?q=" },
+  bing: { name: "Bing", url: "https://www.bing.com/search?q=" },
+  startpage: { name: "Startpage", url: "https://www.startpage.com/sp/search?query=" }
+}
+var ENGINE_IDS = Object.keys(ENGINES)
+var ENGINE_LABELS = (function() { var out = {}; for (var id in ENGINES) out[id] = ENGINES[id].name; return out })()
+
+// An unknown or missing engine is Google: a stale or hand-edited setting
+// should still search.
+function engineOf(id) { return ENGINES[id] ? id : "google" }
+function searchUrl(engine, query) {
+  return ENGINES[engineOf(engine)].url + encodeURIComponent(String(query || "").trim()).replace(/%20/g, "+")
+}
+function googleUrl(query) { return searchUrl("google", query) }
 
 function folderOf(workspace) { return workspace === undefined || workspace === null ? "" : String(workspace).trim() }
 
@@ -126,7 +148,7 @@ function cursorPlan(mode, available, prompt, workspace) {
 }
 
 var ASSISTANTS = ["chatgpt", "claude", "cursor"]
-var ICONS = { google: "󰊭", chatgpt: "󰭹", claude: "󰛄", cursor: "󰨞" }
+var ICONS = { google: "󰊭", search: "󰍉", chatgpt: "󰭹", claude: "󰛄", cursor: "󰨞" }
 
 // The preferred assistant first, then the others in their fixed order; an
 // unknown preference means the default.
@@ -135,13 +157,34 @@ function order(preferred) {
   return [first].concat(ASSISTANTS.filter(function(a) { return a !== first }))
 }
 
-// The "Continue with" rows for one query: Google, then every assistant that
-// has a plan. Scores keep the preferred one first and every assistant above
-// Google (2); the ranking stays within the fallback tier.
+// The web search row for the chosen engine. Ctrl+Enter copies the URL.
+function searchRow(settings, query) {
+  var engine = engineOf((settings || {}).searchEngine), url = searchUrl(engine, query)
+  return { id: "search", title: "Search " + ENGINES[engine].name, subtitle: query, icon: engine === "google" ? ICONS.google : ICONS.search,
+           verb: "Search", action: { type: "url", url: url }, altAction: { type: "copy", text: url }, altVerb: "Copy URL" }
+}
+
+// The search command ("g rust lifetimes"): only the search row, as an answer,
+// because the user asked for exactly this. Empty text has nothing to search.
+function commandRows(settings, query) {
+  var q = String(query || "").trim()
+  if (!q) return []
+  var row = searchRow(settings, q)
+  row.tier = "answer"
+  row.score = 100
+  return [row]
+}
+
+// The "Continue with" rows for one query: the web search, then every
+// assistant that has a plan. Scores keep the preferred one first and every
+// assistant above the search (2); the ranking stays within the fallback tier.
 function rows(settings, available, prompt) {
   var s = settings || {}
-  var out = [{ id: "google", title: "Search Google", subtitle: prompt, icon: ICONS.google, section: "Continue with",
-               verb: "Search", tier: "fallback", score: 2, action: { type: "url", url: googleUrl(prompt) } }]
+  var search = searchRow(s, prompt)
+  search.section = "Continue with"
+  search.tier = "fallback"
+  search.score = 2
+  var out = [search]
   var seq = order(s.provider)
   for (var i = 0; i < seq.length; i++) {
     var a = seq[i]

@@ -311,11 +311,13 @@ function copyEffect(text) { return { type: "copy", text: text } }
 
 // Paste the way Keystroke's own dictation does: put the text on the clipboard,
 // then press Shift+Insert in whatever has focus once the palette is gone. The
-// text is a positional argument, never part of the command string.
-function pasteArgv(text) {
-  return ["sh", "-c", 'wl-copy -- "$1" && sleep 0.15 && wtype -M shift -k Insert -m shift', "keystroke-translate", String(text)]
+// text goes to wl-copy over stdin (Service.qml), never as an argument, where
+// any local user could read it in /proc/<pid>/cmdline.
+function clipboardArgv(paste) {
+  return paste ? ["sh", "-c", "wl-copy && sleep 0.15 && wtype -M shift -k Insert -m shift"] : ["wl-copy"]
 }
-function pasteEffect(text) { return { type: "exec", argv: pasteArgv(text) } }
+// A private effect: an exec effect has no stdin, so activate() delivers it.
+function pasteEffect(text) { return { type: "translate-paste", text: String(text) } }
 
 function webUrl(text, from, to) {
   return WEB + "?sl=" + encodeURIComponent(from || "auto") + "&tl=" + encodeURIComponent(to) + "&text=" + encodeURIComponent(text) + "&op=translate"

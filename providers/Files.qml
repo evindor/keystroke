@@ -19,6 +19,15 @@ Item {
   property bool superseded: false
   readonly property string home: Quickshell.env("HOME")
 
+  // The provider stays loaded when the palette closes. Stop its walk before
+  // a selected action (including hibernate) runs, not just on the next query.
+  Connections {
+    target: root.host
+    function onOpenedChanged() { if (!root.host.opened) root.cancelWalk() }
+    function onScopeChanged() { if (root.host.scope && root.host.scope !== "files") root.cancelWalk() }
+    function onDmenuActiveChanged() { if (root.host.dmenuActive) root.cancelWalk() }
+  }
+
   readonly property var provider: ({
     apiVersion: 1,
     id: "files",
@@ -39,6 +48,8 @@ Item {
       { key: "folders", type: "boolean", label: "Include folders", "default": true },
       { key: "hidden", type: "boolean", label: "Include hidden entries", "default": false,
         description: "Dotfiles and dot-folders such as ~/.config. Slower on a large home folder." },
+      { key: "searchMounts", type: "boolean", label: "Search mounted filesystems", "default": false,
+        description: "Include filesystems mounted under your home folder. Cloud and network mounts can block searches and sleep." },
       { key: "limit", type: "number", label: "Results at the root", "default": 10, min: 1, max: 50, integer: true,
         description: "The Files screen shows more; this caps what mixes into the global search." }
     ],
@@ -101,11 +112,11 @@ Item {
   }
 
   function query(ctx) {
-    if (ctx.scope && ctx.scope !== "files") return []
+    if (ctx.scope && ctx.scope !== "files") { root.cancelWalk(); return [] }
     var req = Files.request(ctx.query, ctx.settings, !!ctx.scope, ctx.command ? ctx.command.rest : null)
     var rows = []
     if (!ctx.scope && !req.explicit) {
-      if (!ctx.query) return [navRow(20)]
+      if (!ctx.query) { root.cancelWalk(); return [navRow(20)] }
       var s = Match.match(ctx.query, "Search Files", "files folders finder home")
       if (s) rows.push(navRow(s))
     }

@@ -47,6 +47,14 @@ class SearchTests(unittest.TestCase):
                 {"type": "url", "name": "Keystroke script", "url": "javascript:alert(1)"}
             ]}]}}}))
 
+    def account_bookmarks(self, profile=None):
+        # Chrome writes bookmarks saved to the Google Account to AccountBookmarks,
+        # often with no Bookmarks file in the profile at all.
+        (profile or self.profile).joinpath("AccountBookmarks").write_text(json.dumps({"roots": {"bookmark_bar": {
+            "type": "folder", "children": [
+                {"type": "url", "name": "Keystroke account", "url": "https://example.org/account", "date_added": "70"}
+            ]}}}))
+
     def search(self, query="keystroke", **kwargs):
         return browser.search(query, home=self.home, config=self.config, desktop=kwargs.pop("desktop", "chromium.desktop"), **kwargs)
 
@@ -65,6 +73,53 @@ class SearchTests(unittest.TestCase):
         with patch.object(browser, "profiles", side_effect=AssertionError("Detection ran")):
             self.assertEqual(self.search(history=False, bookmarks=False)["results"], [])
             self.assertEqual(self.search("x")["results"], [])
+
+    def test_account_bookmarks_file(self):
+        # A signed-in Chrome profile can have AccountBookmarks and no Bookmarks.
+        # Bookmarks-only search must read it instead of reporting that no
+        # enabled data exists.
+        self.history().close()
+        self.account_bookmarks()
+        self.assertFalse((self.profile / "Bookmarks").exists())
+        result = self.search(history=False)
+        self.assertEqual(result["error"], "")
+        self.assertEqual(len(result["results"]), 1)
+        row = result["results"][0]
+        self.assertTrue(row["bookmark"] and not row["history"])
+        self.assertEqual(row["url"], "https://example.org/account")
+
+    def test_account_and_device_bookmarks_are_both_searched(self):
+        # Chrome shows account and device-only bookmarks side by side, so a
+        # profile with both files must search both.
+        self.bookmarks()
+        self.account_bookmarks()
+        result = self.search(history=False)
+        self.assertEqual(result["error"], "")
+        urls = {r["url"] for r in result["results"]}
+        self.assertEqual(urls, {"https://example.org/account", "https://example.org/docs", "https://example.org/saved"})
+
+    def test_one_unreadable_bookmark_file_keeps_the_other(self):
+        self.bookmarks()
+        self.profile.joinpath("AccountBookmarks").write_text("{not json")
+        result = self.search(history=False)
+        self.assertEqual({r["url"] for r in result["results"]}, {"https://example.org/docs", "https://example.org/saved"})
+        self.assertIn("bookmarks", result["error"])
+
+    def test_a_url_in_both_files_is_one_row(self):
+        self.bookmarks()
+        self.profile.joinpath("AccountBookmarks").write_text(self.profile.joinpath("Bookmarks").read_text())
+        urls = [r["url"] for r in self.search(history=False)["results"]]
+        self.assertEqual(sorted(urls), ["https://example.org/docs", "https://example.org/saved"])
+
+    def test_history_only_never_reads_bookmarks(self):
+        # With bookmarks disabled, neither bookmark file may be opened and no
+        # row may carry the bookmark label.
+        self.history().close()
+        self.account_bookmarks()
+        with patch.object(browser, "bookmark_rows", side_effect=AssertionError("Bookmarks accessed")):
+            result = self.search(bookmarks=False)
+        self.assertTrue(result["results"])
+        self.assertTrue(all(r["history"] and not r["bookmark"] for r in result["results"]))
 
     def test_literal_unicode_and_injection(self):
         self.history().close()
