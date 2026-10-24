@@ -33,7 +33,7 @@ Quickshell's log. Review the PNGs before publishing.
 
 Normal providers can read personal clipboard history, files, recent questions,
 and settings. `prepare.py` copies the actual palette, ResultRow, PreviewPane,
-VoiceWave and ConversationView components into `/tmp/keystroke-showcase-plugin`.
+VoiceWave and ConversationView components into a fresh private temporary directory.
 It replaces provider discovery and voice transport with fixtures, redirects
 HOME reads to an empty temporary path, disables queries and activation, and
 adds a `grabToImage` capture method. Calculator and color results run the actual
@@ -55,14 +55,17 @@ An interrupted/killed process may require manual removal of the temporary plugin
 Run deliberately, with access to the user's shell and plugin directory:
 
 ```sh
-python3 tools/showcase/prepare.py
-python3 tools/showcase/fixtures.py
 python3 tools/showcase/capture.py
 ```
 
 Capture temporarily brings an overlay into view and rescans plugins. Review the
 fixture source and generated PNGs before publishing. Do not substitute user data.
 PNG output: `site/assets/screenshots/`, 2560 x 2160 on the reference desktop.
+`capture.py` prepares its code and fixtures together inside one private
+`TemporaryDirectory`, and removes staging when it finishes. It never consumes
+a pre-existing shared temporary plugin. The internal helpers require explicit
+staging paths; `prepare.py` rejects an existing destination.
+
 `prepare.py` honours `KEYSTROKE_SHOWCASE_DEST` and `KEYSTROKE_SHOWCASE_HOME`,
 `fixtures.py` honours `KEYSTROKE_SHOWCASE_FIXTURES`; `offscreen.py` uses those.
 These are screenshot fixtures, not an end-to-end functional test of the providers.

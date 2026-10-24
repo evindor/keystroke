@@ -73,6 +73,7 @@ case "${1:-help}" in
   engine) exec "$ROOT/matching/engine/build-prebuilt.sh" ;;
   test)
     (cd "$ROOT/tests" && /usr/lib/qt6/bin/qmltestrunner -silent -input .)
+    python3 "$ROOT/tests/showcase_staging_check.py"
     python3 "$ROOT/tests/applications_check.py"
     python3 "$ROOT/tests/files_check.py"
     python3 "$ROOT/tests/palette_files_lifecycle_check.py"

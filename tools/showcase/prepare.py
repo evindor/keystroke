@@ -12,8 +12,8 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[2]
 # offscreen.py builds the same fixture in its own work folder.
-DEST = Path(os.environ.get('KEYSTROKE_SHOWCASE_DEST', '/tmp/keystroke-showcase-plugin'))
-DEST.mkdir(exist_ok=True)
+DEST = Path(os.environ['KEYSTROKE_SHOWCASE_DEST'])
+DEST.mkdir(mode=0o700)
 for folder in ('core', 'ui', 'voice', 'codex'):
     shutil.copytree(ROOT / folder, DEST / folder, dirs_exist_ok=True)
 (DEST / 'providers').mkdir(exist_ok=True)
@@ -80,7 +80,7 @@ Item {
 ''')
 s = (ROOT / 'Keystroke.qml').read_text()
 s = s.replace('import "core/Match.js" as Match', 'import "codex"\nimport "core/Units.js" as Units\nimport "core/Match.js" as Match')
-s = s.replace('Quickshell.env("HOME")', json.dumps(os.environ.get('KEYSTROKE_SHOWCASE_HOME', '/tmp/keystroke-showcase-empty-home')))
+s = s.replace('Quickshell.env("HOME")', json.dumps(os.environ['KEYSTROKE_SHOWCASE_HOME']))
 s = s.replace('  function runQuery() {', '  function runQuery() { return;')
 s = s.replace('  function activate(alternate) {', '  function activate(alternate) { return;')
 s = s.replace('  function perform(effect, row) {', '  function perform(effect, row) { return;')

@@ -1,3 +1,9 @@
+## Private live showcase staging (2026-10-24)
+
+- Live capture now prepares code and fixtures together in a fresh mode-0700 temporary directory; preparation rejects an existing destination, including symlinks. Internal helpers require explicit staging paths. The offscreen caller already supplies them.
+- Passed `python3 tests/showcase_staging_check.py`: private preparation, fixture creation, cleanup, existing-directory and symlink refusal. Python AST and whitespace checks passed.
+- Not exercised: enabling the temporary plugin or capturing the live desktop. The regression replaces only the final live capture boundary and runs the real preparation helpers.
+
 > Historical checkpoints below include retired local-model and forked-Voxtype implementations. Current build: [Codex integration verification](codex-integration-verification.md).
 
 
