@@ -1,0 +1,134 @@
+{
+  "name": "Coffee",
+  "version": "1.0.0",
+  "author": "Nate Terrence",
+  "description": "Keep the computer awake on demand: coffee 30m, coffee 5pm, coffee while Firefox",
+  "apiVersion": 1,
+  "icon": "󰅶",
+  "color": "#c9a26b",
+  "homepage": "https://github.com/Natetgmaxwell/keystroke-coffee",
+  "license": "MIT",
+  "commands": [
+    {
+      "id": "coffee",
+      "prefix": "coffee",
+      "title": "Caffeinate or decaffeinate",
+      "summary": "Keep the computer awake on demand",
+      "args": [
+        {
+          "name": "action",
+          "hint": "on, off, toggle, status, 30m, 5pm, while Firefox, or schedule",
+          "optional": true,
+          "rest": true
+        }
+      ],
+      "examples": [
+        "coffee",
+        "coffee 30m",
+        "coffee 5pm",
+        "coffee while Firefox"
+      ]
+    },
+    {
+      "id": "caffeinate",
+      "prefix": "caffeinate",
+      "title": "Keep the computer awake",
+      "summary": "Caffeinate indefinitely until you decaffeinate",
+      "args": [],
+      "examples": [
+        "caffeinate"
+      ]
+    },
+    {
+      "id": "decaffeinate",
+      "prefix": "decaffeinate",
+      "title": "Let the computer sleep",
+      "summary": "Turn off Coffee and restore normal idle and sleep",
+      "args": [],
+      "examples": [
+        "decaffeinate"
+      ]
+    },
+    {
+      "id": "coffee-for",
+      "prefix": "coffee-for",
+      "title": "Stay awake for a duration",
+      "summary": "Caffeinate for a length of time, then stop",
+      "args": [
+        {
+          "name": "duration",
+          "hint": "15m, 1h30m, 0:45, or a bare number of minutes"
+        }
+      ],
+      "examples": [
+        "coffee-for 30m",
+        "coffee-for 1h30m",
+        "coffee-for 90"
+      ]
+    },
+    {
+      "id": "coffee-until",
+      "prefix": "coffee-until",
+      "title": "Stay awake until a time",
+      "summary": "Caffeinate until the next time you name",
+      "args": [
+        {
+          "name": "time",
+          "hint": "5pm, 17:00, noon, midnight, or tomorrow 8am",
+          "optional": true,
+          "rest": true
+        }
+      ],
+      "examples": [
+        "coffee-until 5pm",
+        "coffee-until tomorrow 8am",
+        "coffee-until midnight"
+      ]
+    },
+    {
+      "id": "coffee-while",
+      "prefix": "coffee-while",
+      "title": "Stay awake while an app runs",
+      "summary": "Caffeinate until a process or window goes away",
+      "args": [
+        {
+          "name": "app",
+          "hint": "a process or window name, e.g. Firefox",
+          "rest": true
+        }
+      ],
+      "examples": [
+        "coffee-while Firefox",
+        "coffee-while Slack"
+      ]
+    },
+    {
+      "id": "coffee-status",
+      "prefix": "coffee-status",
+      "title": "Show caffeination status",
+      "summary": "See what is keeping the computer awake and for how long",
+      "args": [],
+      "examples": [
+        "coffee-status"
+      ]
+    },
+    {
+      "id": "coffee-schedule",
+      "prefix": "coffee-schedule",
+      "title": "Manage caffeination schedules",
+      "summary": "Add, list, pause, resume, or delete a recurring schedule",
+      "args": [
+        {
+          "name": "action",
+          "hint": "add Mon,Thu 09:00-14:00, list, pause, resume, or delete",
+          "optional": true,
+          "rest": true
+        }
+      ],
+      "examples": [
+        "coffee-schedule add Mon,Thu 09:00-14:00",
+        "coffee-schedule list"
+      ]
+    }
+  ]
+}

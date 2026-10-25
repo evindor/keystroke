@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -u
+
+# Small helper for the Coffee Keystroke extension. It owns the two things QML
+# cannot do safely in one step: parking Omarchy's idle clock without clearing a
+# stay-awake the user set themselves, and watching for an app to exit.
+
+state_dir="$HOME/.local/state/keystroke/coffee"
+marker="$state_dir/idle-owned"
+stay_awake="$HOME/.local/state/omarchy/indicators/stay-awake"
+omarchy_shell="${OMARCHY_PATH:-/usr/share/omarchy}/bin/omarchy-shell"
+
+if [[ ! -x $omarchy_shell ]]; then
+  omarchy_shell=$(command -v omarchy-shell 2>/dev/null || true)
+fi
+
+case "${1:-}" in
+  idle-on)
+    mkdir -p "$state_dir"
+    if [[ -f $marker ]]; then
+      if [[ -f $stay_awake ]]; then
+        printf 'owned\n'
+        exit 0
+      fi
+      rm -f "$marker"
+    fi
+    if [[ -f $stay_awake ]]; then
+      printf 'already\n'
+      exit 0
+    fi
+    if [[ -n $omarchy_shell ]] && "$omarchy_shell" idle disable >/dev/null 2>&1; then
+      : >"$marker"
+      printf 'owned\n'
+      exit 0
+    fi
+    printf 'unavailable\n'
+    exit 1
+    ;;
+  idle-off)
+    if [[ -f $marker ]]; then
+      if [[ ! -f $stay_awake ]]; then
+        rm -f "$marker"
+      elif [[ -n $omarchy_shell ]] && "$omarchy_shell" idle enable >/dev/null 2>&1; then
+        rm -f "$marker"
+      fi
+    fi
+    ;;
+  watch)
+    pattern="${2:-}"
+    if [[ -z $pattern ]]; then
+      echo "coffee: watch needs an app name" >&2
+      exit 2
+    fi
+    while :; do
+      running=0
+      if pgrep -ix -- "$pattern" >/dev/null 2>&1; then
+        running=1
+      elif ps -eo pid=,comm=,args= | awk -v p="$pattern" -v self="$$" '
+          { line = tolower($0); if ($1 != self && $2 != "ps" && $2 != "awk" && index(line, tolower(p)) > 0) found = 1 }
+          END { exit found ? 0 : 1 }'; then
+        running=1
+      elif command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+        if hyprctl clients -j 2>/dev/null | jq -r '.[] | (.class // ""), (.title // "")' 2>/dev/null | grep -Fqi -- "$pattern"; then
+          running=1
+        fi
+      fi
+      (( running )) || exit 0
+      sleep 2
+    done
+    ;;
+  *)
+    echo "usage: coffee idle-on|idle-off|watch APP" >&2
+    exit 2
+    ;;
+esac
