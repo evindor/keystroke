@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import Quickshell
 import Quickshell.Io
 import "../core/AiTargets.js" as AiTargets
@@ -11,6 +12,7 @@ import "../core/AiTargets.js" as AiTargets
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
   property var available: ({})
 
   readonly property var provider: ({
@@ -21,8 +23,8 @@ Item {
     color: "#e79c85",
     description: "Continue any query in Claude, ChatGPT, Cursor or a web search",
     commands: [
-      { id: "search", prefix: "g", title: "Search the web", summary: "Open your search engine with the text",
-        args: [{ name: "query", hint: "words to search for", rest: true }], examples: ["g rust lifetimes", "g omarchy wallpaper"] }
+      { id: "search", prefix: "g", title: root.t("Search the web"), summary: root.t("Open your search engine with the text"),
+        args: [{ name: "query", hint: root.t("words to search for"), rest: true }], examples: ["g rust lifetimes", "g omarchy wallpaper"] }
     ],
     settings: [
       { key: "searchEngine", type: "enum", label: "Search engine", "default": "google",

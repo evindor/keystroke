@@ -1,15 +1,18 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import qs.Commons
 import qs.Commons as Commons
 
 // Right-hand detail for the selected row: label, swatch, text or image, hint.
 Item {
   id: root
+  property var translate: null
+  function t(key, args) { return typeof root.translate === "function" ? root.translate(key, args) : Locale.format(key, args || []) }
   property var row: ({})
   property bool compact: true
   property color accent: Commons.Color.accent
   property color foreground: Commons.Color.menu.text
-  readonly property bool clipboard: (row.previewLabel || "") === "CLIPBOARD" || (row.previewLabel || "") === "DICTATION"
+  readonly property bool clipboard: (row.previewLabel || "") === root.t("CLIPBOARD") || (row.previewLabel || "") === root.t("DICTATION")
   readonly property bool emoji: row.emoji === true
   readonly property string imagePath: String(row.previewImage || "")
   readonly property bool image: imagePath !== ""
@@ -60,7 +63,7 @@ Item {
   Text {
     id: label
     x: 0; y: Style.space(10)
-    text: root.row.previewLabel || "PREVIEW"
+    text: root.row.previewLabel || root.t("PREVIEW")
     textFormat: Text.PlainText
     font.family: Style.font.menuFamily
     font.pixelSize: Style.font.caption
@@ -134,7 +137,7 @@ Item {
       id: detail
       anchors.bottom: parent.bottom
       width: Math.min(implicitWidth, parent.width - (badge.visible ? badge.width + Style.space(8) : 0))
-      text: root.row.previewDetail || (root.row.verb ? "Press return to " + String(root.row.verb).toLowerCase() : "")
+      text: root.row.previewDetail || (root.row.verb ? root.t("Press return to %1", [String(root.row.verb)]) : "")
       textFormat: Text.PlainText
       color: Util.alpha(root.foreground, 0.55)
       font.family: Style.font.menuFamily

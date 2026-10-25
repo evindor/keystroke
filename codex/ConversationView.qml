@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import Quickshell
 import qs.Commons
 import qs.Commons as Commons
@@ -9,6 +10,7 @@ import "../voice"
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
   property var session: null
   property string voicePrefix: ""
   property string localStatus: ""
@@ -79,7 +81,7 @@ Item {
     id: top
     enabled: !root.approval
     x: Style.space(22); y: Style.space(12); width: parent.width - x * 2; height: Style.space(74)
-    ActionButton { id: back; objectName: "conversationBack"; label: "←"; tooltipText: "Back to results"; onTriggered: host.goBack() }
+    ActionButton { id: back; objectName: "conversationBack"; label: (root.host && root.host.rightToLeft) ? "→" : "←"; tooltipText: root.t("Back to results"); onTriggered: host.goBack() }
     Row {
       anchors.left: back.right; anchors.leftMargin: Style.space(10); y: Style.space(8); spacing: Style.space(10)
       Text { text: "OMARCHY"; color: root.accent; font.family: root.fontFamily; font.pixelSize: root.fontCaption; font.letterSpacing: 2; font.weight: Font.Bold }
@@ -89,10 +91,10 @@ Item {
     Keycap { anchors.right: parent.right; y: Style.space(5); label: "esc"; foreground: root.foreground }
     Text {
       y: Style.space(43); width: parent.width - external.width - Style.space(12); elide: Text.ElideMiddle
-      text: session.mode === "agent" ? session.cwd : "Quick question · " + (session.settings.model || "gpt-5.6-luna") + (session.settings.fast === false ? " · Standard" : " · Fast")
+      text: session.mode === "agent" ? session.cwd : root.t("Quick question · %1 · %2", [session.settings.model || "gpt-5.6-luna", root.t(session.settings.fast === false ? "Standard" : "Fast")])
       color: root.muted; font.family: root.fontFamily; font.pixelSize: root.fontLabel
     }
-    ActionButton { id: external; anchors.right: parent.right; y: Style.space(33); label: session.busy ? "Stop & continue ↗" : "Continue in Codex ↗"; available: !!session.threadId; onTriggered: session.requestHandoff() }
+    ActionButton { id: external; anchors.right: parent.right; y: Style.space(33); label: session.busy ? root.t("Stop & continue ↗") : root.t("Continue in Codex ↗"); available: !!session.threadId; onTriggered: session.requestHandoff() }
   }
   Rectangle { y: top.y + top.height; width: parent.width; height: 1; color: Util.alpha(root.foreground, 0.10) }
   ListModel { id: display }
@@ -108,7 +110,7 @@ Item {
       required property string role
       required property string text
       width: history.width; height: label.height + body.height + Style.space(6)
-      Text { id: label; text: parent.role === "user" ? "You" : parent.role === "activity" ? "Activity" : "Codex"; color: parent.role === "user" ? root.muted : root.accent; font.family: root.fontFamily; font.pixelSize: root.fontLabel }
+      Text { id: label; text: parent.role === "user" ? root.t("You") : parent.role === "activity" ? root.t("Activity") : "Codex"; color: parent.role === "user" ? root.muted : root.accent; font.family: root.fontFamily; font.pixelSize: root.fontLabel }
       TextEdit {
         id: body; y: label.height + Style.space(6); width: parent.width; height: contentHeight
         text: root.markdown(parent.text); textFormat: TextEdit.MarkdownText; wrapMode: TextEdit.Wrap
@@ -118,12 +120,12 @@ Item {
         onLinkActivated: function(link) { if (/^https?:\/\//.test(link)) Qt.openUrlExternally(link) }
       }
     }
-    Text { visible: !history.count; anchors.centerIn: parent; width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; text: session.busy ? "Connecting to Codex…" : "Ask a question. Keep the conversation here.\nType or use your voice hotkey."; color: root.muted; font.family: root.fontFamily; font.pixelSize: root.fontTitle }
+    Text { visible: !history.count; anchors.centerIn: parent; width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; text: session.busy ? root.t("Connecting to Codex…") : root.t("Ask a question. Keep the conversation here.\nType or use your voice hotkey."); color: root.muted; font.family: root.fontFamily; font.pixelSize: root.fontTitle }
   }
   Text {
     id: status
     x: Style.space(22); y: inputBox.y - height - Style.space(10); width: parent.width - x * 2
-    text: host && host.voice.active ? (host.voice.phase === "transcribing" ? "Finishing transcript…" : "Listening…") : session.error || root.localStatus || session.activity
+    text: host && host.voice.active ? (host.voice.phase === "transcribing" ? root.t("Finishing transcript…") : root.t("Listening…")) : session.error || root.localStatus || session.activity
     color: session.error ? Commons.Color.urgent : root.muted; elide: Text.ElideRight
     font.family: root.fontFamily; font.pixelSize: root.fontLabel
   }
@@ -165,7 +167,7 @@ Item {
           if (host.isModifierKey(event.key)) return
           host.voiceCancel()
         }
-        if ((event.key === Qt.Key_Left || event.key === Qt.Key_Backspace) && !text && !preeditText && event.modifiers === Qt.NoModifier) {
+        if (((root.host && typeof root.host.readingKey === "function" ? root.host.readingKey(event) : event.key) === Qt.Key_Left || event.key === Qt.Key_Backspace) && !text && !preeditText && event.modifiers === Qt.NoModifier) {
           host.goBack(); event.accepted = true; return
         }
         if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
@@ -173,24 +175,24 @@ Item {
           event.accepted = true
         }
       }
-      Text { anchors.fill: parent; visible: !composer.text; text: session.messages.length ? "Follow up…" : "Ask anything…"; color: root.muted; font: composer.font }
+      Text { anchors.fill: parent; visible: !composer.text; text: session.messages.length ? root.t("Follow up…") : root.t("Ask anything…"); color: root.muted; font: composer.font }
     }
     }
     VoiceWave { anchors.right: parent.right; anchors.rightMargin: Style.space(12); anchors.verticalCenter: parent.verticalCenter; width: Style.space(48); height: Style.space(32); visible: host && host.voice.active; mode: host ? host.voice.phase : "idle"; level: host ? host.voice.level : 0; history: host ? host.voice.history : []; accent: root.accent; foreground: root.foreground }
-    ActionButton { anchors.right: parent.right; anchors.rightMargin: Style.space(9); anchors.verticalCenter: parent.verticalCenter; visible: host && !host.voice.active; label: "Mic"; onTriggered: { root.focusInput(); host.voiceBegin("tap") } }
+    ActionButton { anchors.right: parent.right; anchors.rightMargin: Style.space(9); anchors.verticalCenter: parent.verticalCenter; visible: host && !host.voice.active; label: root.t("Mic"); onTriggered: { root.focusInput(); host.voiceBegin("tap") } }
   }
   Rectangle { y: bottom.y - Style.space(10); width: parent.width; height: 1; color: Util.alpha(root.foreground, 0.10) }
   Row {
     id: bottom
     enabled: !root.approval
     x: Style.space(18); y: parent.height - height - Style.space(16); spacing: Style.space(8); height: Style.space(30)
-    ActionButton { label: session.busy ? "Update request" : "Send"; available: session.draft.trim().length > 0 && (!session.busy || session.phase === "running") && !root.approval; onTriggered: session.submit() }
+    ActionButton { label: session.busy ? root.t("Update request") : root.t("Send"); available: session.draft.trim().length > 0 && (!session.busy || session.phase === "running") && !root.approval; onTriggered: session.submit() }
     Keycap { anchors.verticalCenter: parent.verticalCenter; label: "↵"; bright: true; foreground: root.foreground }
-    ActionButton { label: "Stop"; available: session.busy; onTriggered: session.stop() }
-    ActionButton { label: "Copy answer"; available: session.answer().length > 0; onTriggered: answerCopy.submit(session.answer(), false) }
-    ActionButton { label: "New question"; available: !session.busy; onTriggered: { session.newQuestion(""); root.focusInput() } }
+    ActionButton { label: root.t("Stop"); available: session.busy; onTriggered: session.stop() }
+    ActionButton { label: root.t("Copy answer"); available: session.answer().length > 0; onTriggered: answerCopy.submit(session.answer(), false) }
+    ActionButton { label: root.t("New question"); available: !session.busy; onTriggered: { session.newQuestion(""); root.focusInput() } }
   }
-  ClipboardTransfer { id: answerCopy; onCopied: root.localStatus = "Answer copied"; onFailed: message => root.localStatus = message }
+  ClipboardTransfer { id: answerCopy; onCopied: root.localStatus = root.t("Answer copied"); onFailed: message => root.localStatus = message }
   Rectangle {
     anchors.fill: parent; visible: !!root.approval; color: host ? host.background : "#222"; z: 10
     MouseArea { anchors.fill: parent }
@@ -200,7 +202,7 @@ Item {
     Column {
       id: approvalContent
       width: parent.width; spacing: Style.space(16)
-      Text { text: "Codex needs your input"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: root.fontInput }
+      Text { text: root.t("Codex needs your input"); color: root.foreground; font.family: root.fontFamily; font.pixelSize: root.fontInput }
       TextEdit { width: parent.width; height: contentHeight; readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap; color: root.foreground; font.family: root.fontFamily; font.pixelSize: root.fontBody;
         text: session.approvalDetail(root.approval) }
 
@@ -218,9 +220,9 @@ Item {
         }
       }
       Row { spacing: Style.space(10)
-        ActionButton { label: root.approval && root.approval.params.questions ? "Answer" : "Allow once"; onTriggered: session.decide(true, root.answers) }
-        ActionButton { id: decline; label: "Decline"; onTriggered: session.decide(false) }
-        ActionButton { label: "Stop & continue in Codex"; onTriggered: session.requestHandoff() }
+        ActionButton { label: root.approval && root.approval.params.questions ? root.t("Answer") : root.t("Allow once"); onTriggered: session.decide(true, root.answers) }
+        ActionButton { id: decline; label: root.t("Decline"); onTriggered: session.decide(false) }
+        ActionButton { label: root.t("Stop & continue in Codex"); onTriggered: session.requestHandoff() }
       }
     }
     }

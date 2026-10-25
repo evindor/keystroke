@@ -1,6 +1,7 @@
 .pragma library
 .import "Match.js" as Match
 .import "Extensions.js" as Extensions
+.import "Locale.js" as Locale
 
 // The settings screens as one flat, searchable tree. build() turns the
 // palette schema and the provider registry into nodes; rows() lists one
@@ -39,7 +40,7 @@ function schemaNodes(nodes, screens, path, schemas, values, scope, parentParts, 
     var current = isBool ? (value ? "On" : "Off") : (value === "" || value === undefined ? "—" : String(value))
     if (schema.optionLabels && schema.optionLabels[value]) current = schema.optionLabels[value]
     nodes.push(node(scope, parts, { id: idPrefix + "/" + k, subtitle: schema.description || "", verb: isBool ? "Toggle" : "Change", order: i,
-      accessory: current, keywords: k + (isEnum ? " " + schema.options.join(" ") : ""), description: schema.description || "",
+      accessory: current, localizeAccessory: isBool || isEnum, accessoryNumber: typeof value === "number" ? value : undefined, keywords: k + (isEnum ? " " + schema.options.join(" ") : ""), description: schema.description || "",
       action: isBool ? settingAction(path, k, !value, schema) : navigate(childScope, schema.label) }))
     if (isEnum) {
       for (var o = 0; o < schema.options.length; o++) {
@@ -58,13 +59,15 @@ function schemaNodes(nodes, screens, path, schemas, values, scope, parentParts, 
 // confirmation because it edits the user's bindings.lua.
 // voice: { schemas, values, detected, version, daemonState,
 //          bindings: "installed" | "outdated" | "missing", bindingsPath }
-function daemonLabel(voice) {
+function daemonLabel(voice, translate) {
+  translate = translate || function(key, args) { return Locale.format(key, args || []) }
   var d = String(voice.daemonState || "")
-  if (!d) return "daemon not running"
-  return d === "idle" ? "daemon ready" : "daemon " + d
+  if (!d) return translate("daemon not running")
+  return d === "idle" ? translate("daemon ready") : translate("daemon %1", [d])
 }
 
-function voiceNodes(nodes, screens, rootParts, voice) {
+function voiceNodes(nodes, screens, rootParts, voice, translate) {
+  translate = translate || function(key, args) { return Locale.format(key, args || []) }
   if (!voice) return
   var parts = rootParts.concat(["Voice"])
   var scope = "settings/voice"
@@ -72,7 +75,7 @@ function voiceNodes(nodes, screens, rootParts, voice) {
   var engine = "Voxtype "
   var on = !!(voice.detected && values.enabled)
   nodes.push(node("settings", parts, { id: "voice", icon: "󰍬", section: "Keystroke", order: 1, lift: 1,
-    subtitle: voice.detected ? (on ? "On" : "Off") + " · " + engine + (voice.version || "") + " · " + daemonLabel(voice) : "Voxtype is not installed",
+    subtitle: voice.detected ? translate(on ? "On" : "Off") + " · " + engine + (voice.version || "") + " · " + daemonLabel(voice, translate) : "Voxtype is not installed",
     keywords: "voxtype dictation speech microphone", description: "voice dictation voxtype speech microphone hold to talk transcribe",
     action: navigate(scope, "Voice") }))
   if (!voice.detected) {
@@ -88,15 +91,15 @@ function voiceNodes(nodes, screens, rootParts, voice) {
   var path = String(voice.bindingsPath || "~/.config/hypr/bindings.lua")
   nodes.push(node(scope, parts.concat(["Hold-to-talk bindings"]), { id: "voice/bindings", icon: "󰌌", order: 50,
     verb: st === "installed" ? "Reinstall" : st === "outdated" ? "Update" : "Install",
-    subtitle: st === "installed" ? "Long-press and release binds are in " + path
-            : st === "outdated" ? "The block in " + path + " does not match the hotkeys above"
-            : "Adds long-press and release binds for the hotkeys above to " + path,
-    accessory: st === "installed" ? "Installed" : st === "outdated" ? "Outdated" : "Missing",
+    subtitle: st === "installed" ? translate("Long-press and release binds are in %1", [path])
+            : st === "outdated" ? translate("The block in %1 does not match the hotkeys above", [path])
+            : translate("Adds long-press and release binds for the hotkeys above to %1", [path]),
+    localizeAccessory: true, accessory: st === "installed" ? "Installed" : st === "outdated" ? "Outdated" : "Missing",
     keywords: "hyprland bindings hold", description: "hyprland keybinding long press release install bindings.lua",
-    confirm: (st === "missing" ? "Add" : "Rewrite") + " the Keystroke voice block in " + path + " and reload Hyprland?",
+    confirm: translate(st === "missing" ? "Add the Keystroke voice block in %1 and reload Hyprland?" : "Rewrite the Keystroke voice block in %1 and reload Hyprland?", [path]),
     action: { type: "voice-bindings" } }))
   nodes.push(node(scope, parts.concat([engine + (voice.version || "")]), { id: "voice/status", icon: "󰍬", verb: "", order: 60, disabled: true, listOnly: true,
-    subtitle: daemonLabel(voice) + " · tap the hotkey again or hold it while the palette is open", action: { type: "noop" } }))
+    subtitle: translate("%1 · tap the hotkey again or hold it while the palette is open", [daemonLabel(voice, translate)]), action: { type: "noop" } }))
 
 }
 
@@ -104,7 +107,8 @@ function voiceNodes(nodes, screens, rootParts, voice) {
 //          entries: [{ key, name, description, icon, iconFont, iconSource, color, source, extensionId, dir, local, loaded, enabled, schemas, values }],
 //          problems: [{ id, message }] }
 function build(model) {
-  var nodes = [], screens = ({})
+  var translate = typeof model.translate === "function" ? model.translate : function(key, args) { return Locale.format(key, args || []) }
+  var nodes = [], screens = ({}), literalNames = ({})
   var rootParts = [ROOT_TITLE]
   nodes.push(node("", rootParts, { id: "settings", subtitle: "Providers, appearance and the config file", order: 7, listScore: 20,
     description: "preferences configuration providers", action: navigate("settings", "Settings") }))
@@ -112,7 +116,7 @@ function build(model) {
   nodes.push(node("settings", appearance, { id: "palette", subtitle: "Density, accent, previews and animations", icon: "󰏘", section: "Keystroke", order: 0, lift: 1,
     description: "layout density accent preview theme animations motion transitions", action: navigate("settings/palette", "Appearance") }))
   schemaNodes(nodes, screens, ["palette"], model.paletteSchema || [], model.paletteValues || {}, "settings/palette", appearance, "palette")
-  voiceNodes(nodes, screens, rootParts, model.voice)
+  voiceNodes(nodes, screens, rootParts, model.voice, translate)
   if (model.matching) {
     var matching = rootParts.concat(["Matching"])
     nodes.push(node("settings", matching, { id: "matching", section: "Keystroke", order: 2, subtitle: "Smart match and model size",
@@ -136,8 +140,9 @@ function build(model) {
     var parts = rootParts.concat([e.name])
     var scope = "settings/" + e.key
     var extension = e.source === "extension"
+    if (extension) literalNames[e.key] = e.name
     var origin = extension ? (e.local ? "Local extension" : "Extension") : "Bundled"
-    nodes.push(node("settings", parts, { id: e.key, subtitle: (e.enabled ? "Enabled" : "Disabled") + " · " + origin + (e.description ? " · " + e.description : ""),
+    nodes.push(node("settings", parts, { id: e.key, subtitle: translate(e.enabled ? "Enabled" : "Disabled") + " · " + translate(origin) + (e.description ? " · " + translate(e.description) : ""),
       icon: e.icon || "⌘", iconFont: e.iconFont || "", iconSource: e.iconSource || "", tint: e.color || "", section: "Providers", order: 10 + i, badge: extension ? (e.local ? "local" : "extension") : "",
       keywords: e.key, description: e.description || "", action: navigate(scope, e.name) }))
     var path = ["providers", e.key]
@@ -148,14 +153,14 @@ function build(model) {
                           description: extension ? "Runs the extension's code in your shell with your permissions" : "Include this provider in Keystroke" }
     // Turning an extension on runs its code: that asks first, as the Extensions screen does.
     nodes.push(node(scope, parts.concat([enabledSchema.label]), { id: e.key + "/enabled", subtitle: enabledSchema.description, verb: "Toggle", order: -1, lift: 1,
-      accessory: e.enabled ? "On" : "Off", keywords: "enabled", description: "enable disable toggle on off " + enabledSchema.description,
-      confirm: extension && !e.enabled ? Extensions.enableConfirm(e) : "",
-      confirmDetail: extension && !e.enabled ? Extensions.enableDetail(e) : "",
+      localizeAccessory: true, accessory: e.enabled ? "On" : "Off", keywords: "enabled", description: "enable disable toggle on off " + enabledSchema.description,
+      confirm: extension && !e.enabled ? Locale.extensionConsent(e, translate).message : "",
+      confirmDetail: extension && !e.enabled ? Locale.extensionConsent(e, translate).detail : "",
       confirmText: extension && !e.enabled ? Extensions.ENABLE_LABELS.confirmText : "",
       cancelText: extension && !e.enabled ? Extensions.ENABLE_LABELS.cancelText : "",
       action: settingAction(path, "enabled", !e.enabled, enabledSchema) }))
     if (extension)
-      nodes.push(node(scope, parts.concat(["Manage extension"]), { id: e.key + "/provenance", subtitle: (e.loaded ? "Loaded from " : "Off · ") + (e.dir || e.extensionId),
+      nodes.push(node(scope, parts.concat(["Manage extension"]), { id: e.key + "/provenance", subtitle: e.loaded ? translate("Loaded from %1", [e.dir || e.extensionId]) : translate("Off · %1", [e.dir || e.extensionId]),
         icon: "󰏓", verb: "Open", order: 900, badge: e.local ? "local" : "extension", listOnly: true, keywords: e.extensionId, action: navigate("extensions/" + e.extensionId, e.name) }))
     schemaNodes(nodes, screens, path, e.schemas || [], e.values || {}, scope, parts, e.key)
   }
@@ -164,7 +169,7 @@ function build(model) {
     nodes.push(node("settings", rootParts.concat([problems[p].id]), { id: "problem/" + problems[p].id, subtitle: problems[p].message, icon: "󰀦",
       section: "Extensions needing attention", verb: "", order: 500 + p, disabled: true, badge: "extension", description: "extension problem " + problems[p].message,
       action: { type: "noop" } }))
-  return { nodes: nodes, screens: screens }
+  return { nodes: nodes, screens: screens, literalNames: literalNames }
 }
 
 function depthOf(scope) { return scope ? scope.split("/").length : 0 }

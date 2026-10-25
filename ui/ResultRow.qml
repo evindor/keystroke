@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -10,6 +11,9 @@ import qs.Ui
 // from) belongs to the preview pane.
 BorderSurface {
   id: root
+  property var translate: null
+  property bool rightToLeft: false
+  function t(key, args) { return typeof root.translate === "function" ? root.translate(key, args) : Locale.format(key, args || []) }
   property string title: ""
   property string subtitle: ""
   property string icon: ""
@@ -136,7 +140,7 @@ BorderSurface {
     anchors.right: parent.right
     anchors.rightMargin: Style.space(12)
     anchors.verticalCenter: parent.verticalCenter
-    text: root.accessory ? root.accessory : (root.disabled ? "" : (root.verb === "Open" ? "›" : ""))
+    text: root.accessory ? root.accessory : (root.disabled ? "" : (root.verb === root.t("Open") ? (root.rightToLeft ? "‹" : "›") : ""))
     textFormat: Text.PlainText
     color: root.accessory ? root.textColor : Util.alpha(root.textColor, 0.4)
     font.family: Style.font.menuFamily

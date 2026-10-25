@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import "../core/Commands.js" as Commands
 
 // What can I type? The "/" screen: every command the enabled providers
@@ -11,6 +12,7 @@ import "../core/Commands.js" as Commands
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
 
   readonly property var provider: ({
     apiVersion: 1,
@@ -20,16 +22,16 @@ Item {
     color: "#a5a4ad",
     description: "Every prefix you can type, with its arguments",
     commands: [
-      { id: "help", prefix: Commands.HELP_PREFIX, title: "What can I type?", summary: "Lists every command with its arguments",
-        args: [{ name: "command", hint: "part of a name or prefix, to filter the list", optional: true, rest: true }], examples: ["/", "/tr"] }
+      { id: "help", prefix: Commands.HELP_PREFIX, title: root.t("What can I type?"), summary: root.t("Lists every command with its arguments"),
+        args: [{ name: "command", hint: root.t("part of a name or prefix, to filter the list"), optional: true, rest: true }], examples: ["/", "/tr"] }
     ],
     settings: [],
     query: function(ctx) { return root.query(ctx) }
   })
 
   function navRow(score) {
-    return { id: "help", title: "What can I type?", subtitle: "Every command and its arguments · or type /", icon: "󰘳", section: "Keystroke",
-             verb: "Open", tier: "item", score: score, order: 99, keywords: "help commands prefixes usage",
+    return { id: "help", title: root.t("What can I type?"), subtitle: root.t("Every command and its arguments · or type /"), icon: "󰘳", section: "Keystroke",
+             verb: root.t("Open"), tier: "item", score: score, order: 99, keywords: "help commands prefixes usage",
              description: "help commands prefixes what can I type usage arguments", action: { type: "navigate", scope: "commands", title: "Commands" } }
   }
 

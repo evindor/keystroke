@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import Quickshell
 import Quickshell.Io
 import qs.Commons
@@ -11,6 +12,7 @@ import "../core/Match.js" as Match
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
   readonly property string omarchyPath: Quickshell.env("OMARCHY_PATH")
   readonly property string defaultMenuPath: omarchyPath + "/default/omarchy/omarchy-menu.jsonc"
   readonly property string userMenuPath: Quickshell.env("HOME") + "/.config/omarchy/extensions/omarchy-menu.jsonc"
@@ -312,7 +314,7 @@ Item {
       action = { type: "shell", command: entry.action }
       verb = "Run"
     } else if (entry.provider === "apps") {
-      action = { type: "navigate", scope: "applications", title: "Applications" }
+      action = { type: "navigate", scope: "applications", title: root.t("Applications") }
       verb = "Open"
     } else {
       var target = entry.kind === "link" ? entry.target : entry.id
@@ -364,8 +366,8 @@ Item {
     if (!root.rowsLoaded) { ctx.pending(); return [] }
     var confirmDestructive = ctx.settings.confirmDestructive !== false
     if (!ctx.scope && !ctx.query)
-      return [{ id: "menu", title: "Omarchy Menu", subtitle: "Your entire desktop, at your fingertips", icon: "\udb82\udcc7",
-                section: "Omarchy", verb: "Open", tier: "item", score: 28, order: 1,
+      return [{ id: "menu", title: root.t("Omarchy Menu"), subtitle: root.t("Your entire desktop, at your fingertips"), icon: "\udb82\udcc7",
+                section: "Omarchy", verb: root.t("Open"), tier: "item", score: 28, order: 1,
                 action: { type: "navigate", scope: "omarchy/root", title: "Omarchy" } }]
     var active = ctx.sub && root.item(ctx.sub) ? ctx.sub : "root"
     var rows = [], i, entry

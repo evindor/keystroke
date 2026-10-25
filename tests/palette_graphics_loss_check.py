@@ -106,6 +106,7 @@ ShellRoot {
     env = dict(os.environ, PATH=str(work / "bin") + os.pathsep + os.environ["PATH"], HOME=str(work), XDG_RUNTIME_DIR=str(work), QT_QPA_PLATFORM="offscreen", QT_QPA_PLATFORMTHEME="generic", QT_QUICK_BACKEND="software", QML_IMPORT_PATH=str(work), OMARCHY_PATH="/usr/share/omarchy")
     env.pop("DISPLAY", None)
     env.pop("WAYLAND_DISPLAY", None)
+    env["OMARCHY_LANGUAGE_FILE"] = str(work / "test-language")
     result = subprocess.run(["quickshell", "-p", str(work / "shell.qml")], env=env, capture_output=True, text=True, timeout=20)
     output = result.stdout + result.stderr
     assert "PASS palette graphics loss" in output and "FAIL" not in output, output

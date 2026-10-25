@@ -5,7 +5,7 @@ root=pathlib.Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='keystroke-codex-test-') as temp:
  p=pathlib.Path(temp);(p/'.local/state/keystroke/questions').mkdir(parents=True)
  (p/'codex').symlink_to(root/'codex');(p/'qs').symlink_to('/usr/share/omarchy/shell')
- for name in ['ui','voice']: (p/name).symlink_to(root/name)
+ for name in ['ui','voice','core']: (p/name).symlink_to(root/name)
  for name in ['Commons','Ui']: (p/name).symlink_to('/usr/share/omarchy/shell/'+name)
  (p/'shell.qml').write_text('''import QtQuick
 import QtTest

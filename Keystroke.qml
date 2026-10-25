@@ -6,10 +6,12 @@ import Quickshell.Wayland
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import "i18n" as Localization
 import "ui"
 import "providers"
 import "voice"
 import "core"
+import "core/Locale.js" as Locale
 import "core/Match.js" as Match
 import "core/Frecency.js" as Frecency
 import "core/Settings.js" as Settings
@@ -25,6 +27,32 @@ import "matching" as Matching
 // menu. Hosted by omarchy-shell as a `menu` plugin (see manifest.json).
 Item {
   id: root
+
+  Localization.Locale { id: strings; directory: Qt.resolvedUrl("i18n"); omarchyPath: root.omarchyPath }
+  readonly property string language: strings.language
+  readonly property string formatLocale: strings.formatLocale
+  readonly property bool rightToLeft: strings.rightToLeft
+  readonly property var translationStamp: strings.strings
+  Component { id: translatorFactory; Localization.Locale { omarchyPath: root.omarchyPath } }
+  function createTranslator(owner, directory) { return translatorFactory.createObject(owner, { directory: directory }) }
+  function t(key, args) { return Locale.format(strings.t(key, key), args || []) }
+  function readingKey(event) {
+    if (!root.rightToLeft) return event.key
+    if (event.key === Qt.Key_Left) return Qt.Key_Right
+    if (event.key === Qt.Key_Right) return Qt.Key_Left
+    return event.key
+  }
+  function formatNumber(value, decimals) { return strings.formatNumber(value, decimals) }
+  function tn(key, count) { return Locale.format(strings.tn(key, count, key), [strings.formatNumber(count)]) }
+  Connections {
+    target: strings
+    function onStringsChanged() {
+      providerRegistry.rebuild()
+      root.commandIndex = ({ items: [], conflicts: [], entries: null, config: null })
+      root.updateCommandLive()
+      root.requery()
+    }
+  }
 
   // Injected by omarchy-shell when the plugin loads.
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
@@ -245,7 +273,7 @@ Item {
     if (!entry || root.providerEnabled(entry)) return
     root.scope = ""
     root.scopeTitle = ""
-    root.statusMessage = entry.provider.name + " is disabled in Keystroke Settings"
+    root.statusMessage = root.t("%1 is disabled in Keystroke Settings", [root.t(entry.provider.name)])
   }
   function applyConfigText(text) {
     var parsed = Settings.parse(text)
@@ -346,7 +374,7 @@ Item {
     root.edited()
   }
   function installVoiceBindings() {
-    if (!root.bindingsKnown) { root.errorMessage = "Could not read " + root.bindingsPath; return }
+    if (!root.bindingsKnown) { root.errorMessage = root.t("Could not read %1", [root.bindingsPath]); return }
     var next = VoiceBindings.apply(root.bindingsText, root.voiceSettings.keys)
     root.bindingsText = next
     bindingsFile.setText(next)
@@ -434,6 +462,13 @@ Item {
   property string fontFamily: Style.font.menuFamily
   property string scope: ""
   property string scopeTitle: ""
+  readonly property string localizedScopeTitle: {
+    var parts = root.scope.split("/")
+    var owner = root.registryEntry(parts[0])
+    if (owner && owner.source === "extension") return root.scopeTitle
+    var target = parts[0] === "settings" && parts.length === 2 ? root.registryEntry(parts[1]) : null
+    return target && target.source === "extension" ? root.scopeTitle : root.t(root.scopeTitle)
+  }
   property var history: []
   property var rows: []
   property var uids: []
@@ -466,7 +501,7 @@ Item {
     else if (can && row.altVerb && !voice.active) out.push({ label: row.altVerb, key: "ctrl ↵" })
     if (can && row.copyAction && !voice.active) out.push({ label: row.copyVerb, key: "ctrl C" })
     if (can && row.copyAltAction && !voice.active) out.push({ label: row.copyAltVerb, key: "ctrl ⇧ C" })
-    if (can && row.appId) out.push({ label: "Uninstall", key: "del" })
+    if (can && row.appId) out.push({ label: root.t("Uninstall"), key: "del" })
     // Ctrl+K is the one hint not about the selection; it yields when the row
     // already fills the footer (Files: open, terminal, copy file, copy path).
     if (out.length <= 3) out.push({ label: root.compact ? "Settings" : "Provider settings", key: "ctrl K" })
@@ -690,7 +725,7 @@ Item {
     if (root.dmenuActive && root.requestActive) root.finishRequest(null)   // a new caller cancels the previous one
     root.voiceCancel()
     root.mode = payload.mode === "input" ? "input" : "select"
-    root.dmenuPrompt = String(payload.prompt || (root.mode === "input" ? "Input" : "Select"))
+    root.dmenuPrompt = String(payload.prompt || (root.mode === "input" ? root.t("Input") : root.t("Select")))
     root.dmenuOptions = Array.isArray(payload.options) ? payload.options : []
     root.selectionFile = String(payload.selectionFile || "")
     root.doneFile = String(payload.doneFile || "")
@@ -831,7 +866,7 @@ Item {
       if (!root.providerEnabled(entry)) continue
       if (scope && owner !== entry.key) continue
       var ctx = { query: "", rawQuery: "", scope: scope, sub: scope ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
-                  patterns: Patterns.evaluate(entry.patterns, ""), pending: mark, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
+                  patterns: Patterns.evaluate(entry.patterns, ""), pending: mark, language: root.language, formatLocale: root.formatLocale, t: root.t, tn: root.tn, formatNumber: root.formatNumber, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
       try {
         var candidates = []
         if (typeof entry.provider.catalog === "function") candidates = entry.provider.catalog(ctx) || []
@@ -935,7 +970,7 @@ Item {
     var boost = Math.max(patterns.boost, command ? Commands.BOOST : 0)
     var ctx = { query: q, rawQuery: root.voiceRawText || search.text, scope: sc, sub: sc ? sub : "", generation: root.generation, settings: root.settingsFor(entry),
                 patterns: patterns, command: command ? { id: command.command.id, prefix: command.prefix, rest: command.rest, args: command.command.args } : null,
-                pending: function() { result.pending = true }, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
+                pending: function() { result.pending = true }, language: root.language, formatLocale: root.formatLocale, t: root.t, tn: root.tn, formatNumber: root.formatNumber, host: root, shell: root.shell, appLibrary: root.appLibrary, omarchyPath: root.omarchyPath }
     // The default matcher sees the text after a recognised prefix, not the prefix itself.
     var matchText = command ? command.rest : q
     try {
@@ -970,7 +1005,7 @@ Item {
     for (var k in row) out[k] = row[k]
     out.id = String(row.id === undefined ? row.title : row.id)
     out.providerKey = entry.key
-    out.providerName = entry.provider.name
+    out.providerName = entry.source === "bundled" ? root.t(entry.provider.name) : entry.provider.name
     out.source = entry.source
     out.uid = entry.key + "/" + out.id
     out.subtitle = String(row.subtitle || "")
@@ -978,17 +1013,17 @@ Item {
     out.iconFont = String(row.iconFont || "")
     out.iconSource = String(row.iconSource || "")
     out.tint = String(row.tint || "")
-    out.section = String(row.section || entry.provider.name)
-    out.verb = String(row.verb || (row.action && row.action.type === "navigate" ? "Open" : "Run"))
+    out.section = entry.source === "bundled" ? root.t(String(row.section || entry.provider.name)) : String(row.section || entry.provider.name)
+    out.verb = root.t(String(row.verb || (row.action && row.action.type === "navigate" ? "Open" : "Run")))
     out.tier = row.tier === "answer" || row.tier === "fallback" ? row.tier : "item"
     var base = typeof row.score === "number" ? row.score : Match.match(q, row.title, row.keywords || "", row.path || "", row.description || "")
     // A matched provider pattern lifts rows that already match; it never revives a row the matcher dropped.
     out.score = q && base > 0 && boost > 0 ? base + boost : base
     out.accessory = String(row.accessory || "")
     out.badge = String(row.badge || (entry.source === "extension" ? "extension" : ""))
-    out.altVerb = String(row.altVerb || (row.altAction ? root.defaultVerb(row.altAction) : ""))
-    out.copyVerb = String(row.copyVerb || (row.copyAction ? "Copy" : ""))
-    out.copyAltVerb = String(row.copyAltVerb || (row.copyAltAction ? "Copy" : ""))
+    out.altVerb = root.t(String(row.altVerb || (row.altAction ? root.defaultVerb(row.altAction) : "")))
+    out.copyVerb = root.t(String(row.copyVerb || (row.copyAction ? "Copy" : "")))
+    out.copyAltVerb = root.t(String(row.copyAltVerb || (row.copyAltAction ? "Copy" : "")))
     out.disabled = row.disabled === true
     out.remember = row.remember === true
     out.confirm = String(row.confirm || "")
@@ -1009,7 +1044,7 @@ Item {
       var detail = parts.join("\t")
       if (q && label.toLowerCase().indexOf(q) < 0 && detail.toLowerCase().indexOf(q) < 0) continue
       rows.push({ id: String(i), uid: "dmenu/" + i, title: label, subtitle: detail, icon: icon, iconFont: "", iconSource: "", tint: "",
-                  section: "", verb: "Select", tier: "item", score: 1, order: i, accessory: "", badge: "", altVerb: "", disabled: false,
+                  section: "", verb: root.t("Select"), tier: "item", score: 1, order: i, accessory: "", badge: "", altVerb: "", disabled: false,
                   remember: false, confirm: "", providerKey: "dmenu", value: detail ? label + "\t" + detail : label })
     }
     return rows
@@ -1179,7 +1214,7 @@ Item {
     if (!effect) return
     root.flash(row.uid)
     var run = function() { root.remember(row); root.perform(effect, row) }
-    if (row.confirm) root.confirmPending = { message: row.confirm, detail: row.confirmDetail || "", confirmText: row.confirmText || "Confirm", cancelText: row.cancelText || "Cancel", run: run }
+    if (row.confirm) root.confirmPending = { message: row.confirm, detail: row.confirmDetail || "", confirmText: row.confirmText || root.t("Confirm"), cancelText: row.cancelText || root.t("Cancel"), run: run }
     else run()
   }
 
@@ -1205,7 +1240,7 @@ Item {
     var row = root.current
     if (!row || !row.appId || !root.appLibrary) return
     var id = row.appId, name = row.title
-    root.confirmPending = { message: "Uninstall " + name + "?", detail: "Removes the package from this computer.", confirmText: "Uninstall", cancelText: "Keep it",
+    root.confirmPending = { message: root.t("Uninstall %1?", [name]), detail: root.t("Removes the package from this computer."), confirmText: root.t("Uninstall"), cancelText: root.t("Keep it"),
                             run: function() { root.cancel(); root.appLibrary.remove(id, name) } }
   }
 
@@ -1330,6 +1365,8 @@ Item {
 
     BorderSurface {
       id: card
+      LayoutMirroring.enabled: root.rightToLeft
+      LayoutMirroring.childrenInherit: true
       width: Math.min(root.dmenuActive ? Style.space(root.dmenuWidth) : Style.space(root.compact ? 640 : 760), panel.width - Style.gapsOut * 2)
       height: root.dmenuActive
         ? Math.min(root.headerHeight + (root.mode === "input" ? Style.space(12) : root.dmenuRowsHeight + Style.space(20)), panel.height - Style.gapsOut * 2)
@@ -1343,7 +1380,7 @@ Item {
       borderSpec: root.borderSpec
       clip: true
       Accessible.role: Accessible.Dialog
-      Accessible.name: "Keystroke command palette"
+      Accessible.name: root.t("Keystroke command palette")
       MouseArea { anchors.fill: parent; onClicked: {} }
 
       // A provider view covers the palette, so the host paints the backdrop
@@ -1403,7 +1440,7 @@ Item {
           // Switching away from two horizontal anchors does not restore a
           // constant width. Keep one anchor and bind both widths explicitly.
           width: root.liveText ? Math.min(Style.space(96), fieldWidth * 0.22) : fieldWidth
-          readonly property real fieldWidth: Math.max(0, escCap.x - Style.space(12) - glyph.x - glyph.width - Style.space(14))
+          readonly property real fieldWidth: Math.max(0, Math.abs(escCap.x - glyph.x) - glyph.width - Style.space(26))
           height: Style.space(40)
           mode: voice.phase
           level: voice.level
@@ -1458,11 +1495,11 @@ Item {
           clip: true
           focus: true
           opacity: voice.active && !root.liveText ? 0 : 1   // the string takes the field until words arrive; focus and keys stay here
-          Accessible.name: root.dmenuActive ? root.dmenuPrompt : "Search commands, apps and extensions"
+          Accessible.name: root.dmenuActive ? root.dmenuPrompt : root.t("Search commands, apps and extensions")
           Text {
             anchors.fill: parent
             verticalAlignment: Text.AlignVCenter
-            text: root.dictationMode ? "Speak or edit your dictation…" : root.dmenuActive ? root.dmenuPrompt + "…" : root.scope ? "Search " + root.scopeTitle.toLowerCase() + "…" : "What would you like to do?"
+            text: root.dictationMode ? root.t("Speak or edit your dictation…") : root.dmenuActive ? root.dmenuPrompt + "…" : root.scope ? root.t("Search %1…", [root.localizedScopeTitle]) : root.t("What would you like to do?")
             color: Util.alpha(root.foreground, 0.42)
             font: parent.font
             visible: !parent.text && !parent.preeditText && !voice.active
@@ -1522,8 +1559,8 @@ Item {
             else if (event.key === Qt.Key_PageUp) { root.selectPage(-6); event.accepted = true }
             else if (ctrl && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) { root.activate(true); event.accepted = true }
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { root.activate(); event.accepted = true }
-            else if (event.key === Qt.Key_Right && (atEnd || !text) && !root.dmenuActive && root.rows.length) { root.activate(); event.accepted = true }
-            else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Backspace) && !text && !preeditText && (root.scope || root.history.length)) { root.goBack(); event.accepted = true }
+            else if (root.readingKey(event) === Qt.Key_Right && (atEnd || !text) && !root.dmenuActive && root.rows.length) { root.activate(); event.accepted = true }
+            else if ((root.readingKey(event) === Qt.Key_Left || event.key === Qt.Key_Backspace) && !text && !preeditText && (root.scope || root.history.length)) { root.goBack(); event.accepted = true }
             else if (event.key === Qt.Key_Delete && atEnd && !selectedText && root.current.appId) { root.requestUninstall(); event.accepted = true }
             else if (ctrl && event.key === Qt.Key_C && !selectedText && root.copySelection(!!(event.modifiers & Qt.ShiftModifier))) { event.accepted = true }
             else if (ctrl && event.key >= Qt.Key_1 && event.key <= Qt.Key_8) { root.activateAt(event.key - Qt.Key_1); event.accepted = true }
@@ -1549,14 +1586,14 @@ Item {
         height: root.crumbHeight
         spacing: Style.space(10)
         Text { id: brand; anchors.verticalCenter: parent.verticalCenter; text: "OMARCHY"; textFormat: Text.PlainText; color: root.accent; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 2; font.weight: Font.Bold }
-        Text { anchors.baseline: brand.baseline; text: root.scope ? "›" : "/"; textFormat: Text.PlainText; color: Util.alpha(root.foreground, 0.35); font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+        Text { anchors.baseline: brand.baseline; text: root.scope ? (root.rightToLeft ? "‹" : "›") : "/"; textFormat: Text.PlainText; color: Util.alpha(root.foreground, 0.35); font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
         Text {
           anchors.baseline: brand.baseline
           width: Math.max(0, crumbs.parent.width - crumbs.x * 2 - brand.width - Style.space(30))
           elide: Text.ElideRight
           // The hint line: a recognised command names its action and the
           // argument the caret is on; the empty root says how to list them.
-          text: root.scope ? root.scopeTitle : root.commandHint ? root.commandHint : search.text ? "Search results" : "Apps, commands, answers · / lists what you can type"
+          text: root.scope ? root.localizedScopeTitle : root.commandHint ? root.commandHint : search.text ? root.t("Search results") : root.t("Apps, commands, answers · / lists what you can type")
           textFormat: Text.PlainText
           color: root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
         }
@@ -1637,6 +1674,8 @@ Item {
             }
             ResultRow {
               id: rowItem
+              translate: root.t
+              rightToLeft: root.rightToLeft
               width: parent.width
               paintsSelection: false
               flashRise: root.motion.flashRise; flashFall: root.motion.flashFall
@@ -1654,11 +1693,12 @@ Item {
             }
           }
         }
-        Rectangle { visible: root.previewVisible; x: resultList.width + Style.space(12); width: 1; height: parent.height - Style.space(12); color: root.hairline }
+        Rectangle { visible: root.previewVisible; x: root.rightToLeft ? parent.width - resultList.width - Style.space(12) : resultList.width + Style.space(12); width: 1; height: parent.height - Style.space(12); color: root.hairline }
         PreviewPane {
+          translate: root.t
           visible: root.previewVisible
-          x: resultList.width + Style.space(30)
-          width: parent.width - x - Style.space(10)
+          x: root.rightToLeft ? Style.space(10) : resultList.width + Style.space(30)
+          width: parent.width - resultList.width - Style.space(40)
           height: parent.height
           row: root.current
           compact: root.compact
@@ -1672,12 +1712,12 @@ Item {
           Text { anchors.horizontalCenter: parent.horizontalCenter; text: "✳"; color: root.accent; font.pixelSize: Style.space(40) }
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: root.pending ? "Finding your next move…" : search.text ? "No matches for “" + search.text + "”" : root.scope === "clipboard" ? "Your clipboard is empty" : root.scope === "files" ? "Type to search your home folder" : "Nothing here yet"
+            text: root.pending ? root.t("Finding your next move…") : search.text ? root.t("No matches for “%1”", [search.text]) : root.scope === "clipboard" ? root.t("Your clipboard is empty") : root.scope === "files" ? root.t("Type to search your home folder") : root.t("Nothing here yet")
             textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: root.fontFamily; font.pixelSize: Style.font.title
           }
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: root.scope === "converter" ? "Try 2m in feet or 10 am in London" : root.scope === "calculator" ? "Try sqrt(144) + 15% of 80" : root.dmenuActive ? "" : "Search by name. Follow your curiosity."
+            text: root.scope === "converter" ? root.t("Try 2m in feet or 10 am in London") : root.scope === "calculator" ? root.t("Try sqrt(144) + 15% of 80") : root.dmenuActive ? "" : root.t("Search by name. Follow your curiosity.")
             textFormat: Text.PlainText; color: root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.body
           }
         }
@@ -1691,9 +1731,9 @@ Item {
         Row {
           anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
           Text {
-            text: voice.phase === "listening" ? (root.voiceTrigger === "hold" ? "Listening… release to finish" : "Listening… tap the hotkey again or press ↵ to finish")
-                : voice.phase === "transcribing" ? "Finishing transcript…" : voice.phase === "starting" ? "Starting voxtype…"
-                : root.pending && root.showLoading ? "Searching…" : root.errorMessage ? "Needs attention: " + root.errorMessage : root.statusMessage || (root.current.providerName ? root.current.providerName : "Keystroke")
+            text: voice.phase === "listening" ? (root.voiceTrigger === "hold" ? root.t("Listening… release to finish") : root.t("Listening… tap the hotkey again or press ↵ to finish"))
+                : voice.phase === "transcribing" ? root.t("Finishing transcript…") : voice.phase === "starting" ? root.t("Starting voxtype…")
+                : root.pending && root.showLoading ? root.t("Searching…") : root.errorMessage ? root.t("Needs attention: %1", [root.errorMessage]) : root.t(root.statusMessage) || (root.current.providerName ? root.current.providerName : "Keystroke")
             textFormat: Text.PlainText; elide: Text.ElideRight; width: Math.min(implicitWidth, card.width * 0.5)
             color: root.errorMessage ? Commons.Color.urgent : root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
             anchors.verticalCenter: parent.verticalCenter
@@ -1708,7 +1748,7 @@ Item {
               required property var modelData
               anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(8)
               Text {
-                text: modelData.label; textFormat: Text.PlainText
+                text: root.t(modelData.label); textFormat: Text.PlainText
                 color: modelData.bright ? Util.alpha(root.foreground, 0.8) : root.muted
                 font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; anchors.verticalCenter: parent.verticalCenter
               }
@@ -1722,14 +1762,15 @@ Item {
       }
 
       ConfirmSheet {
+        translate: root.t
         id: confirmDialog
         anchors.fill: parent
         z: 10
         opened: root.confirmPending !== null
         message: root.confirmPending ? root.confirmPending.message : ""
         detail: root.confirmPending && root.confirmPending.detail ? root.confirmPending.detail : ""
-        confirmText: root.confirmPending && root.confirmPending.confirmText ? root.confirmPending.confirmText : "Confirm"
-        cancelText: root.confirmPending && root.confirmPending.cancelText ? root.confirmPending.cancelText : "Cancel"
+        confirmText: root.confirmPending && root.confirmPending.confirmText ? root.confirmPending.confirmText : root.t("Confirm")
+        cancelText: root.confirmPending && root.confirmPending.cancelText ? root.confirmPending.cancelText : root.t("Cancel")
         background: root.background
         foreground: root.foreground
         muted: root.muted

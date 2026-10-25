@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import "../core/Match.js" as Match
 
 // Installed applications through Omarchy's shared AppLibrary (hidden-entry
@@ -7,6 +8,7 @@ import "../core/Match.js" as Match
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
   readonly property var library: host ? host.appLibrary : null
   property var searchCache: ({})
 
@@ -52,7 +54,7 @@ Item {
     var subtitle = root.library.entrySubtext(entry) || String(entry.comment || "") || "Application"
     return {
       id: String(entry.id), title: name, subtitle: subtitle, icon: "󰀻", iconSource: root.library.iconSource(entry.icon),
-      section: "Applications", verb: "Launch", tier: "item", score: score, order: order, remember: true,
+      section: "Applications", verb: root.t("Launch"), tier: "item", score: score, order: order, remember: true,
       appId: String(entry.id), action: { type: "app", id: String(entry.id), name: name },
       description: root.searchText(entry), descriptionKey: name
     }
@@ -61,8 +63,8 @@ Item {
   function query(ctx) {
     if (ctx.scope && ctx.scope !== "applications") return []
     if (!ctx.scope && !ctx.query)
-      return [{ id: "apps", title: "Applications", subtitle: "Every app, one shortcut away", icon: "󰀻", section: "Applications",
-                verb: "Open", tier: "item", score: 30, order: 0, action: { type: "navigate", scope: "applications", title: "Applications" } }]
+      return [{ id: "apps", title: root.t("Applications"), subtitle: root.t("Every app, one shortcut away"), icon: "󰀻", section: "Applications",
+                verb: root.t("Open"), tier: "item", score: 30, order: 0, action: { type: "navigate", scope: "applications", title: "Applications" } }]
     if (!root.library) return []
     var all = root.library.sortedEntries(""), rows = []
     for (var i = 0; i < all.length; i++) {

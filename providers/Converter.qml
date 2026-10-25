@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import Quickshell
 import Quickshell.Io
 import "../core/Match.js" as Match
@@ -11,6 +12,7 @@ import "../core/Units.js" as Units
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
   property string systemZone: ""
   property var timeCache: ({})
   property string inflight: ""
@@ -75,13 +77,13 @@ Item {
   }
 
   function navRow(score) {
-    return { id: "converter", title: "Convert Anything", subtitle: "Units, temperatures & time zones", icon: "\udb82\udfcd", section: "Converter",
-             verb: "Open", tier: "item", score: score, order: 4, action: { type: "navigate", scope: "converter", title: "Converter" } }
+    return { id: "converter", title: root.t("Convert Anything"), subtitle: root.t("Units, temperatures & time zones"), icon: "\udb82\udfcd", section: "Converter",
+             verb: root.t("Open"), tier: "item", score: score, order: 4, action: { type: "navigate", scope: "converter", title: "Converter" } }
   }
 
   function answer(text, detail, query) {
-    return { id: "conversion", title: text, subtitle: detail, icon: "\udb82\udfcd", section: "Converter", verb: "Copy result", tier: "answer", score: 195,
-             action: { type: "copy", text: text }, preview: text, previewLabel: "CONVERSION", previewDetail: query + "\n" + detail }
+    return { id: "conversion", title: text, subtitle: detail, icon: "\udb82\udfcd", section: "Converter", verb: root.t("Copy result"), tier: "answer", score: 195,
+             action: { type: "copy", text: text }, preview: text, previewLabel: root.t("CONVERSION"), previewDetail: query + "\n" + detail }
   }
 
   function query(ctx) {
@@ -89,7 +91,7 @@ Item {
     if (!ctx.query) return ctx.scope ? [] : [navRow(23)]
     var rows = []
     if (!ctx.scope) {
-      var s = Match.match(ctx.query, "Convert Anything", "converter units timezone temperature")
+      var s = Match.match(ctx.query, root.t("Convert Anything"), "Convert Anything converter units timezone temperature")
       if (s) rows.push(navRow(s))
     }
     var q = ctx.query.trim()

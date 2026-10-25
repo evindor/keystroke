@@ -34,6 +34,12 @@ setup, matching works offline.
 
 Requires Omarchy ≥ 4.0.2 (Quickshell 0.3, Qt 6.11). Like every Omarchy plugin, Keystroke runs unsandboxed inside your shell with your permissions; the code is here to read.
 
+## Language
+
+On Omarchy 4.5+, Keystroke follows **Setup → Language** live, without a shell restart. On older Omarchy 4.x installations, it takes the language from the system locale (`LC_ALL`/`LC_MESSAGES`/`LANG`) when the shell starts. The new API is detected before it is loaded, so older shells do not need the new QML types. English and German catalogs cover the palette, settings, bundled provider navigation and conversation controls. Other Omarchy languages fall back to English; regional variants try their base language first. Settings can be found by their translated or English names. Commands, prefixes, saved values, paths, application names, clipboard text and conversation content are not translated.
+
+This localizes Keystroke's own UI; it does not translate arbitrary output from providers or extensions. Extensions can ship their own catalogs using the same Omarchy component. See [Localization](docs/localization.md) to add a language or localize an extension.
+
 ## What it does
 
 <table>

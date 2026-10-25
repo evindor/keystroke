@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import Quickshell
 import Quickshell.Io
 import "../codex"
@@ -8,6 +9,7 @@ import "../core/Match.js" as Match
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
   property var available: ({})
   readonly property var preferences: host ? host.settingsFor({key: "codex", provider: provider}) : ({})
   readonly property bool active: host ? host.providerEnabled({key: "codex", source: "bundled"}) : false
@@ -51,20 +53,20 @@ Item {
     if (ctx.scope && ctx.scope !== "codex") return []
     var text = raw(ctx), rows = [], scoped = ctx.scope === "codex"
     if (text.trim()) {
-      rows.push({id: "ask", title: "Ask Codex here", subtitle: text, icon: "✳", section: "Continue with", tier: /^\?/.test(ctx.query) ? "answer" : "fallback", score: root.preferredScore(), verb: "Ask", altVerb: "Open task in Codex", action: {type: "provider-view", provider: "codex", text: text}, altAction: {type: "codex-external", text: text}})
-      rows.push({id: "task", title: "Open task in Codex", subtitle: (root.preferences.destination === "cli" ? "Terminal" : "Desktop") + " · full request ready to continue", icon: "↗", section: "Continue with", tier: "fallback", score: root.preferredScore() - 0.1, verb: "Open", action: {type: "codex-external", text: text}})
-      if (scoped) rows.push({id: "desktop-task", title: "Do this here · desktop settings", subtitle: "Agent may edit ~/.config · uses the Omarchy skill", icon: "⌘", score: 3, verb: "Start task", action: {type: "provider-view", provider: "codex", text: text, cwd: root.host.home + "/.config"}})
-      if (scoped && root.preferences.workspace) rows.push({id: "project-task", title: "Do this here · working folder", subtitle: root.preferences.workspace, icon: "⌘", score: 2, verb: "Start task", action: {type: "provider-view", provider: "codex", text: text, cwd: root.preferences.workspace}})
+      rows.push({id: "ask", title: root.t("Ask Codex here"), subtitle: text, icon: "✳", section: "Continue with", tier: /^\?/.test(ctx.query) ? "answer" : "fallback", score: root.preferredScore(), verb: root.t("Ask"), altVerb: root.t("Open task in Codex"), action: {type: "provider-view", provider: "codex", text: text}, altAction: {type: "codex-external", text: text}})
+      rows.push({id: "task", title: root.t("Open task in Codex"), subtitle: (root.preferences.destination === "cli" ? "Terminal" : "Desktop") + " · full request ready to continue", icon: "↗", section: "Continue with", tier: "fallback", score: root.preferredScore() - 0.1, verb: root.t("Open"), action: {type: "codex-external", text: text}})
+      if (scoped) rows.push({id: "desktop-task", title: root.t("Do this here · desktop settings"), subtitle: root.t("Agent may edit ~/.config · uses the Omarchy skill"), icon: "⌘", score: 3, verb: root.t("Start task"), action: {type: "provider-view", provider: "codex", text: text, cwd: root.host.home + "/.config"}})
+      if (scoped && root.preferences.workspace) rows.push({id: "project-task", title: root.t("Do this here · working folder"), subtitle: root.preferences.workspace, icon: "⌘", score: 2, verb: root.t("Start task"), action: {type: "provider-view", provider: "codex", text: text, cwd: root.preferences.workspace}})
     }
     if (!text.trim()) {
-      if (!scoped) rows.push({id: "open", title: "Codex", subtitle: "Quick questions, recent conversations and tasks", icon: "✳", score: 24, verb: "Open", action: {type: "navigate", scope: "codex", title: "Codex"}})
-      rows.push({id: "new", title: "Ask Codex here", subtitle: "Type or speak a quick question", icon: "✳", score: scoped ? 100 : 23, verb: "Ask", action: {type: "provider-view", provider: "codex", text: ""}})
+      if (!scoped) rows.push({id: "open", title: root.t("Codex"), subtitle: root.t("Quick questions, recent conversations and tasks"), icon: "✳", score: 24, verb: root.t("Open"), action: {type: "navigate", scope: "codex", title: "Codex"}})
+      rows.push({id: "new", title: root.t("Ask Codex here"), subtitle: root.t("Type or speak a quick question"), icon: "✳", score: scoped ? 100 : 23, verb: root.t("Ask"), action: {type: "provider-view", provider: "codex", text: ""}})
     }
     var recent = session.recent
     for (var i = 0; i < Math.min(recent.length, scoped ? 40 : (text.trim() ? 0 : 1)); i++) {
       var row = recent[i], score = text.trim() ? Match.match(text, row.title) : 20 - i
-      if (score) rows.push({id: "recent/" + row.id, title: scoped ? row.title : "Resume last question", subtitle: scoped ? new Date(row.updated).toLocaleString() : row.title,
-        icon: "↶", section: "Recent questions", score: score, verb: "Resume", action: {type: "provider-view", provider: "codex", recent: row}})
+      if (score) rows.push({id: "recent/" + row.id, title: scoped ? row.title : "Resume last question", subtitle: scoped ? new Date(row.updated).toLocaleString(Qt.locale(root.host && root.host.formatLocale ? root.host.formatLocale : "en-US")) : row.title,
+        icon: "↶", section: "Recent questions", score: score, verb: root.t("Resume"), action: {type: "provider-view", provider: "codex", recent: row}})
     }
     return rows
   }

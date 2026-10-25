@@ -1,10 +1,12 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import "../core/Match.js" as Match
 import "../core/Calculator.js" as Calc
 
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
   readonly property var provider: ({
     apiVersion: 1,
     id: "calculator",
@@ -17,8 +19,8 @@ Item {
   })
 
   function navRow(score) {
-    return { id: "calc", title: "Calculator", subtitle: "Try 128 * 1.24 or 15% of 80", icon: "󰃬", section: "Calculator",
-             verb: "Open", tier: "item", score: score, order: 3, action: { type: "navigate", scope: "calculator", title: "Calculator" } }
+    return { id: "calc", title: root.t("Calculator"), subtitle: root.t("Try 128 * 1.24 or 15% of 80"), icon: "󰃬", section: "Calculator",
+             verb: root.t("Open"), tier: "item", score: score, order: 3, action: { type: "navigate", scope: "calculator", title: "Calculator" } }
   }
 
   function query(ctx) {
@@ -26,20 +28,20 @@ Item {
     if (!ctx.query) return ctx.scope ? [] : [navRow(24)]
     var rows = []
     if (!ctx.scope) {
-      var s = Match.match(ctx.query, "Calculator", "arithmetic math")
+      var s = Match.match(ctx.query, root.t("Calculator"), "Calculator arithmetic math")
       if (s) rows.push(navRow(s))
     }
     var result = Calc.evaluate(ctx.query)
     if (!result) return rows
     if (result.partial !== undefined) {
-      rows.unshift({ id: "result", title: result.partial + " …", subtitle: "Continue your calculation", icon: "󰃬", section: "Calculator",
-                     verb: "Keep typing", tier: "answer", score: 200, disabled: true, action: { type: "noop" },
-                     preview: result.partial + " …", previewLabel: "CALCULATOR", previewDetail: "Add the next number" })
+      rows.unshift({ id: "result", title: result.partial + " …", subtitle: root.t("Continue your calculation"), icon: "󰃬", section: "Calculator",
+                     verb: root.t("Keep typing"), tier: "answer", score: 200, disabled: true, action: { type: "noop" },
+                     preview: result.partial + " …", previewLabel: root.t("CALCULATOR"), previewDetail: "Add the next number" })
       return rows
     }
     var text = Calc.format(result.value, ctx.settings.precision)
-    rows.unshift({ id: "result", title: text, subtitle: ctx.query.trim() + " =", icon: "󰃬", section: "Calculator", verb: "Copy result",
-                   tier: "answer", score: 200, action: { type: "copy", text: text }, preview: text, previewLabel: "RESULT",
+    rows.unshift({ id: "result", title: text, subtitle: ctx.query.trim() + " =", icon: "󰃬", section: "Calculator", verb: root.t("Copy result"),
+                   tier: "answer", score: 200, action: { type: "copy", text: text }, preview: text, previewLabel: root.t("RESULT"),
                    previewDetail: ctx.query.trim() })
     return rows
   }

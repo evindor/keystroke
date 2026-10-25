@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import "../core/Match.js" as Match
 import "../core/Settings.js" as Settings
 import "../core/Extensions.js" as Extensions
@@ -14,6 +15,7 @@ import "../core/Patterns.js" as Patterns
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
 
   readonly property var provider: ({
     apiVersion: 1,
@@ -62,19 +64,38 @@ Item {
     return { type: "exec", argv: argv }
   }
 
+  function navRow(score, counts) {
+    var row = Extensions.navRow(score, counts)
+    row.title = root.t(row.title)
+    row.verb = root.t(row.verb)
+    row.subtitle = root.host && typeof root.host.tn === "function"
+      ? root.host.tn("%1 extension", counts.total) + " · " + root.host.tn("%1 enabled", counts.on)
+      : row.subtitle
+    return row
+  }
+
+  function detailRows(query, entry) {
+    var rows = Extensions.detailRows(query, entry)
+    var consent = Locale.extensionConsent(entry, root.t)
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].confirm && rows[i].action && rows[i].action.type === "setting" && rows[i].action.key === "enabled" && rows[i].action.value === true) { rows[i].confirm = consent.message; rows[i].confirmDetail = consent.detail }
+    }
+    return rows
+  }
+
   function query(ctx) {
     var id = Extensions.scopeId(ctx.scope)
     if (ctx.scope && id === null) return []
     var list = extensions()
     if (!ctx.scope) {
       var counts = { total: list.length, on: list.filter(function(e) { return e.enabled }).length }
-      if (!ctx.query) return [Extensions.navRow(8, counts)]
-      var s = Match.match(ctx.query, "Extensions", "extensions plugins community", "", "extensions plugins community providers turn on off enable disable")
-      return s ? [Extensions.navRow(s, counts)] : []
+      if (!ctx.query) return [root.navRow(8, counts)]
+      var s = Match.match(ctx.query, root.t("Extensions"), "Extensions extensions plugins community", "", "extensions plugins community providers turn on off enable disable")
+      return s ? [root.navRow(s, counts)] : []
     }
     if (id === "") return Extensions.screenRows(ctx.query, list)
     var e = find(id)
-    if (!e) return [{ id: "gone", title: "No such extension", subtitle: id, icon: Extensions.ICON, verb: "", tier: "item", score: 1, disabled: true, action: { type: "noop" } }]
-    return Extensions.detailRows(ctx.query, e)
+    if (!e) return [{ id: "gone", title: root.t("No such extension"), subtitle: id, icon: Extensions.ICON, verb: "", tier: "item", score: 1, disabled: true, action: { type: "noop" } }]
+    return root.detailRows(ctx.query, e)
   }
 }

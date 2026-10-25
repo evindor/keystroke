@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import Quickshell
 import Quickshell.Io
 import "../core/Match.js" as Match
@@ -8,6 +9,7 @@ import "../core/Match.js" as Match
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
   property var entries: []
   readonly property string omarchyPath: Quickshell.env("OMARCHY_PATH")
   readonly property string historyPath: Quickshell.env("HOME") + "/.local/state/omarchy/clipboard-history.json"
@@ -60,9 +62,9 @@ Item {
   function query(ctx) {
     if (ctx.scope && ctx.scope !== "clipboard") return []
     if (!ctx.scope) {
-      var s = ctx.query ? Match.match(ctx.query, "Clipboard History", "paste copied text images") : 26
-      return s ? [{ id: "clipboard", title: "Clipboard History", subtitle: "Text & images, ready to use again", icon: "󰅌", section: "Clipboard",
-                    verb: "Open", tier: "item", score: s, order: 2, action: { type: "navigate", scope: "clipboard", title: "Clipboard" } }] : []
+      var s = ctx.query ? Match.match(ctx.query, root.t("Clipboard History"), "Clipboard History paste copied text images") : 26
+      return s ? [{ id: "clipboard", title: root.t("Clipboard History"), subtitle: root.t("Text & images, ready to use again"), icon: "󰅌", section: "Clipboard",
+                    verb: root.t("Open"), tier: "item", score: s, order: 2, action: { type: "navigate", scope: "clipboard", title: "Clipboard" } }] : []
     }
     var rows = []
     var limit = ctx.settings.limit
@@ -85,7 +87,7 @@ Item {
         section: "Clipboard", tier: "item", score: score, order: i,
         verb: pasteFirst ? "Paste" : "Copy", action: pasteFirst ? paste : copy,
         altVerb: pasteFirst ? "Copy" : "Paste", altAction: pasteFirst ? copy : paste,
-        preview: text.slice(0, 12000), previewImage: image ? e.path : "", previewLabel: "CLIPBOARD",
+        preview: text.slice(0, 12000), previewImage: image ? e.path : "", previewLabel: root.t("CLIPBOARD"),
         previewDetail: "Copied locally · never included in global search"
       })
     }

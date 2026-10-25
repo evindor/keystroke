@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import "../core/Settings.js" as Settings
 import "../core/SettingsTree.js" as SettingsTree
 
@@ -9,6 +10,7 @@ import "../core/SettingsTree.js" as SettingsTree
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
   property var tree: null
   property var treeStamp: []
 
@@ -35,17 +37,17 @@ Item {
                  dir: e.manifest ? e.manifest.dir : "", local: !!(e.manifest && e.manifest.source === "local"), loaded: e.loaded !== false, enabled: h.providerEnabled(e), schemas: schemas,
                  values: Settings.values(h.config, ["providers", e.key], schemas) })
     }
-    return { configPath: h.configPath, paletteSchema: h.paletteSchema, paletteValues: h.paletteValues(), voice: h.voiceModel(), matching: h.matchingModel(), entries: out, problems: h.registry.problems }
+    return { translate: function(key, args) { return root.t(key, args) }, configPath: h.configPath, paletteSchema: h.paletteSchema, paletteValues: h.paletteValues(), voice: h.voiceModel(), matching: h.matchingModel(), entries: out, problems: h.registry.problems }
   }
 
   // Rebuilt only when the config or the registry changes; every keystroke
   // reuses the same nodes and breadcrumb strings.
   function current() {
     var h = root.host
-    var stamp = [h.config, h.registry.entries, h.registry.problems, h.voiceStamp, h.matchingStamp]
+    var stamp = [h.config, h.registry.entries, h.registry.problems, h.voiceStamp, h.matchingStamp, h.translationStamp]
     var old = root.treeStamp
-    if (root.tree && old.length === 5 && old[0] === stamp[0] && old[1] === stamp[1] && old[2] === stamp[2] && old[3] === stamp[3] && old[4] === stamp[4]) return root.tree
-    root.tree = SettingsTree.build(root.model())
+    if (root.tree && old.length === 6 && old[0] === stamp[0] && old[1] === stamp[1] && old[2] === stamp[2] && old[3] === stamp[3] && old[4] === stamp[4] && old[5] === stamp[5]) return root.tree
+    root.tree = Locale.settings(SettingsTree.build(root.model()), function(key) { return root.t(key) }, h.formatNumber)
     root.treeStamp = stamp
     return root.tree
   }
@@ -56,10 +58,10 @@ Item {
     var typed = schema.type === "number" ? Number(ctx.query) : ctx.query
     var ok = ctx.query.length > 0
     try { Settings.validate(schema, typed) } catch (e) { ok = false }
-    var rows = [{ id: "current", title: value === "" || value === undefined ? "Not set" : String(value), subtitle: "Current value · type a new one",
-                  icon: "󰒓", section: schema.label, verb: "", tier: "item", score: 1, order: 0, disabled: true, action: { type: "noop" } }]
-    if (ok) rows.push({ id: "save", title: "Save “" + String(typed) + "”", subtitle: schema.description || "", icon: "✓", section: schema.label,
-                        verb: "Save", tier: "item", score: 100, order: 1, action: SettingsTree.settingAction(screen.path, schema.key, typed, schema) })
+    var rows = [{ id: "current", title: value === "" || value === undefined ? root.t("Not set") : String(value), subtitle: root.t("Current value · type a new one"),
+                  icon: "󰒓", section: root.t(schema.label), verb: "", tier: "item", score: 1, order: 0, disabled: true, action: { type: "noop" } }]
+    if (ok) rows.push({ id: "save", title: root.t("Save “%1”", [String(typed)]), subtitle: root.t(schema.description || ""), icon: "✓", section: root.t(schema.label),
+                        verb: root.t("Save"), tier: "item", score: 100, order: 1, action: SettingsTree.settingAction(screen.path, schema.key, typed, schema) })
     return rows
   }
 

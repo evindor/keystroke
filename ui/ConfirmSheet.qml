@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -13,6 +14,8 @@ import qs.Ui
 // survive that.
 Item {
   id: root
+  property var translate: null
+  function t(key, args) { return typeof root.translate === "function" ? root.translate(key, args) : Locale.format(key, args || []) }
 
   property bool opened: false
   property string message: ""
@@ -102,7 +105,7 @@ Item {
             spacing: Style.space(10)
             Keycap { label: "↵"; bright: true; foreground: root.foreground; anchors.verticalCenter: parent.verticalCenter }
             Text {
-              textFormat: Text.PlainText; text: root.confirmText; color: root.selectedText
+              textFormat: Text.PlainText; text: root.t(root.confirmText); color: root.selectedText
               font.family: root.fontFamily; font.pixelSize: Style.font.body; anchors.verticalCenter: parent.verticalCenter
             }
           }
@@ -115,7 +118,7 @@ Item {
             spacing: Style.space(10)
             Keycap { label: "esc"; foreground: root.foreground; anchors.verticalCenter: parent.verticalCenter }
             Text {
-              textFormat: Text.PlainText; text: root.cancelText; color: root.muted
+              textFormat: Text.PlainText; text: root.t(root.cancelText); color: root.muted
               font.family: root.fontFamily; font.pixelSize: Style.font.body; anchors.verticalCenter: parent.verticalCenter
             }
           }

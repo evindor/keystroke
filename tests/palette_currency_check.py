@@ -119,6 +119,7 @@ ShellRoot {
                QT_QPA_PLATFORM="offscreen", QT_QPA_PLATFORMTHEME="generic", QT_QUICK_BACKEND="software", QML_IMPORT_PATH=str(work))
     for k in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_CACHE_HOME", "XDG_STATE_HOME"):
         env.pop(k, None)
+    env["OMARCHY_LANGUAGE_FILE"] = str(work / "test-language")
     result = subprocess.run(["quickshell", "-p", str(work / "shell.qml")], env=env, capture_output=True, text=True, timeout=30)
     output = result.stdout + result.stderr
     assert "PASS palette currency" in output and "FAIL" not in output, output

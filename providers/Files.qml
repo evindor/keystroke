@@ -1,4 +1,5 @@
 import QtQuick
+import "../core/Locale.js" as Locale
 import Quickshell
 import Quickshell.Io
 import "../core/Match.js" as Match
@@ -13,6 +14,7 @@ import "../core/Files.js" as Files
 Item {
   id: root
   property var host: null
+  function t(key, args) { return Locale.text(root.host, key, args) }
   property bool available: false
   property var cache: ({})
   property string inflight: ""
@@ -37,8 +39,8 @@ Item {
     description: "Files and folders under your home folder, found with fd",
     prefix: "~",
     commands: [
-      { id: "files", prefix: "~", title: "Find files", summary: "Files and folders under your home folder, found with fd",
-        args: [{ name: "name", hint: "part of a file or folder name, or a path like /Documents report", rest: true }], examples: ["~readme", "~/Documents report"] }
+      { id: "files", prefix: "~", title: root.t("Find files"), summary: root.t("Files and folders under your home folder, found with fd"),
+        args: [{ name: "name", hint: root.t("part of a file or folder name, or a path like /Documents report"), rest: true }], examples: ["~readme", "~/Documents report"] }
     ],
     settings: [
       { key: "searchMode", type: "enum", label: "Search in the main palette", "default": "fuzzy",
@@ -107,8 +109,8 @@ Item {
   }
 
   function navRow(score) {
-    return { id: "files", title: "Search Files", subtitle: "Files and folders under ~", icon: "󰈞", section: "Files",
-             verb: "Open", tier: "item", score: score, order: 6, action: { type: "navigate", scope: "files", title: "Files" } }
+    return { id: "files", title: root.t("Search Files"), subtitle: root.t("Files and folders under ~"), icon: "󰈞", section: "Files",
+             verb: root.t("Open"), tier: "item", score: score, order: 6, action: { type: "navigate", scope: "files", title: "Files" } }
   }
 
   function query(ctx) {
@@ -117,19 +119,19 @@ Item {
     var rows = []
     if (!ctx.scope && !req.explicit) {
       if (!ctx.query) { root.cancelWalk(); return [navRow(20)] }
-      var s = Match.match(ctx.query, "Search Files", "files folders finder home")
+      var s = Match.match(ctx.query, root.t("Search Files"), "Search Files files folders finder home")
       if (s) rows.push(navRow(s))
     }
     if (!req.enabled) { root.cancelWalk(); return rows }
     if (!root.available) {
-      if (ctx.scope || req.explicit) rows.push({ id: "missing", title: "fd is not installed", subtitle: "sudo pacman -S fd, then search again", icon: "󰈞",
+      if (ctx.scope || req.explicit) rows.push({ id: "missing", title: root.t("fd is not installed"), subtitle: root.t("sudo pacman -S fd, then search again"), icon: "󰈞",
                                  section: "Files", verb: "", tier: "item", disabled: true, score: 1, action: { type: "noop" } })
       return rows
     }
     var key = Files.cacheKey(req.query, req.settings)
     if (!key) {
       root.cancelWalk()
-      if (req.explicit || ctx.scope) rows.push({ id:"hint", title:"Type a file or folder name", subtitle:"At least two characters · Searches under ~", icon:"󰈞",
+      if (req.explicit || ctx.scope) rows.push({ id:"hint", title: root.t("Type a file or folder name"), subtitle: root.t("At least two characters · Searches under ~"), icon:"󰈞",
         section:"Files", tier:"item", score:1, disabled:true, action:{type:"noop"} })
       return rows
     }
