@@ -1577,3 +1577,23 @@ Contributed by Pablo Pineda (#16); reworked on the PR branch in review.
   the helper receives `--shift-insert`. `tests/clipboard_transfer_check.py`
   is unchanged and passes.
 - Not exercised: a real paste into applications, which needs the live desktop.
+
+## Omarchy 4.5 menu compatibility (2026-10-25)
+
+Rebased the local language-provider fix onto upstream `dev` (`ff96fb7`). Re-vendored `omarchy/MenuModel.js` from installed Omarchy `4.5.0rc1-1`, byte-identical below the attribution header. The adapter now loads the language list and watches the language choice and translated menu catalog, preserving user retitles and English search terms without introducing new IPC aliases. Open breadcrumbs follow live catalog changes. Missing catalogs fall back to the shipped English definitions; Keystroke's own UI remains English.
+
+`disabled` results now reach visible rows and the Smart Match catalog, so installed entries carry a check and cannot be activated through normal row selection. Guard batches use upstream's cached readers, package snapshots and parallel groups; initial default/user menu loads are settled before launching a batch. Omarchy 4.5's Apps row has both a provider and a dock action; Keystroke deliberately preserves its Applications screen for both direct routes and visible rows.
+
+Multi-select menu requests now honor `multiple`, `selected`, `onChange` and `changeKey`, with stable values, filtered Apply rows, JSON-array results and serialized literal-argv callbacks. Live callbacks may return the applied selection; failed changes restore the last confirmed checks. Single-selection/input requests retain their existing stdin-based result writer.
+
+- QML unit suite: 281 passed, zero failed (`QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=Basic QT_QUICK_BACKEND=software`).
+- New `tests/omarchy45_check.py`: synthetic German/English catalogs, user overrides, live language changes, English-name search, disabled/visible rows and language-provider output.
+- New `tests/menu45_guards_check.py`: execute the actual vendored guard generator against fake commands; verify visibility/check/disabled results, one invocation for repeated readers and propagation of a failed parallel group.
+- New `tests/palette_dmenu45_check.py`: actual palette with synthetic data; preselection filtering, toggles, filtered Apply, stable ordered JSON result, rapid serial callbacks, rejection rollback, and a disabled action whose forbidden shell effect never occurs.
+- Updated `tests/palette_route_check.py`: the real 4.5 Apps action/provider definition, disabled Applications fallback and live translated breadcrumbs.
+- `bin/keystroke test` passed its unit, application, file, catalog, matching, route, motion, graphics-loss, matching-worker/engine, voice-session, clipboard and Codex checks, then stopped at the existing `palette_dictation_check.py` timeout. The same dictation test also times out on unchanged upstream `ff96fb7` in this environment; the debug run reports `FAIL copy closes palette`. The full suite is therefore not reported green.
+- Ran the remaining timezone, extension lifecycle, currency, command, URL, web-search, private-copy and hotkey checks separately: passed. All extension validations passed with the offscreen Qt environment. `omarchy plugin validate` and `git diff --check` passed. QML lint passed with the documented Quickshell metadata warnings.
+
+Not exercised: a real OS language switch, actual package installation/removal, real live-change settings callbacks, or other machines/Omarchy versions. Compatibility was checked against the locally installed 4.5 release candidate, not a later 4.5 release.
+
+Live verification: installed the rebased branch in the existing local plugin Git checkout, preserving the earlier language-only patch in a named stash, and restarted the shell. IPC inspection reports 50 language rows with empty problem/error fields. The user's OS choice was already `de`; the live Setup menu now reports German labels including `Sprache`, `Monitore`, `Tastenkürzel`, `Standards` and `Sicherheit`. No OS language setting, installer action or real multi-picker callback was changed for this verification.

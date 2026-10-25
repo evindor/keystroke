@@ -27,10 +27,11 @@ ShellRoot {
     var menu = palette.registry.bundled[0]
     menu.items = {
       root: { id: "root", parent: "", kind: "menu", label: "Root", aliases: [] },
-      apps: { id: "apps", parent: "root", kind: "provider", provider: "apps", label: "Apps", aliases: [] }
+      apps: { id: "apps", parent: "root", kind: "action", provider: "apps", label: "Apps", aliases: [], action: "must-not-run-dock" }
     }
     menu.itemOrder = ["root", "apps"]
     menu.rowsLoaded = true
+    test.check(menu.rowFor(menu.items.apps, "", 1, true).action.type === "navigate", "4.5 Apps row uses the Applications provider")
   }
   Keystroke { id: palette; omarchyPath: "/usr/share/omarchy" }
   Timer { interval: 250; running: true; onTriggered: {
@@ -47,6 +48,12 @@ ShellRoot {
     test.check(palette.scope === "applications", "an enabled apps route still opens Applications")
     test.check(palette.scopeTitle === "Applications", "the enabled breadcrumb is preserved")
     test.check(palette.statusMessage === "", "an enabled route has no warning")
+    var menu=palette.registry.bundled[0]
+    menu.items = { language: {id:"language", label:"Sprache", title:""} }
+    palette.scope="omarchy/language"; palette.scopeTitle="Language"
+    test.check(palette.displayedScopeTitle === "Sprache", "breadcrumb follows the current translated menu item")
+    menu.items = { language: {id:"language", label:"Language", title:""} }
+    test.check(palette.displayedScopeTitle === "Language", "breadcrumb follows a live language change")
     palette.cancel()
     console.log("PASS palette routes")
     Qt.quit()

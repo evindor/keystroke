@@ -7,7 +7,7 @@ import "../core/Match.js" as Match
 
 // The complete Omarchy menu as a Keystroke provider. Parsing, merging, routes,
 // guards and dynamic providers follow the stock plugin (Menu.qml/MenuModel.js
-// in Omarchy 4.0.2) so behavior stays identical; only presentation changed.
+// in Omarchy 4.5) so behavior stays identical; only presentation changed.
 Item {
   id: root
   property var host: null
@@ -15,13 +15,19 @@ Item {
   readonly property string defaultMenuPath: omarchyPath + "/default/omarchy/omarchy-menu.jsonc"
   readonly property string userMenuPath: Quickshell.env("HOME") + "/.config/omarchy/extensions/omarchy-menu.jsonc"
 
+  property string language: "en"
+  property var menuCatalog: ({})
+  readonly property string languagePath: Quickshell.env("OMARCHY_LANGUAGE_FILE") || ((Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/omarchy/language")
   property var defaultMenuItems: []
   property var userMenuItems: []
   property var items: ({})
   property var itemOrder: []
   property bool rowsLoaded: false
+  property bool defaultMenuSettled: false
+  property bool userMenuSettled: false
   property var whenResults: ({})
   property var checkedResults: ({})
+  property var disabledResults: ({})
   property bool guardsPending: false
   property var providersLoaded: ({})
   property var providerQueue: []
@@ -43,6 +49,12 @@ Item {
       script: "current=$(powerprofilesctl get 2>/dev/null); omarchy-powerprofiles-list 2>/dev/null | while read -r p; do [[ -z $p ]] && continue; printf '%s\\t%s\\t%s\\n' \"$p\" \"$p\" \"$current\"; done",
       icon: "\udb81\udc0b",
       actionFor: function(value) { return "omarchy-powerprofiles-set autodetect " + Util.shellQuote(value) }
+    },
+    "languages": {
+      script: "current=$(omarchy-language 2>/dev/null); omarchy-language list 2>/dev/null | while IFS=$'\\t' read -r name code english; do [[ -z $code ]] && continue; printf '%s\\t%s\\t%s\\t%s\\n' \"$name\" \"$code\" \"$current\" \"$english\"; done",
+      icon: "\uf1ab",
+      volatile: true,
+      actionFor: function(value) { return "omarchy-language " + Util.shellQuote(value) }
     }
   })
 
@@ -65,8 +77,10 @@ Item {
   // ---------------------------------------------------------------- model
   function item(id) { return root.items[id] || null }
 
-  function rebuildItemsFromSources() {
-    var merged = MenuModel.mergeMenuSources(root.defaultMenuItems, root.userMenuItems)
+  function rebuildItemsFromSources(skipGuards) {
+    var translated = MenuModel.applyTranslations(root.defaultMenuItems, root.menuCatalog)
+    var heading = root.menuCatalog.root
+    var merged = MenuModel.mergeMenuSources(translated, root.userMenuItems, heading && heading.label)
     root.providerRevision += 1
     root.providersLoaded = ({})
     root.providerQueue = []
@@ -75,13 +89,15 @@ Item {
     root.pathCache = ({})
     root.rowsLoaded = true
     root.lastEnteredMenu = ""
-    root.evaluateGuards()
+    if (!skipGuards && root.defaultMenuSettled && root.userMenuSettled) root.evaluateGuards()
     if (root.host) root.host.requery({ provider: root.provider.id })
   }
 
   function reload() {
     defaultMenuFile.reload()
     userMenuFile.reload()
+    languageFile.reload()
+    menuCatalogFile.reload()
   }
 
   FileView {
@@ -89,7 +105,8 @@ Item {
     path: root.defaultMenuPath
     watchChanges: true
     printErrors: false
-    onLoaded: { root.defaultMenuItems = MenuModel.parseMenuJsonc(defaultMenuFile.text()); root.rebuildItemsFromSources() }
+    onLoaded: { root.defaultMenuItems = MenuModel.parseMenuJsonc(defaultMenuFile.text()); root.defaultMenuSettled = true; root.rebuildItemsFromSources() }
+    onLoadFailed: { root.defaultMenuSettled = true; if (root.userMenuSettled) root.evaluateGuards() }
     onFileChanged: reload()
   }
 
@@ -98,8 +115,43 @@ Item {
     path: root.userMenuPath
     watchChanges: true
     printErrors: false
-    onLoaded: { root.userMenuItems = MenuModel.parseMenuJsonc(userMenuFile.text()); root.rebuildItemsFromSources() }
-    onLoadFailed: { root.userMenuItems = []; root.rebuildItemsFromSources() }
+    onLoaded: { root.userMenuItems = MenuModel.parseMenuJsonc(userMenuFile.text()); root.userMenuSettled = true; root.rebuildItemsFromSources() }
+    onLoadFailed: { root.userMenuItems = []; root.userMenuSettled = true; root.rebuildItemsFromSources() }
+    onFileChanged: reload()
+  }
+
+  function parseCatalog(raw) {
+    try {
+      var parsed = JSON.parse(raw || "{}")
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : ({})
+    } catch (error) { return ({}) }
+  }
+
+  function setLanguage(raw) {
+    var code = String(raw || "").trim()
+    if (!/^[a-z]{2,3}(-[A-Za-z]{2})?$/.test(code)) code = "en"
+    if (root.language === code) return
+    root.language = code
+    menuCatalogFile.reload()
+  }
+
+  FileView {
+    id: languageFile
+    path: root.languagePath
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.setLanguage(text())
+    onLoadFailed: root.setLanguage("")
+    onFileChanged: reload()
+  }
+
+  FileView {
+    id: menuCatalogFile
+    path: root.omarchyPath + "/default/i18n/" + root.language + "/menu.json"
+    watchChanges: true
+    printErrors: false
+    onLoaded: { root.menuCatalog = root.parseCatalog(text()); root.rebuildItemsFromSources(true) }
+    onLoadFailed: { root.menuCatalog = ({}); root.rebuildItemsFromSources(true) }
     onFileChanged: reload()
   }
 
@@ -110,7 +162,7 @@ Item {
     if (guardProc.running) { root.guardsPending = true; return }
     root.guardsPending = false
     var script = MenuModel.guardScript(root.items)
-    if (!script) { root.whenResults = ({}); root.checkedResults = ({}); return }
+    if (!script) { root.whenResults = ({}); root.checkedResults = ({}); root.disabledResults = ({}); return }
     guardProc.collected = ""
     guardProc.command = ["bash", "-lc", script]
     guardProc.running = true
@@ -125,7 +177,7 @@ Item {
         if (root.guardsPending) Qt.callLater(function() { root.evaluateGuards() })
         return
       }
-      var nextWhen = ({}), nextChecked = ({})
+      var nextWhen = ({}), nextChecked = ({}), nextDisabled = ({})
       var lines = guardProc.collected.split("\n")
       for (var i = 0; i < lines.length; i++) {
         var line = lines[i].trim()
@@ -139,9 +191,11 @@ Item {
         var id = rest.substring(0, tagAt), tag = rest.substring(tagAt + 1)
         if (tag === "w") nextWhen[id] = value
         else if (tag === "c") nextChecked[id] = value
+        else if (tag === "d") nextDisabled[id] = value
       }
       root.whenResults = nextWhen
       root.checkedResults = nextChecked
+      root.disabledResults = nextDisabled
       if (root.host) root.host.requery({ provider: root.provider.id })
       if (root.guardsPending) Qt.callLater(function() { root.evaluateGuards() })
     }
@@ -184,7 +238,7 @@ Item {
       takenIds[rowId] = true
       providerRows.push({ id: rowId, parent: menuId, kind: "action", icon: (value === current) ? "✓" : (spec.icon || ""),
         label: label, title: "", target: "", description: "", action: spec.actionFor(value), provider: "",
-        aliases: [], when: "", checked: "", order: 0 })
+        aliases: [], searchTerms: parts[3] ? [parts[3]] : [], when: "", checked: "", order: 0 })
     }
     var merged = MenuModel.swapProviderRows(root.items, root.itemOrder, menuId, providerRows)
     root.items = merged.items
@@ -256,6 +310,8 @@ Item {
     if (!root.rowsLoaded) return { kind: "menu", id: "root" }
     var id = root.resolveRoute(input)
     var entry = root.items[id]
+    // 4.5 also gives Apps a dock action; Keystroke keeps its own Applications screen.
+    if (entry && entry.provider === "apps") return { kind: "apps" }
     if (entry && entry.kind === "action" && entry.action) return { kind: "action", action: entry.action, label: entry.label }
     if (entry && entry.kind === "link" && entry.target) { id = entry.target; entry = root.items[id] }
     if (entry && entry.provider === "apps") return { kind: "apps" }
@@ -288,7 +344,7 @@ Item {
     while (current && current.id !== "root" && guard < 32) { labels.unshift(current.label); current = root.item(current.parent); guard++ }
     var entry = root.item(id)
     hit = { labels: labels, path: labels.join(" › "), relative: ({}),
-            keywords: entry ? (entry.aliases.join(" ") + " " + MenuModel.searchableToken(MenuModel.leafIdFor(id))).trim() : "" }
+            keywords: entry ? (entry.aliases.concat(entry.searchTerms || []).join(" ") + " " + MenuModel.searchableToken(MenuModel.leafIdFor(id))).trim() : "" }
     root.pathCache[id] = hit
     return hit
   }
@@ -308,12 +364,13 @@ Item {
 
   function rowFor(entry, subtitle, score, confirmDestructive) {
     var action, verb
-    if (entry.kind === "action") {
-      action = { type: "shell", command: entry.action }
-      verb = "Run"
-    } else if (entry.provider === "apps") {
+    var disabled = MenuModel.isDisabled(root.disabledResults, entry)
+    if (entry.provider === "apps") {
       action = { type: "navigate", scope: "applications", title: "Applications" }
       verb = "Open"
+    } else if (entry.kind === "action") {
+      action = { type: "shell", command: entry.action }
+      verb = "Run"
     } else {
       var target = entry.kind === "link" ? entry.target : entry.id
       action = { type: "navigate", scope: "omarchy/" + target, title: entry.title || entry.label }
@@ -322,7 +379,8 @@ Item {
     return {
       id: entry.id, title: entry.label, subtitle: subtitle || "", icon: entry.icon || "\udb82\udcc7", iconFont: entry.iconFont || "",
       section: "Omarchy", verb: verb, tier: "item", score: score, order: entry.order,
-      accessory: entry.checked && root.checkedResults[entry.id] ? "✓" : "",
+      disabled: disabled,
+      accessory: disabled || (entry.checked && root.checkedResults[entry.id]) ? "✓" : "",
       remember: true, action: action, previewDetail: root.searchInfo(entry.id).path,
       path: root.searchInfo(entry.id).path, keywords: root.searchInfo(entry.id).keywords, description: entry.description,
       descriptionKey: [entry.action, entry.target, entry.provider].join("\u001f"),

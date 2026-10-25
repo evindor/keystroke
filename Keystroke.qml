@@ -10,6 +10,7 @@ import "ui"
 import "providers"
 import "voice"
 import "core"
+import "omarchy/MenuModel.js" as MenuModel
 import "core/Match.js" as Match
 import "core/Frecency.js" as Frecency
 import "core/Settings.js" as Settings
@@ -426,6 +427,12 @@ Item {
   readonly property bool dmenuActive: mode === "select" || mode === "input"
   property string dmenuPrompt: ""
   property var dmenuOptions: []
+  property bool dmenuMultiple: false
+  property var dmenuSelected: []
+  property var dmenuSaved: []
+  property var dmenuOnChange: []
+  property string dmenuChangeKey: ""
+  property int requestSerial: 0
   property string selectionFile: ""
   property string doneFile: ""
   property int dmenuWidth: 300
@@ -434,6 +441,13 @@ Item {
   property string fontFamily: Style.font.menuFamily
   property string scope: ""
   property string scopeTitle: ""
+  readonly property string displayedScopeTitle: {
+    if (root.scope.indexOf("omarchy/") === 0) {
+      var menu = providerRegistry.bundled[0].item(root.scope.substring(8))
+      if (menu) return menu.title || menu.label
+    }
+    return root.scopeTitle
+  }
   property var history: []
   property var rows: []
   property var uids: []
@@ -684,6 +698,7 @@ Item {
   }
 
   function openDmenu(payload) {
+    root.requestSerial += 1
     matchingSession.cancelRequest()
     root.closeProviderView()
     clipboardTransfer.cancel()
@@ -692,6 +707,14 @@ Item {
     root.mode = payload.mode === "input" ? "input" : "select"
     root.dmenuPrompt = String(payload.prompt || (root.mode === "input" ? "Input" : "Select"))
     root.dmenuOptions = Array.isArray(payload.options) ? payload.options : []
+    root.dmenuMultiple = root.mode === "select" && payload.multiple === true
+    root.dmenuOnChange = root.dmenuMultiple && Array.isArray(payload.onChange)
+      && payload.onChange.every(function(arg) { return typeof arg === "string" }) ? payload.onChange : []
+    root.dmenuChangeKey = String(payload.changeKey || JSON.stringify(root.dmenuOnChange))
+    root.dmenuSelected = MenuModel.dmenuSelections(root.dmenuOptions, Array.isArray(payload.selected) ? payload.selected : [], root.dmenuOnChange.length > 0)
+    root.dmenuSaved = root.dmenuSelected
+    if (root.dmenuOnChange.length > 0)
+      root.dmenuSelected = MenuModel.dmenuSelections(root.dmenuOptions, selectionProc.requestedSelection(), true)
     root.selectionFile = String(payload.selectionFile || "")
     root.doneFile = String(payload.doneFile || "")
     root.requestActive = !!root.doneFile
@@ -708,6 +731,66 @@ Item {
     root.opened = true
     root.runQuery()
     Qt.callLater(function() { search.forceActiveFocus() })
+  }
+
+  Process {
+    id: selectionProc
+    property int serial: 0
+    property string changeKey: ""
+    property var selected: []
+    property var queue: []
+    property string collected: ""
+
+    function requestedSelection() {
+      for (var i = queue.length - 1; i >= 0; i--) {
+        if (queue[i].key === root.dmenuChangeKey) return queue[i].selected
+      }
+      if (running && changeKey === root.dmenuChangeKey) return selected
+      return root.dmenuSelected
+    }
+
+    function enqueue(values) {
+      var selected = MenuModel.dmenuSelections(root.dmenuOptions, values, true)
+      queue = queue.concat([{
+        serial: root.requestSerial, key: root.dmenuChangeKey, selected: selected,
+        command: root.dmenuOnChange.concat([JSON.stringify(selected)])
+      }])
+      if (!running) startNext()
+    }
+
+    function startNext() {
+      if (queue.length === 0) return
+      var change = queue[0]
+      queue = queue.slice(1)
+      serial = change.serial
+      changeKey = change.key
+      selected = change.selected
+      collected = ""
+      command = change.command
+      running = true
+    }
+
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: selectionProc.collected = text
+    }
+    onExited: function(exitCode) {
+      if (changeKey === root.dmenuChangeKey && root.dmenuActive && root.dmenuOnChange.length > 0) {
+        if (exitCode === 0) {
+          var applied = selected
+          if (collected.trim()) {
+            try { applied = JSON.parse(collected) } catch (error) { applied = root.dmenuSelected }
+          }
+          if (Array.isArray(applied))
+            root.dmenuSelected = MenuModel.dmenuSelections(root.dmenuOptions, applied, true)
+          root.dmenuSaved = root.dmenuSelected
+        } else {
+          root.dmenuSelected = root.dmenuSaved
+        }
+        root.runQuery()
+      }
+      startNext()
+    }
   }
 
   function finishRequest(selection) {
@@ -1002,14 +1085,20 @@ Item {
   function dmenuRows() {
     if (root.mode === "input") return []
     var q = search.text.trim().toLowerCase(), rows = []
+    if (root.dmenuMultiple && root.dmenuOnChange.length === 0) {
+      rows.push({ id: "apply", uid: "dmenu/apply", title: "Apply", subtitle: root.dmenuSelected.length + " selected",
+                  icon: "", iconFont: "", iconSource: "", tint: "", section: "", verb: "Apply", tier: "item", score: 1,
+                  order: -1, accessory: "", badge: "", altVerb: "", disabled: false, remember: false, confirm: "", providerKey: "dmenu", value: "" })
+    }
     for (var i = 0; i < root.dmenuOptions.length; i++) {
       var parts = String(root.dmenuOptions[i] || "").split("\t")
       var icon = parts.length > 1 ? parts.shift() : ""
       var label = parts.shift() || ""
       var detail = parts.join("\t")
+      if (root.dmenuMultiple) icon = root.dmenuSelected.indexOf(MenuModel.dmenuValue(root.dmenuOptions[i])) >= 0 ? "✓" : "○"
       if (q && label.toLowerCase().indexOf(q) < 0 && detail.toLowerCase().indexOf(q) < 0) continue
       rows.push({ id: String(i), uid: "dmenu/" + i, title: label, subtitle: detail, icon: icon, iconFont: "", iconSource: "", tint: "",
-                  section: "", verb: "Select", tier: "item", score: 1, order: i, accessory: "", badge: "", altVerb: "", disabled: false,
+                  section: "", verb: root.dmenuMultiple ? "Toggle" : "Select", tier: "item", score: 1, order: i, accessory: "", badge: "", altVerb: "", disabled: false,
                   remember: false, confirm: "", providerKey: "dmenu", value: detail ? label + "\t" + detail : label })
     }
     return rows
@@ -1159,7 +1248,17 @@ Item {
     if (debounce.running || refresh.running) root.runQuery()
     if (root.dmenuActive) {
       if (root.mode === "input") { root.applyDmenuSelection(search.text); return }
-      if (root.rows.length) { root.flash(root.current.uid); root.applyDmenuSelection(root.current.value) }
+      if (root.rows.length) {
+        if (root.dmenuMultiple) {
+          if (root.current.id === "apply") {
+            root.applyDmenuSelection(JSON.stringify(MenuModel.dmenuSelections(root.dmenuOptions, root.dmenuSelected)))
+          } else {
+            var selected = MenuModel.toggleDmenuSelection(selectionProc.requestedSelection(), root.current.value)
+            if (root.dmenuOnChange.length > 0) selectionProc.enqueue(selected)
+            else { root.dmenuSelected = selected; root.runQuery() }
+          }
+        } else { root.flash(root.current.uid); root.applyDmenuSelection(root.current.value) }
+      }
       return
     }
     var row = root.current
@@ -1462,7 +1561,7 @@ Item {
           Text {
             anchors.fill: parent
             verticalAlignment: Text.AlignVCenter
-            text: root.dictationMode ? "Speak or edit your dictation…" : root.dmenuActive ? root.dmenuPrompt + "…" : root.scope ? "Search " + root.scopeTitle.toLowerCase() + "…" : "What would you like to do?"
+            text: root.dictationMode ? "Speak or edit your dictation…" : root.dmenuActive ? root.dmenuPrompt + "…" : root.scope ? "Search " + root.displayedScopeTitle.toLowerCase() + "…" : "What would you like to do?"
             color: Util.alpha(root.foreground, 0.42)
             font: parent.font
             visible: !parent.text && !parent.preeditText && !voice.active
@@ -1556,7 +1655,7 @@ Item {
           elide: Text.ElideRight
           // The hint line: a recognised command names its action and the
           // argument the caret is on; the empty root says how to list them.
-          text: root.scope ? root.scopeTitle : root.commandHint ? root.commandHint : search.text ? "Search results" : "Apps, commands, answers · / lists what you can type"
+          text: root.scope ? root.displayedScopeTitle : root.commandHint ? root.commandHint : search.text ? "Search results" : "Apps, commands, answers · / lists what you can type"
           textFormat: Text.PlainText
           color: root.muted; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
         }

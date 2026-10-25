@@ -32,4 +32,22 @@ TestCase {
         verify(MenuModel.pathFor(items, "a").length > 0)
         verify(!MenuModel.isDescendantOf(items, "a", "zzz"))
     }
+    function test_multi_selection_values_and_order() {
+        var options = ["x\tOne\tid1", "Two", "x\tOne\tid2"]
+        compare(MenuModel.dmenuValue(options[0]), "One\tid1")
+        compare(MenuModel.dmenuSelections(options, ["Two", "unknown", "One\tid1", "Two"]), ["One\tid1", "Two"])
+        compare(MenuModel.dmenuSelections(options, ["Two", "One\tid1"], true), ["Two", "One\tid1"])
+        compare(MenuModel.toggleDmenuSelection(["Two"], "Two"), [])
+        compare(MenuModel.toggleDmenuSelection([], "Two"), ["Two"])
+    }
+    function test_translation_fallback_and_search_only_english() {
+        var original = MenuModel.parseMenuJsonc(JSON.stringify({"setup.language": {label: "Language", description: "Choose language"}}))
+        var translated = MenuModel.applyTranslations(original, {"setup.language": {label: "Sprache"}})
+        compare(original[0].label, "Language")
+        compare(translated[0].label, "Sprache")
+        compare(translated[0].description, "Choose language")
+        compare(translated[0].searchTerms, ["Language"])
+        compare(translated[0].aliases, [])
+        compare(MenuModel.applyTranslations(original, {})[0].label, "Language")
+    }
 }
