@@ -1,0 +1,30 @@
+{
+  "name": "Spell check",
+  "version": "1.0.0",
+  "author": "dev-ahad-ali",
+  "description": "Check the spelling of one English word: spell tresspass",
+  "apiVersion": 1,
+  "icon": "󰓆",
+  "color": "#c586c0",
+  "license": "MIT",
+  "commands": [
+    {
+      "id": "spell",
+      "prefix": "spell",
+      "title": "Check the spelling",
+      "summary": "Suggestions for one English word; Enter copies, Ctrl+Enter pastes",
+      "args": [
+        {
+          "name": "word",
+          "hint": "the word you are not sure of",
+          "rest": true
+        }
+      ],
+      "examples": [
+        "spell tresspass",
+        "spell recieve",
+        "spell suceed"
+      ]
+    }
+  ]
+}
