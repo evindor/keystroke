@@ -1,31 +1,27 @@
 {
   "name": "Raycast",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "T3lluz",
-  "description": "Install and run extensions from the Raycast store: ray dad jokes",
+  "description": "Extensions from the Raycast store: raycast extension",
   "apiVersion": 1,
   "icon": "󰏓",
   "color": "#f36b4a",
   "license": "MIT",
-  "setup": {
-    "run": "bin/setup",
-    "summary": "Installs the pinned react and react-reconciler packages from the npm registry into ~/.local/share/keystroke/raycast/runtime. npm ci checks the lockfile hashes. Nothing else is downloaded."
-  },
   "commands": [
     {
       "id": "raycast",
-      "prefix": "ray",
-      "title": "Raycast extensions",
-      "summary": "Search the Raycast store, install an extension, and run its commands",
+      "prefix": "raycast",
+      "title": "Raycast Extensions",
+      "summary": "The Raycast store, as a list",
       "args": [
         {
           "name": "search",
-          "hint": "an extension or command",
+          "hint": "filter the list",
           "optional": true,
           "rest": true
         }
       ],
-      "examples": ["ray dad jokes", "ray hacker news", "ray"]
+      "examples": ["raycast extension", "raycast extensions", "raycast dad jokes"]
     }
   ]
 }

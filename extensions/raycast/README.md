@@ -1,8 +1,6 @@
 # Raycast
 
-Install an extension from the [Raycast store](https://www.raycast.com/store) and run it inside Keystroke. Enable **Extensions → Raycast**, run **Run setup** once, then type `ray dad jokes` and install **Dad Jokes**. Enter on **Random Dad Joke** opens it in the palette.
-
-`ray` with nothing after it lists what you have installed and the first page of the store. A query searches `https://backend.raycast.com/api/v1/store_listings/search`. Enter installs. On the Raycast screen, **Uninstall** removes a bundle you already downloaded. Installed commands also show up in the main palette when your query matches their name, so the next time you can type `dad` instead of `ray`.
+Type `raycast extension` and the Raycast store is the list. There is no setup step. Enter installs the one you pick. A word after that filters the list: `raycast dad jokes`. Installed commands also show up from the root when the name matches, so the next time `dad` is enough.
 
 Inside a command:
 
@@ -27,12 +25,8 @@ Paste uses Keystroke's `bin/keystroke-paste` when this folder is the shipped ext
 
 ## Limits and dependencies
 
-Nothing runs while the extension is off. Turning it on runs `bin/host status`, which reads the extensions directory and, if the cache is stale, fetches the Vicinae compatibility sheet.
+The store list is requested when you type `raycast extension` (or open the Raycast screen). That sends the filter, if you typed one, to `backend.raycast.com`. Installing downloads the zip from the URL in that response, only when the host is `raycast.com` or `raycast-releases.com`. Opening a command runs it in this shell, with your permissions, unsandboxed, same as every other Keystroke extension.
 
-`ray`, or the Raycast screen, then requests the store. That sends your search text to `backend.raycast.com`. Installing downloads the zip from the URL in that response, only when the host is `raycast.com` or `raycast-releases.com`. Extra npm dependencies other than `@raycast/api` and `@raycast/utils` are installed with `npm install --ignore-scripts` into that extension's folder. Opening a command starts `node` and runs the extension's JavaScript in this shell, with your permissions, unsandboxed, same as every other Keystroke extension.
-
-**Run setup** copies `host/runtime-package.json` and the lockfile to `~/.local/share/keystroke/raycast/runtime` and runs `npm ci --omit=dev --ignore-scripts`. The lockfile pins `react@19.2.0` and `react-reconciler@0.31.0`; `npm ci` checks the registry hashes. Node.js 20 or newer has to be on `PATH` already. Setup does not use sudo and does not write inside the plugin folder.
-
-Also used, and not downloaded by setup: `python3` (to unpack the zip), `npm`, `wl-copy`, `wl-paste`, `xdg-open`, and either `wtype` or Keystroke's paste helper.
+`host/dist/host.js` is the runner, with React already inside it. Nothing else has to be installed for the list or for an extension that only needs `@raycast/api`. Node.js has to be on `PATH`, which it is on this machine. An extension with other npm dependencies gets those with `npm install --ignore-scripts` into its own folder at install time. Unpacking uses `python3`. Copy and paste use `wl-copy`, `wl-paste`, and `wtype` or Keystroke's paste helper. `xdg-open` opens links.
 
 Preferences are the defaults from `package.json`, overridden by `preferences.json` in the extension directory if you create one. There is no preferences screen.

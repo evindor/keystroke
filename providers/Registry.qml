@@ -107,7 +107,11 @@ Item {
     root.manifests = found.manifests
     root.sync(true)
   }
-  function switchedOn(id) { return Settings.isEnabled(root.host ? root.host.config : null, ["providers", id], false) }
+  function switchedOn(id) {
+    // The Raycast store is part of the palette, the way Vicinae's is. The
+    // switch still exists, so it can be turned off.
+    return Settings.isEnabled(root.host ? root.host.config : null, ["providers", id], id === "raycast")
+  }
 
   // Reconcile the services with the manifests and the switches: create what
   // is on and not running, destroy what is off or gone, keep the rest.

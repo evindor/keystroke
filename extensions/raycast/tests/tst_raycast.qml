@@ -59,13 +59,21 @@ TestCase {
         compare(removal.confirmText, "Uninstall")
     }
 
-    function test_setup_blocks_the_store_until_node_is_ready() {
-        var rows = Raycast.rows({ ready: true, runtime: false, nodeOk: true, inCommand: true, commandRest: "dad" })
-        compare(rows.length, 1)
-        compare(rows[0].id, "need-setup")
-        compare(rows[0].disabled, true)
-        var starting = Raycast.rows({ ready: false, inCommand: true, commandRest: "dad" })
-        compare(starting[0].id, "starting")
+    function test_raycast_extension_is_the_store_list() {
+        compare(Raycast.storeSearchText("extension"), "")
+        compare(Raycast.storeSearchText("extensions"), "")
+        compare(Raycast.storeSearchText("extension dad jokes"), "dad jokes")
+        var rows = Raycast.rows({
+            inCommand: true, commandRest: "extension", installed: installed(),
+            store: [
+                { name: "dad-jokes", title: "Dad Jokes", description: "Jokes", handle: "someone" },
+                { name: "gif-search", title: "GIF Search", description: "GIFs", handle: "someone" }
+            ]
+        })
+        compare(rows.length, 2)
+        compare(rows[0].title, "Dad Jokes")
+        compare(rows[0].section, "Raycast Extensions")
+        compare(rows[1].title, "GIF Search")
     }
 
     function test_flatten_keeps_section_headers() {

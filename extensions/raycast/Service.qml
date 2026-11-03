@@ -3,9 +3,8 @@ import Quickshell
 import Quickshell.Io
 import "core/Raycast.js" as Raycast
 
-// Raycast store extensions. Off until the user turns it on. Search hits
-// backend.raycast.com only after `ray` or this screen is open, and an
-// extension's code runs only after they install it and open a command.
+// Raycast store. Typing "raycast extension" lists the store. Nothing is
+// installed ahead of time: the host bundle already includes React.
 QtObject {
   id: root
   property var shell: null
@@ -72,10 +71,7 @@ QtObject {
       installed: root.installed,
       store: root.storeHits,
       searching: root.searching,
-      searchError: root.searchError,
-      runtime: root.runtime,
-      nodeOk: root.nodeOk,
-      ready: root.statusDone
+      searchError: root.searchError
     })
   }
 
@@ -110,13 +106,16 @@ QtObject {
   function note(ctx) {
     var scoped = ctx && (ctx.scope === root.key || String(ctx.scope || "").indexOf(root.key + "/") === 0)
     var prompted = scoped || !!(ctx && ctx.command)
-    if (!prompted || !root.runtime || !root.nodeOk) return
-    var text = scoped ? String(ctx.query || "").trim() : String(ctx.command && ctx.command.rest || "").trim()
+    if (!prompted) return
+    var raw = scoped ? String(ctx.query || "").trim() : String(ctx.command && ctx.command.rest || "").trim()
+    var text = Raycast.storeSearchText(raw)
     if (text === root.wanted) return
     root.wanted = text
     root.storeHits = []
     root.searchError = ""
-    root.debounce.restart()
+    root.searching = true
+    if (!text) root.runSearch()
+    else root.debounce.restart()
   }
 
   function requery() {
@@ -132,21 +131,15 @@ QtObject {
   }
 
   function applyStatus() {
-    var parsed = root.parse(root.statusBody)
     root.statusDone = true
-    if (!parsed || parsed.ok === false) {
-      root.nodeOk = false
-      root.runtime = false
-      root.banner = (parsed && parsed.error) || "Could not start the Raycast host"
-      return
-    }
+    var parsed = root.parse(root.statusBody)
+    if (!parsed || parsed.ok === false) return
     root.nodeOk = true
-    root.runtime = !!parsed.runtime
     root.installed = parsed.extensions || []
   }
 
   function runSearch() {
-    if (!root.runtime || !root.nodeOk) return
+    if (!root.hostBin) return
     if (searchProc.running) { root.searchAgain = true; return }
     root.searching = true
     root.searchBody = ""

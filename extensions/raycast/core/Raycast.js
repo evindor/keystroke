@@ -93,7 +93,7 @@ function storeRows(store, installed) {
       title: ext.title || name,
       subtitle: ext.description || name,
       icon: ICON,
-      section: "Raycast store",
+      section: "Raycast Extensions",
       verb: installedHere ? "Open" : "Install",
       tier: "item",
       order: i,
@@ -147,49 +147,32 @@ function uninstallRows(installed) {
   return rows
 }
 
-function blocker(nodeOk, runtime) {
-  return {
-    id: runtime ? "need-node" : "need-setup",
-    title: nodeOk ? "Set up Raycast" : "Node.js 20 or newer is required",
-    subtitle: nodeOk
-      ? "Open Extensions, then Raycast, then Run setup"
-      : "Install Node.js, then Run setup on the Raycast extension",
-    icon: ICON,
-    section: "Raycast",
-    disabled: true,
-    score: 100,
-    tier: "item"
-  }
+// "raycast extension" is the store itself, not a search for the word extension.
+function storeSearchText(text) {
+  var t = String(text || "").trim()
+  if (!t || /^(extensions?|store)$/i.test(t)) return ""
+  return t.replace(/^(extensions?|store)\s+/i, "").trim()
 }
 
-// input: { scope, query, commandRest, inCommand, installed, store, searching, searchError, runtime, nodeOk }
+// input: { scope, query, commandRest, inCommand, installed, store, searching, searchError }
 function rows(input) {
   var src = input || {}
   var scope = String(src.scope || "")
   var scoped = scope === "raycast" || scope.indexOf("raycast/") === 0
   var prompted = scoped || !!src.inCommand
-  var needle = scoped ? String(src.query || "").trim() : (src.inCommand ? String(src.commandRest || "").trim() : String(src.query || "").trim())
-  if (!prompted && !needle) return []
-  if (!src.ready) {
-    if (!prompted) return []
-    return [{
-      id: "starting", title: "Starting Raycast", subtitle: "Checking Node", icon: ICON, section: "Raycast",
-      disabled: true, score: 100, tier: "item"
-    }]
+  var needle = storeSearchText(scoped ? src.query : (src.inCommand ? src.commandRest : src.query))
+  if (!prompted) {
+    if (!String(src.query || "").trim()) return []
+    return commandRows(src.installed, needle, false)
   }
-  if (!src.runtime || !src.nodeOk) {
-    if (!prompted) return []
-    return [blocker(!!src.nodeOk, !!src.runtime)]
-  }
-  var out = commandRows(src.installed, needle, prompted)
-  if (!prompted) return out
+  var out = []
   if (src.searchError) {
     out.push({
       id: "store-error",
       title: "Raycast store unavailable",
       subtitle: String(src.searchError),
       icon: ICON,
-      section: "Raycast store",
+      section: "Raycast Extensions",
       disabled: true,
       score: 60,
       tier: "item"
@@ -200,7 +183,7 @@ function rows(input) {
       title: needle ? "Searching the Raycast store" : "Loading the Raycast store",
       subtitle: needle,
       icon: ICON,
-      section: "Raycast store",
+      section: "Raycast Extensions",
       disabled: true,
       score: 60,
       tier: "item"
@@ -211,7 +194,7 @@ function rows(input) {
       title: "No store extensions match",
       subtitle: needle,
       icon: ICON,
-      section: "Raycast store",
+      section: "Raycast Extensions",
       disabled: true,
       score: 60,
       tier: "item"

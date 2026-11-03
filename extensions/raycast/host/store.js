@@ -131,7 +131,7 @@ async function search(query, extensionsDir, compat) {
   const q = String(query || "").trim();
   const url = q
     ? API + "/store_listings/search?q=" + encodeURIComponent(q).replace(/%20/g, "+")
-    : API + "/store_listings?page=1&per_page=24";
+    : API + "/store_listings?page=1&per_page=50";
   const payload = await getJson(url);
   const data = Array.isArray(payload) ? payload : payload.data || [];
   const installed = installedNames(extensionsDir);
