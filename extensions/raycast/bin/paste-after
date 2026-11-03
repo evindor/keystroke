@@ -1,0 +1,9 @@
+#!/bin/sh
+# The palette has already copied the text and is closing. Wait until it has
+# released the keyboard, then paste into the window that comes back.
+sleep 0.2
+helper=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/../../bin/keystroke-paste
+if [ -x "$helper" ]; then
+  exec "$helper"
+fi
+exec wtype -M ctrl -k v -m ctrl

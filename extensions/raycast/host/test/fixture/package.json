@@ -1,0 +1,5 @@
+{
+  "name": "hello",
+  "title": "Hello",
+  "commands": [{ "name": "hello", "title": "Hello", "mode": "view" }]
+}

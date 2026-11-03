@@ -1,0 +1,9 @@
+#!/bin/sh
+# Run the Raycast host with the runtime installed by bin/setup.
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+data=${XDG_DATA_HOME:-"$HOME/.local/share"}/keystroke/raycast/runtime/node_modules
+if [ -d "$data" ]; then
+  export NODE_PATH="$data${NODE_PATH:+:$NODE_PATH}"
+fi
+exec node "$here/../host/cli.js" "$@"

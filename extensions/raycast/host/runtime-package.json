@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "name": "keystroke-raycast-runtime",
+  "description": "Pinned React runtime for the Keystroke Raycast host. Installed by bin/setup into the user data directory.",
+  "dependencies": {
+    "react": "19.2.0",
+    "react-reconciler": "0.31.0"
+  }
+}
