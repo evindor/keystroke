@@ -1,0 +1,18 @@
+{
+  "name": "ITT: Improve This Text",
+  "version": "1.0.0",
+  "author": "Victor Arocha",
+  "description": "Improve This Text with OpenAI, Grok, or the Omarchy default agent",
+  "apiVersion": 1,
+  "icon": "󰏫",
+  "color": "#8bceb4",
+  "commands": [
+    {
+      "id": "itt",
+      "prefix": "itt",
+      "title": "Improve This Text",
+      "summary": "Improve the selected text or enter text manually",
+      "examples": ["itt"]
+    }
+  ]
+}
